@@ -183,6 +183,110 @@ def _seed_demo_user(conn: sqlite3.Connection) -> None:
         (bid, uid, "My bookshelf"),
     )
 
+    markdown_syntax_page = """# Markdown basic syntax
+
+Official reference: [Markdown Guide — Basic Syntax](https://www.markdownguide.org/basic-syntax/)
+
+The examples below follow the same ideas as that guide (headings, emphasis, lists, links, code, and more).
+
+---
+
+## Headings
+
+# Heading level 1
+## Heading level 2
+### Heading level 3
+#### Heading level 4
+
+---
+
+## Paragraphs and line breaks
+
+Separate paragraphs with a blank line.
+
+End a line with two spaces before a newline for a soft line break  
+like this (two trailing spaces on the previous line).
+
+---
+
+## Emphasis
+
+**Bold** with `**double asterisks**` or `__double underscores__`.
+
+*Italic* with `*single asterisks*` or `_single underscores_`.
+
+***Bold and italic*** with three asterisks.
+
+---
+
+## Blockquotes
+
+> This is a blockquote.
+>
+> It can span multiple lines.
+
+---
+
+## Lists
+
+Unordered:
+
+- First item
+- Second item
+  - Nested item
+  - Another nested item
+
+Ordered:
+
+1. First item
+2. Second item
+3. Third item
+
+---
+
+## Code
+
+Inline: `const x = 1;`
+
+Fenced block:
+
+```
+function hello() {
+  console.log("Hello");
+}
+```
+
+---
+
+## Horizontal rule
+
+Three or more asterisks, dashes, or underscores on their own line:
+
+---
+
+## Links
+
+[Markdown Guide](https://www.markdownguide.org/basic-syntax/ "Basic syntax — Markdown Guide")
+
+Autolink style: <https://www.markdownguide.org/basic-syntax/>
+
+---
+
+## Images
+
+![Alt text describes the image](https://picsum.photos/seed/md-demo/400/240 "Optional title")
+
+---
+
+## Escaping
+
+Use a backslash to show literal formatting characters: \\*not italic\\*
+
+---
+
+*Tip: bookmark [Basic Syntax](https://www.markdownguide.org/basic-syntax/) for the full tables and best-practice notes.*
+"""
+
     demos: list[tuple[str, str, str, str]] = [
         (
             "nb-demo-welcome",
@@ -199,6 +303,12 @@ def _seed_demo_user(conn: sqlite3.Connection) -> None:
             "# Sandbox\n\n"
             "Use this notebook to try Markdown, diagrams, and anything else. "
             "Add sections and pages from the sidebar.\n",
+        ),
+        (
+            "nb-demo-markdown",
+            "Markdown basics",
+            "Basic syntax",
+            markdown_syntax_page,
         ),
     ]
     for nb_id, nb_title, page_title, page_md in demos:
