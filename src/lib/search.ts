@@ -192,7 +192,7 @@ export function searchNotes(
   }
 
   // global
-  for (const nb of state.notebooks) {
+  for (const nb of state.notebooks.filter((n) => !n.archived)) {
     if (matches(nb.title, q)) {
       pushNotebook(nb.id, nb.title);
     }

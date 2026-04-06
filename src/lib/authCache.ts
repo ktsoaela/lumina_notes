@@ -2,6 +2,7 @@ import type { AuthState, User } from '../types';
 
 const TOKEN_KEY = 'lumina_token';
 const USER_KEY = 'lumina_user_cache';
+const BOOKSHELF_KEY = 'lumina_active_bookshelf_id';
 
 /** JWT — same key as `api.ts` Authorization header. */
 export function readToken(): string | null {
@@ -37,9 +38,27 @@ export function writeSession(user: User, token: string) {
   localStorage.setItem(USER_KEY, JSON.stringify(user));
 }
 
+export function readActiveBookshelfId(): string | null {
+  try {
+    return localStorage.getItem(BOOKSHELF_KEY);
+  } catch {
+    return null;
+  }
+}
+
+export function writeActiveBookshelfId(id: string | null) {
+  try {
+    if (id) localStorage.setItem(BOOKSHELF_KEY, id);
+    else localStorage.removeItem(BOOKSHELF_KEY);
+  } catch {
+    /* ignore */
+  }
+}
+
 export function clearSession() {
   localStorage.removeItem(TOKEN_KEY);
   localStorage.removeItem(USER_KEY);
+  localStorage.removeItem(BOOKSHELF_KEY);
 }
 
 export function getInitialAuthState(): AuthState {

@@ -129,9 +129,9 @@ export function SearchPanel({ open, onClose, state, onNavigate }: SearchPanelPro
             exit={{ opacity: 0, y: -8, scale: 0.98 }}
             transition={{ type: 'spring', damping: 26, stiffness: 320 }}
           >
-            <div className="rounded-2xl border border-gray-200 bg-white shadow-2xl shadow-purple-900/10 overflow-hidden">
-              <div className="flex items-center gap-2 border-b border-gray-100 px-3 py-2">
-                <Search className="w-4 h-4 shrink-0 text-gray-400" />
+            <div className="overflow-hidden rounded-2xl border border-[var(--app-border)] bg-[var(--app-surface)] text-[var(--app-fg)] shadow-2xl shadow-brand-900/20 dark:shadow-black/40">
+              <div className="flex items-center gap-2 border-b border-[var(--app-border)] px-3 py-2">
+                <Search className="h-4 w-4 shrink-0 text-gray-400 dark:text-[var(--app-muted)]" />
                 <input
                   ref={inputRef}
                   value={query}
@@ -153,19 +153,19 @@ export function SearchPanel({ open, onClose, state, onNavigate }: SearchPanelPro
                     }
                   }}
                   placeholder="Search notebook, section, or page…"
-                  className="min-w-0 flex-1 bg-transparent py-2 text-sm text-gray-900 placeholder:text-gray-400 focus:outline-none"
+                  className="min-w-0 flex-1 bg-transparent py-2 text-sm text-[var(--app-fg)] placeholder:text-gray-400 focus:outline-none dark:placeholder:text-[var(--app-muted)]"
                 />
                 <button
                   type="button"
                   onClick={onClose}
-                  className="rounded-lg p-1.5 text-gray-400 hover:bg-gray-100 hover:text-gray-600"
+                  className="rounded-lg p-1.5 text-gray-400 hover:bg-gray-100 hover:text-gray-600 dark:text-[var(--app-muted)] dark:hover:bg-[var(--app-bg)] dark:hover:text-[var(--app-fg)]"
                 >
                   <X className="w-4 h-4" />
                 </button>
               </div>
 
-              <div className="flex flex-wrap items-center gap-1.5 px-3 py-2 bg-gray-50/80 border-b border-gray-100">
-                <span className="text-[10px] font-semibold uppercase tracking-wider text-gray-400 mr-1">
+              <div className="flex flex-wrap items-center gap-1.5 border-b border-[var(--app-border)] bg-gray-50/80 px-3 py-2 dark:bg-[var(--app-bg)]/85">
+                <span className="mr-1 text-[10px] font-semibold uppercase tracking-wider text-gray-400 dark:text-[var(--app-muted)]">
                   Scope
                 </span>
                 {SCOPES.map(({ id, icon }) => {
@@ -182,8 +182,8 @@ export function SearchPanel({ open, onClose, state, onNavigate }: SearchPanelPro
                       className={cn(
                         'inline-flex items-center gap-1 rounded-lg px-2 py-1 text-[11px] font-medium transition-colors',
                         active
-                          ? 'bg-purple-600 text-white'
-                          : 'bg-white text-gray-600 ring-1 ring-gray-200 hover:bg-gray-50',
+                          ? 'bg-brand-600 text-white'
+                          : 'bg-white text-gray-600 ring-1 ring-gray-200 hover:bg-gray-50 dark:bg-[var(--app-surface)] dark:text-[var(--app-fg)] dark:ring-[var(--app-border)] dark:hover:bg-[var(--app-bg)]',
                         disabled && 'opacity-40 cursor-not-allowed'
                       )}
                     >
@@ -196,12 +196,12 @@ export function SearchPanel({ open, onClose, state, onNavigate }: SearchPanelPro
 
               <div className="max-h-[min(50vh,360px)] overflow-y-auto py-1">
                 {!query.trim() && (
-                  <p className="px-4 py-8 text-center text-xs text-gray-400">
+                  <p className="px-4 py-8 text-center text-xs text-gray-400 dark:text-[var(--app-muted)]">
                     Type a query to search {scopeLabel(scope).toLowerCase()}.
                   </p>
                 )}
                 {query.trim() && results.length === 0 && (
-                  <p className="px-4 py-8 text-center text-xs text-gray-500">
+                  <p className="px-4 py-8 text-center text-xs text-gray-500 dark:text-[var(--app-muted)]">
                     No matches.
                   </p>
                 )}
@@ -211,29 +211,31 @@ export function SearchPanel({ open, onClose, state, onNavigate }: SearchPanelPro
                     type="button"
                     onClick={() => applyResult(r)}
                     className={cn(
-                      'flex w-full flex-col gap-0.5 px-4 py-2.5 text-left text-sm transition-colors border-b border-gray-50 last:border-0',
-                      i === selected ? 'bg-purple-100' : 'hover:bg-purple-50'
+                      'flex w-full flex-col gap-0.5 px-4 py-2.5 text-left text-sm transition-colors border-b border-[var(--app-border)] last:border-0',
+                      i === selected
+                        ? 'bg-brand-100 dark:bg-brand-900/40'
+                        : 'hover:bg-brand-50 dark:hover:bg-[var(--app-surface)]'
                     )}
                   >
                     <div className="flex items-center gap-2 min-w-0">
                       {r.kind === 'notebook' && (
-                        <Book className="w-3.5 h-3.5 shrink-0 text-purple-600" />
+                        <Book className="w-3.5 h-3.5 shrink-0 text-brand-600 dark:text-brand-400" />
                       )}
                       {r.kind === 'section' && (
-                        <Hash className="w-3.5 h-3.5 shrink-0 text-purple-600" />
+                        <Hash className="w-3.5 h-3.5 shrink-0 text-brand-600 dark:text-brand-400" />
                       )}
                       {r.kind === 'page' && (
-                        <FileText className="w-3.5 h-3.5 shrink-0 text-purple-600" />
+                        <FileText className="w-3.5 h-3.5 shrink-0 text-brand-600 dark:text-brand-400" />
                       )}
-                      <span className="font-medium text-gray-900 truncate">{r.label}</span>
+                      <span className="truncate font-medium text-gray-900 dark:text-[var(--app-fg)]">{r.label}</span>
                     </div>
                     {'breadcrumb' in r && r.breadcrumb && (
-                      <span className="pl-5 text-[10px] text-gray-500 truncate">
+                      <span className="truncate pl-5 text-[10px] text-gray-500 dark:text-[var(--app-muted)]">
                         {r.breadcrumb}
                       </span>
                     )}
                     {r.snippet && r.kind === 'page' && (
-                      <span className="pl-5 text-[11px] text-gray-500 line-clamp-2 font-mono">
+                      <span className="line-clamp-2 pl-5 font-mono text-[11px] text-gray-500 dark:text-[var(--app-muted)]">
                         {r.snippet}
                       </span>
                     )}
@@ -241,14 +243,25 @@ export function SearchPanel({ open, onClose, state, onNavigate }: SearchPanelPro
                 ))}
               </div>
 
-              <div className="flex items-center justify-between border-t border-gray-100 px-3 py-2 text-[10px] text-gray-400 bg-gray-50/50">
+              <div className="flex items-center justify-between border-t border-[var(--app-border)] bg-gray-50/50 px-3 py-2 text-[10px] text-gray-400 dark:bg-[var(--app-bg)]/70 dark:text-[var(--app-muted)]">
                 <span>
-                  <kbd className="rounded border border-gray-200 bg-white px-1 font-mono">↑</kbd>
-                  <kbd className="rounded border border-gray-200 bg-white px-1 font-mono">↓</kbd> move ·{' '}
-                  <kbd className="rounded border border-gray-200 bg-white px-1 font-mono">Enter</kbd> open
+                  <kbd className="rounded border border-gray-200 bg-white px-1 font-mono text-gray-700 dark:border-[var(--app-border)] dark:bg-[var(--app-surface)] dark:text-[var(--app-fg)]">
+                    ↑
+                  </kbd>
+                  <kbd className="rounded border border-gray-200 bg-white px-1 font-mono text-gray-700 dark:border-[var(--app-border)] dark:bg-[var(--app-surface)] dark:text-[var(--app-fg)]">
+                    ↓
+                  </kbd>{' '}
+                  move ·{' '}
+                  <kbd className="rounded border border-gray-200 bg-white px-1 font-mono text-gray-700 dark:border-[var(--app-border)] dark:bg-[var(--app-surface)] dark:text-[var(--app-fg)]">
+                    Enter
+                  </kbd>{' '}
+                  open
                 </span>
                 <span>
-                  <kbd className="rounded border border-gray-200 bg-white px-1 font-mono">Esc</kbd> close
+                  <kbd className="rounded border border-gray-200 bg-white px-1 font-mono text-gray-700 dark:border-[var(--app-border)] dark:bg-[var(--app-surface)] dark:text-[var(--app-fg)]">
+                    Esc
+                  </kbd>{' '}
+                  close
                 </span>
               </div>
             </div>

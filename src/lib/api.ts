@@ -1,4 +1,11 @@
-import { Notebook, Section, Page, User } from '../types';
+import type {
+  Bookshelf,
+  Notebook,
+  Section,
+  Page,
+  User,
+  UserStats,
+} from '../types';
 
 const getHeaders = () => {
   const token = localStorage.getItem('lumina_token');
@@ -32,23 +39,105 @@ export const api = {
       const res = await fetch('/api/auth/me', { headers: getHeaders() });
       if (!res.ok) throw new Error('Auth failed');
       return res.json();
-    }
+    },
+    updateProfile: async (body: { name?: string; email?: string }) => {
+      const res = await fetch('/api/auth/profile', {
+        method: 'PUT',
+        headers: getHeaders(),
+        body: JSON.stringify(body),
+      });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({})) as {
+          detail?: string | Array<{ msg?: string }>;
+        };
+        const d = err.detail;
+        const msg =
+          typeof d === 'string'
+            ? d
+            : Array.isArray(d)
+              ? d.map((x) => x.msg).filter(Boolean).join(', ')
+              : 'Profile update failed';
+        throw new Error(msg || 'Profile update failed');
+      }
+      return res.json() as Promise<{ token: string; user: User }>;
+    },
   },
-  notebooks: {
-    list: async (): Promise<Notebook[]> => {
-      const res = await fetch('/api/notebooks', { headers: getHeaders() });
-      const notebooks = await res.json();
-      // Fetch sections for each notebook
-      return Promise.all(notebooks.map(async (nb: any) => {
-        const sections = await api.sections.list(nb.id);
-        return { ...nb, title: nb.name, sections };
+  user: {
+    stats: async () => {
+      const res = await fetch('/api/user/stats', { headers: getHeaders() });
+      if (!res.ok) throw new Error('Failed to load stats');
+      return res.json() as Promise<UserStats>;
+    },
+  },
+  bookshelves: {
+    list: async (): Promise<Bookshelf[]> => {
+      const res = await fetch('/api/bookshelves', { headers: getHeaders() });
+      if (!res.ok) throw new Error('Failed to load bookshelves');
+      const rows = await res.json();
+      return (rows as Array<{ id: string; name: string }>).map((r) => ({
+        id: r.id,
+        title: r.name,
       }));
     },
     create: async (id: string, name: string) => {
+      const res = await fetch('/api/bookshelves', {
+        method: 'POST',
+        headers: getHeaders(),
+        body: JSON.stringify({ id, name }),
+      });
+      if (!res.ok) throw new Error('Failed to create bookshelf');
+      const j = await res.json();
+      return { id: j.id as string, title: j.name as string };
+    },
+    update: async (id: string, name: string) => {
+      const res = await fetch(`/api/bookshelves/${encodeURIComponent(id)}`, {
+        method: 'PUT',
+        headers: getHeaders(),
+        body: JSON.stringify({ name }),
+      });
+      if (!res.ok) throw new Error('Failed to rename bookshelf');
+      const j = await res.json();
+      return { id: j.id as string, title: j.name as string };
+    },
+    delete: async (id: string) => {
+      const res = await fetch(`/api/bookshelves/${encodeURIComponent(id)}`, {
+        method: 'DELETE',
+        headers: getHeaders(),
+      });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({})) as { detail?: string };
+        throw new Error(err.detail || 'Failed to delete bookshelf');
+      }
+    },
+  },
+  notebooks: {
+    list: async (archived: boolean, bookshelfId: string): Promise<Notebook[]> => {
+      const params = new URLSearchParams();
+      params.set('bookshelfId', bookshelfId);
+      if (archived) params.set('archived', 'true');
+      const res = await fetch(`/api/notebooks?${params}`, {
+        headers: getHeaders(),
+      });
+      if (!res.ok) throw new Error('Failed to load notebooks');
+      const notebooks = await res.json();
+      return Promise.all(
+        notebooks.map(async (nb: Record<string, unknown>) => {
+          const sections = await api.sections.list(nb.id as string);
+          return {
+            ...nb,
+            title: nb.name as string,
+            sections,
+            archived,
+            bookshelfId: (nb.bookshelfId as string) || bookshelfId,
+          } as Notebook;
+        })
+      );
+    },
+    create: async (id: string, name: string, bookshelfId: string) => {
       const res = await fetch('/api/notebooks', {
         method: 'POST',
         headers: getHeaders(),
-        body: JSON.stringify({ id, name })
+        body: JSON.stringify({ id, name, bookshelfId }),
       });
       if (!res.ok) throw new Error('Failed to create notebook');
       return res.json();
@@ -65,7 +154,16 @@ export const api = {
     delete: async (id: string) => {
       const res = await fetch(`/api/notebooks/${id}`, { method: 'DELETE', headers: getHeaders() });
       if (!res.ok) throw new Error('Failed to delete notebook');
-    }
+    },
+    setArchive: async (id: string, archived: boolean) => {
+      const res = await fetch(`/api/notebooks/${id}/archive`, {
+        method: 'PATCH',
+        headers: getHeaders(),
+        body: JSON.stringify({ archived }),
+      });
+      if (!res.ok) throw new Error('Failed to update notebook');
+      return res.json();
+    },
   },
   sections: {
     list: async (notebookId: string): Promise<Section[]> => {

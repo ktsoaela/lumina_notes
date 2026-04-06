@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { Mail, Lock, User, ArrowLeft, Loader2, AlertCircle } from 'lucide-react';
 import { Logo } from './Logo';
@@ -7,9 +7,11 @@ import { api } from '../lib/api';
 interface AuthProps {
   onAuthSuccess: (user: any, token: string) => void;
   onBack: () => void;
+  /** Pre-fill demo credentials (after View Demo failed or manual sign-in help) */
+  prefillDemo?: boolean;
 }
 
-export default function Auth({ onAuthSuccess, onBack }: AuthProps) {
+export default function Auth({ onAuthSuccess, onBack, prefillDemo }: AuthProps) {
   const [isLogin, setIsLogin] = useState(true);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -20,6 +22,17 @@ export default function Auth({ onAuthSuccess, onBack }: AuthProps) {
     name: '',
     username: ''
   });
+
+  useEffect(() => {
+    if (prefillDemo) {
+      setIsLogin(true);
+      setFormData((prev) => ({
+        ...prev,
+        identifier: 'demo_user',
+        password: 'demo_user',
+      }));
+    }
+  }, [prefillDemo]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -50,7 +63,7 @@ export default function Auth({ onAuthSuccess, onBack }: AuthProps) {
   };
 
   return (
-    <div className="min-h-screen bg-gray-50 flex flex-col items-center justify-center p-4 selection:bg-purple-100">
+    <div className="flex min-h-screen flex-col items-center justify-center bg-[var(--app-bg)] p-4 selection:bg-brand-100 dark:selection:bg-brand-900/40">
       <motion.div 
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
@@ -58,21 +71,21 @@ export default function Auth({ onAuthSuccess, onBack }: AuthProps) {
       >
         <button 
           onClick={onBack}
-          className="flex items-center gap-2 text-sm font-medium text-gray-500 hover:text-purple-600 transition-colors mb-8 group"
+          className="flex items-center gap-2 text-sm font-medium text-gray-500 dark:text-[var(--app-muted)] hover:text-brand-600 dark:hover:text-brand-400 transition-colors mb-8 group"
         >
           <ArrowLeft className="w-4 h-4 group-hover:-translate-x-1 transition-transform" />
           Back to Home
         </button>
 
-        <div className="bg-white rounded-3xl shadow-xl shadow-purple-100 border border-gray-100 overflow-hidden">
+        <div className="bg-white dark:bg-[var(--app-surface)] rounded-3xl shadow-xl shadow-brand-100 dark:shadow-black/30 border border-gray-100 dark:border-[var(--app-border)] overflow-hidden">
           <div className="p-8 pb-0 text-center">
-            <div className="mx-auto mb-6 flex h-16 w-16 items-center justify-center rounded-2xl bg-white p-2 shadow-lg shadow-purple-200 ring-1 ring-gray-100">
+            <div className="mx-auto mb-6 flex h-16 w-16 items-center justify-center rounded-2xl bg-white p-2 shadow-lg shadow-brand-200 ring-1 ring-gray-100 dark:bg-[var(--app-bg)] dark:shadow-none dark:ring-[var(--app-border)]">
               <Logo variant="colour" className="h-full w-full object-contain" />
             </div>
-            <h2 className="text-2xl font-bold text-gray-900 mb-2">
+            <h2 className="mb-2 text-2xl font-bold text-gray-900 dark:text-[var(--app-fg)]">
               {isLogin ? 'Welcome back' : 'Create an account'}
             </h2>
-            <p className="text-sm text-gray-500">
+            <p className="text-sm text-gray-500 dark:text-[var(--app-muted)]">
               {isLogin 
                 ? 'Sign in to access your notes and diagrams.' 
                 : 'Start organizing your thoughts today.'}
@@ -86,7 +99,7 @@ export default function Auth({ onAuthSuccess, onBack }: AuthProps) {
                   initial={{ opacity: 0, height: 0 }}
                   animate={{ opacity: 1, height: 'auto' }}
                   exit={{ opacity: 0, height: 0 }}
-                  className="bg-red-50 text-red-600 p-3 rounded-xl text-xs font-medium flex items-center gap-2 border border-red-100"
+                  className="bg-red-50 dark:bg-red-950/40 text-red-600 dark:text-red-400 p-3 rounded-xl text-xs font-medium flex items-center gap-2 border border-red-100 dark:border-red-900/60"
                 >
                   <AlertCircle className="w-4 h-4 shrink-0" />
                   {error}
@@ -96,15 +109,15 @@ export default function Auth({ onAuthSuccess, onBack }: AuthProps) {
 
             {!isLogin && (
               <div className="space-y-1.5">
-                <label className="text-xs font-bold text-gray-500 uppercase tracking-wider ml-1">Full Name</label>
+                <label className="text-xs font-bold text-gray-500 dark:text-[var(--app-muted)] uppercase tracking-wider ml-1">Full Name</label>
                 <div className="relative group">
-                  <User className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 group-focus-within:text-purple-600 transition-colors" />
+                  <User className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 group-focus-within:text-brand-600 transition-colors" />
                   <input 
                     type="text"
                     required
                     value={formData.name}
                     onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                    className="w-full bg-gray-50 border border-gray-200 rounded-xl py-3 pl-10 pr-4 text-sm focus:outline-none focus:ring-2 focus:ring-purple-500/20 focus:border-purple-500 transition-all"
+                    className="w-full bg-gray-50 dark:bg-[var(--app-surface)] border border-gray-200 dark:border-[var(--app-border)] rounded-xl py-3 pl-10 pr-4 text-sm text-gray-900 dark:text-[var(--app-fg)] placeholder:text-gray-400 dark:placeholder:text-[var(--app-muted)] focus:outline-none focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500 transition-all"
                     placeholder="John Doe"
                   />
                 </div>
@@ -113,16 +126,16 @@ export default function Auth({ onAuthSuccess, onBack }: AuthProps) {
 
             {isLogin ? (
               <div className="space-y-1.5">
-                <label className="text-xs font-bold text-gray-500 uppercase tracking-wider ml-1">Email or username</label>
+                <label className="text-xs font-bold text-gray-500 dark:text-[var(--app-muted)] uppercase tracking-wider ml-1">Email or username</label>
                 <div className="relative group">
-                  <Mail className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 group-focus-within:text-purple-600 transition-colors" />
+                  <Mail className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 group-focus-within:text-brand-600 transition-colors" />
                   <input
                     type="text"
                     autoComplete="username"
                     required
                     value={formData.identifier}
                     onChange={(e) => setFormData({ ...formData, identifier: e.target.value })}
-                    className="w-full bg-gray-50 border border-gray-200 rounded-xl py-3 pl-10 pr-4 text-sm focus:outline-none focus:ring-2 focus:ring-purple-500/20 focus:border-purple-500 transition-all"
+                    className="w-full bg-gray-50 dark:bg-[var(--app-surface)] border border-gray-200 dark:border-[var(--app-border)] rounded-xl py-3 pl-10 pr-4 text-sm text-gray-900 dark:text-[var(--app-fg)] placeholder:text-gray-400 dark:placeholder:text-[var(--app-muted)] focus:outline-none focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500 transition-all"
                     placeholder="you@example.com or your_username"
                   />
                 </div>
@@ -130,29 +143,29 @@ export default function Auth({ onAuthSuccess, onBack }: AuthProps) {
             ) : (
               <>
                 <div className="space-y-1.5">
-                  <label className="text-xs font-bold text-gray-500 uppercase tracking-wider ml-1">Email address</label>
+                  <label className="text-xs font-bold text-gray-500 dark:text-[var(--app-muted)] uppercase tracking-wider ml-1">Email address</label>
                   <div className="relative group">
-                    <Mail className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 group-focus-within:text-purple-600 transition-colors" />
+                    <Mail className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 group-focus-within:text-brand-600 transition-colors" />
                     <input
                       type="email"
                       required
                       value={formData.email}
                       onChange={(e) => setFormData({ ...formData, email: e.target.value })}
-                      className="w-full bg-gray-50 border border-gray-200 rounded-xl py-3 pl-10 pr-4 text-sm focus:outline-none focus:ring-2 focus:ring-purple-500/20 focus:border-purple-500 transition-all"
+                      className="w-full bg-gray-50 dark:bg-[var(--app-surface)] border border-gray-200 dark:border-[var(--app-border)] rounded-xl py-3 pl-10 pr-4 text-sm text-gray-900 dark:text-[var(--app-fg)] placeholder:text-gray-400 dark:placeholder:text-[var(--app-muted)] focus:outline-none focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500 transition-all"
                       placeholder="name@example.com"
                     />
                   </div>
                 </div>
                 <div className="space-y-1.5">
-                  <label className="text-xs font-bold text-gray-500 uppercase tracking-wider ml-1">Username <span className="font-normal normal-case text-gray-400">(optional)</span></label>
+                  <label className="text-xs font-bold text-gray-500 dark:text-[var(--app-muted)] uppercase tracking-wider ml-1">Username <span className="font-normal normal-case text-gray-400">(optional)</span></label>
                   <div className="relative group">
-                    <User className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 group-focus-within:text-purple-600 transition-colors" />
+                    <User className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 group-focus-within:text-brand-600 transition-colors" />
                     <input
                       type="text"
                       autoComplete="off"
                       value={formData.username}
                       onChange={(e) => setFormData({ ...formData, username: e.target.value })}
-                      className="w-full bg-gray-50 border border-gray-200 rounded-xl py-3 pl-10 pr-4 text-sm focus:outline-none focus:ring-2 focus:ring-purple-500/20 focus:border-purple-500 transition-all"
+                      className="w-full bg-gray-50 dark:bg-[var(--app-surface)] border border-gray-200 dark:border-[var(--app-border)] rounded-xl py-3 pl-10 pr-4 text-sm text-gray-900 dark:text-[var(--app-fg)] placeholder:text-gray-400 dark:placeholder:text-[var(--app-muted)] focus:outline-none focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500 transition-all"
                       placeholder="letters, numbers, underscore (3–32)"
                     />
                   </div>
@@ -161,15 +174,15 @@ export default function Auth({ onAuthSuccess, onBack }: AuthProps) {
             )}
 
             <div className="space-y-1.5">
-              <label className="text-xs font-bold text-gray-500 uppercase tracking-wider ml-1">Password</label>
+              <label className="text-xs font-bold text-gray-500 dark:text-[var(--app-muted)] uppercase tracking-wider ml-1">Password</label>
               <div className="relative group">
-                <Lock className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 group-focus-within:text-purple-600 transition-colors" />
+                <Lock className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 group-focus-within:text-brand-600 transition-colors" />
                 <input 
                   type="password"
                   required
                   value={formData.password}
                   onChange={(e) => setFormData({ ...formData, password: e.target.value })}
-                  className="w-full bg-gray-50 border border-gray-200 rounded-xl py-3 pl-10 pr-4 text-sm focus:outline-none focus:ring-2 focus:ring-purple-500/20 focus:border-purple-500 transition-all"
+                  className="w-full bg-gray-50 dark:bg-[var(--app-surface)] border border-gray-200 dark:border-[var(--app-border)] rounded-xl py-3 pl-10 pr-4 text-sm text-gray-900 dark:text-[var(--app-fg)] placeholder:text-gray-400 dark:placeholder:text-[var(--app-muted)] focus:outline-none focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500 transition-all"
                   placeholder="••••••••"
                 />
               </div>
@@ -178,7 +191,7 @@ export default function Auth({ onAuthSuccess, onBack }: AuthProps) {
             <button 
               type="submit"
               disabled={isLoading}
-              className="w-full bg-purple-600 text-white py-3.5 rounded-xl font-bold text-sm hover:bg-purple-700 transition-all shadow-lg shadow-purple-200 flex items-center justify-center gap-2 disabled:opacity-70 disabled:cursor-not-allowed mt-4"
+              className="w-full bg-brand-600 text-white py-3.5 rounded-xl font-bold text-sm hover:bg-brand-700 transition-all shadow-lg shadow-brand-200 flex items-center justify-center gap-2 disabled:opacity-70 disabled:cursor-not-allowed mt-4"
             >
               {isLoading ? (
                 <Loader2 className="w-4 h-4 animate-spin" />
@@ -191,14 +204,14 @@ export default function Auth({ onAuthSuccess, onBack }: AuthProps) {
           <div className="p-8 pt-0 text-center">
             <button 
               onClick={() => setIsLogin(!isLogin)}
-              className="text-sm font-medium text-gray-500 hover:text-purple-600 transition-colors"
+              className="text-sm font-medium text-gray-500 dark:text-[var(--app-muted)] hover:text-brand-600 dark:hover:text-brand-400 transition-colors"
             >
               {isLogin ? "Don't have an account? Sign up" : "Already have an account? Sign in"}
             </button>
           </div>
         </div>
 
-        <p className="text-center text-xs text-gray-400 mt-8">
+        <p className="mt-8 text-center text-xs text-gray-400 dark:text-[var(--app-muted)]">
           By continuing, you agree to Lumina's Terms of Service and Privacy Policy.
         </p>
       </motion.div>
