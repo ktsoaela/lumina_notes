@@ -1,12 +1,14 @@
 import React from 'react';
-import logoOutline from '../assets/book_colour_outline.png';
-import logoColour from '../assets/book_colour_no_outline.png';
-import logoMono from '../assets/book_black_and_white.png';
+import {
+  defaultLogo,
+  logoColourNoOutline,
+  logoBlackAndWhite,
+} from '../assets';
 
 const variants = {
-  outline: logoOutline,
-  colour: logoColour,
-  mono: logoMono,
+  outline: defaultLogo,
+  colour: logoColourNoOutline,
+  mono: logoBlackAndWhite,
 } as const;
 
 export type LogoVariant = keyof typeof variants;
@@ -15,7 +17,7 @@ interface LogoProps extends React.ImgHTMLAttributes<HTMLImageElement> {
   variant?: LogoVariant;
 }
 
-/** Logo from `src/assets` — use `mono` on dark backgrounds (e.g. purple header). */
+/** Logo from `src/assets` — `outline` uses `defaultLogo`; use `mono` on dark backgrounds (e.g. purple header). */
 export function Logo({
   variant = 'outline',
   className = 'h-8 w-auto',

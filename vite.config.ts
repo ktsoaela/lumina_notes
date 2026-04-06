@@ -8,6 +8,9 @@ export default defineConfig(({mode}) => {
   const apiPort = env.API_PORT || process.env.API_PORT || '58888';
   return {
     plugins: [react(), tailwindcss()],
+    optimizeDeps: {
+      include: ['html2pdf.js', 'html2canvas', 'jspdf'],
+    },
     define: {
       'process.env.GEMINI_API_KEY': JSON.stringify(env.GEMINI_API_KEY),
     },

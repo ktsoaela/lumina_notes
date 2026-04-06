@@ -1,13 +1,14 @@
-; Inno Setup 6 — build after: npm run build && pyinstaller (see scripts/build_installer.ps1)
-; Install: https://jrsoftware.org/isdl.php
+; Optional: wraps electron-builder win-unpacked (primary installer is electron-builder NSIS).
+; Build win-unpacked first: npm run build:electron:app
+; Install Inno: https://jrsoftware.org/isdl.php
 ; Compile: ISCC.exe installer\LuminaNotes.iss
 
 #define MyAppName "Lumina Notes"
 #define MyAppVersion "1.0.0"
 #define MyAppPublisher "Lumina"
-#define MyAppExeName "LuminaNotes.exe"
+#define MyAppExeName "Lumina Notes.exe"
 ; Paths relative to this .iss file (installer/)
-#define BuildOutput "..\release\LuminaNotes"
+#define BuildOutput "..\release\electron\win-unpacked"
 
 [Setup]
 AppId={{A7E4F9C2-8B1D-4E6F-9C0A-3D5E7F9B2A4C}
@@ -34,7 +35,8 @@ LicenseFile=
 Name: "english"; MessagesFile: "compiler:Default.isl"
 
 [Tasks]
-Name: "desktopicon"; Description: "{cm:CreateDesktopIcon}"; GroupDescription: "{cm:AdditionalIcons}"; Flags: unchecked
+; Desktop shortcut is optional; Start menu entry is always created (see [Icons]).
+Name: "desktopicon"; Description: "{cm:CreateDesktopIcon}"; GroupDescription: "{cm:AdditionalIcons}"; Flags: checked
 
 [Files]
 Source: "{#BuildOutput}\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs createallsubdirs

@@ -24,10 +24,26 @@ export interface Section {
   pages: Page[];
 }
 
+export interface Bookshelf {
+  id: string;
+  title: string;
+}
+
 export interface Notebook {
   id: string;
   title: string;
   sections: Section[];
+  archived?: boolean;
+  bookshelfId?: string;
+}
+
+export interface UserStats {
+  storageBytes: number;
+  notebooksActive: number;
+  notebooksArchived: number;
+  sectionsActive: number;
+  pagesActive: number;
+  pagesArchived: number;
 }
 
 export interface AppState {
@@ -35,4 +51,6 @@ export interface AppState {
   activeNotebookId: string | null;
   activeSectionId: string | null;
   activePageId: string | null;
+  /** Second page when “two notes” mode is on (Shift+click in sidebar) */
+  secondaryPageId: string | null;
 }
