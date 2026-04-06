@@ -1,0 +1,46 @@
+{
+  "name": "react-example",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "start": "python run_project.py",
+    "start:desktop": "python run_project.py --webview",
+    "dev:api": "python -m uvicorn app:app --host 127.0.0.1 --port 58888",
+    "dev:django": "python manage.py runserver 127.0.0.1:8001",
+    "build": "vite build",
+    "build:desktop": "scripts\\build_desktop.bat",
+    "build:installer": "scripts\\build_installer.bat",
+    "preview": "vite preview",
+    "clean": "rm -rf dist",
+    "lint": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@google/genai": "^1.29.0",
+    "@tailwindcss/vite": "^4.1.14",
+    "@vitejs/plugin-react": "^5.0.4",
+    "clsx": "^2.1.1",
+    "date-fns": "^4.1.0",
+    "lucide-react": "^0.546.0",
+    "mermaid": "^11.14.0",
+    "motion": "^12.23.24",
+    "plotly.js": "^3.5.0",
+    "react": "^19.0.0",
+    "react-dom": "^19.0.0",
+    "react-markdown": "^10.1.0",
+    "react-plotly.js": "^2.6.0",
+    "react-resizable-panels": "^4.9.0",
+    "remark-gfm": "^4.0.1",
+    "tailwind-merge": "^3.5.0"
+  },
+  "devDependencies": {
+    "@types/node": "^22.14.0",
+    "@types/plotly.js": "^3.0.10",
+    "@types/react-plotly.js": "^2.6.4",
+    "autoprefixer": "^10.4.21",
+    "tailwindcss": "^4.1.14",
+    "typescript": "~5.8.2",
+    "vite": "^6.2.0"
+  }
+}
