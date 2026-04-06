@@ -1,13 +1,10 @@
 # -*- mode: python ; coding: utf-8 -*-
-# Build: npm run build  →  then  pyinstaller --distpath release build_desktop.spec
-# (Use --distpath release so PyInstaller does not overwrite the Vite dist/ folder.)
+# PyInstaller: FastAPI + static dist (served by app.py). Used by Electron (no pywebview).
+# Build: npm run build  →  pyinstaller --distpath release build_backend.spec
 
 import os
 from pathlib import Path
 
-from PyInstaller.utils.hooks import collect_all
-
-# SPECPATH is the folder containing this .spec (see PyInstaller CONF["specpath"])
 try:
     project_root = Path(SPECPATH).resolve()
 except NameError:
@@ -37,16 +34,10 @@ hiddenimports = [
     "jose.backends.cryptography_backend",
 ]
 
-# webview ships platform DLLs / loaders; uvicorn is picked up by Analysis()
-d, b, h = collect_all("webview")
-datas += d
-binaries += b
-hiddenimports += h
-
 block_cipher = None
 
 a = Analysis(
-    [str(project_root / "main.py")],
+    [str(project_root / "run_api.py")],
     pathex=[str(project_root)],
     binaries=binaries,
     datas=datas,
@@ -65,7 +56,7 @@ exe = EXE(
     a.scripts,
     [],
     exclude_binaries=True,
-    name="LuminaNotes",
+    name="LuminaApi",
     debug=False,
     bootloader_ignore_signals=False,
     strip=False,
@@ -86,5 +77,5 @@ coll = COLLECT(
     strip=False,
     upx=False,
     upx_exclude=[],
-    name="LuminaNotes",
+    name="LuminaApi",
 )

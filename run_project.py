@@ -3,9 +3,10 @@ Run the full stack: FastAPI + Django admin + Vite concurrently.
 
 Usage:
   python run_project.py
-  python run_project.py --webview
   python run_project.py --reload          # uvicorn --reload (can fail on some Windows setups)
   python run_project.py --no-django       # skip Django admin server
+
+Desktop shell (Electron + Vite + API): npm run dev:electron
 
 Env:
   API_PORT     FastAPI (default 58888 — avoids common Windows reserved ports)
@@ -114,11 +115,6 @@ def main() -> None:
         action="store_true",
         help="Do not start Django (admin will not be available).",
     )
-    parser.add_argument(
-        "--webview",
-        action="store_true",
-        help="Open a desktop window (pywebview) pointing at the Vite dev URL.",
-    )
     args = parser.parse_args()
 
     if not (ROOT / "package.json").is_file():
@@ -206,26 +202,6 @@ def main() -> None:
                 break
             time.sleep(0.25)
         stop_all()
-
-    if args.webview:
-        watcher = threading.Thread(target=watch_children, daemon=True)
-        watcher.start()
-        time.sleep(1.2)
-        try:
-            import webview
-        except ImportError:
-            print("Install pywebview: pip install pywebview", file=sys.stderr)
-            stop_all()
-            sys.exit(1)
-        try:
-            webview.create_window(
-                "Lumina Notes",
-                f"http://127.0.0.1:{VITE_PORT}",
-            )
-            webview.start()
-        finally:
-            stop_all()
-        return
 
     try:
         watch_children()
