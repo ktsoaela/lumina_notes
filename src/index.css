@@ -8,10 +8,12 @@
   --color-brand-100: #dceaf4;
   --color-brand-200: #b8d4e8;
   --color-brand-300: #8ab8d4;
+  --color-brand-400: #3d7aaa;
   --color-brand-500: #2a6fa8;
   --color-brand-600: #1e5a8a;
   --color-brand-700: #174a73;
   --color-brand-800: #143c5e;
+  --color-brand-900: #0f2840;
 }
 
 /* Light: white canvas, near-black / navy body text (use brand utilities for blue accents) */
