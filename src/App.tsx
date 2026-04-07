@@ -1,5 +1,4 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
-import { useReactToPrint } from 'react-to-print';
 import { 
   Group as PanelGroup, 
   Panel, 
@@ -17,7 +16,6 @@ import {
 import Sidebar from './components/Sidebar';
 import { SearchPanel, useSearchHotkey } from './components/SearchPanel';
 import NotePanel, { type EditorViewMode } from './components/NotePanel';
-import PrintableNote from './components/PrintableNote';
 import LandingPage from './components/LandingPage';
 import Auth from './components/Auth';
 import ProfilePage from './components/ProfilePage';
@@ -49,7 +47,8 @@ import {
   writeActiveBookshelfId,
   writeSession,
 } from './lib/authCache';
-import { exportPageToPdf } from './lib/exportPdf';
+import { exportMarkdownToPdf } from './lib/exportPdf';
+import { openPrintWindow } from './lib/printDocument';
 import { sanitizeFilename } from './lib/filename';
 import {
   applyTheme,
@@ -282,25 +281,26 @@ export default function App() {
     ? findPageInState(state, state.secondaryPageId)
     : undefined;
 
-  const printRefPrimary = useRef<HTMLDivElement>(null);
-  const printRefSecondary = useRef<HTMLDivElement>(null);
-  const handlePrintPrimary = useReactToPrint({
-    contentRef: printRefPrimary,
-    documentTitle: activePage?.title ?? 'Lumina Notes',
-  });
-  const handlePrintSecondary = useReactToPrint({
-    contentRef: printRefSecondary,
-    documentTitle: secondaryPage?.title ?? 'Lumina Notes',
-  });
   const [pdfExportingPrimary, setPdfExportingPrimary] = useState(false);
   const [pdfExportingSecondary, setPdfExportingSecondary] = useState(false);
 
+  const handlePrintPrimary = useCallback(() => {
+    if (!activePage) return;
+    openPrintWindow(activePage.title, activePage.content);
+  }, [activePage]);
+
+  const handlePrintSecondary = useCallback(() => {
+    if (!secondaryPage) return;
+    openPrintWindow(secondaryPage.title, secondaryPage.content);
+  }, [secondaryPage]);
+
   const handleExportPdfPrimary = useCallback(async () => {
-    if (!printRefPrimary.current || !activePage) return;
+    if (!activePage) return;
     setPdfExportingPrimary(true);
     try {
-      await exportPageToPdf(
-        printRefPrimary.current,
+      await exportMarkdownToPdf(
+        activePage.title,
+        activePage.content,
         sanitizeFilename(activePage.title)
       );
     } catch (err) {
@@ -311,11 +311,12 @@ export default function App() {
   }, [activePage]);
 
   const handleExportPdfSecondary = useCallback(async () => {
-    if (!printRefSecondary.current || !secondaryPage) return;
+    if (!secondaryPage) return;
     setPdfExportingSecondary(true);
     try {
-      await exportPageToPdf(
-        printRefSecondary.current,
+      await exportMarkdownToPdf(
+        secondaryPage.title,
+        secondaryPage.content,
         sanitizeFilename(secondaryPage.title)
       );
     } catch (err) {
@@ -1049,24 +1050,6 @@ export default function App() {
         </div>
       </footer>
 
-      {activePage && (
-        <div aria-hidden className="pointer-events-none">
-          <PrintableNote
-            ref={printRefPrimary}
-            title={activePage.title}
-            content={activePage.content}
-          />
-        </div>
-      )}
-      {dualPageOpen && secondaryPage && (
-        <div aria-hidden className="pointer-events-none">
-          <PrintableNote
-            ref={printRefSecondary}
-            title={secondaryPage.title}
-            content={secondaryPage.content}
-          />
-        </div>
-      )}
     </div>
   );
 }

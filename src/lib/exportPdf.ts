@@ -1,4 +1,22 @@
 import html2pdf from 'html2pdf.js';
+import { createPrintRootElement } from './printDocument';
+
+/**
+ * PDF from the same rendered Markdown/HTML as print (workbook-style document + metadata).
+ */
+export async function exportMarkdownToPdf(
+  title: string,
+  markdown: string,
+  filenameBase: string
+): Promise<void> {
+  const el = createPrintRootElement(title, markdown);
+  document.body.appendChild(el);
+  try {
+    await exportPageToPdf(el, filenameBase);
+  } finally {
+    el.remove();
+  }
+}
 
 /**
  * Renders a DOM subtree to A4 PDF via html2canvas + jsPDF.
