@@ -1,6 +1,7 @@
 import {StrictMode} from 'react';
 import {createRoot} from 'react-dom/client';
 import App from './App.tsx';
+import { AppDialogsProvider } from './context/AppDialogsContext';
 import './index.css';
 import {applyTheme, getStoredTheme} from './lib/theme';
 
@@ -19,6 +20,8 @@ document.title = 'Lumina Notes';
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
-    <App />
+    <AppDialogsProvider>
+      <App />
+    </AppDialogsProvider>
   </StrictMode>,
 );
