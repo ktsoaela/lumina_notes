@@ -18,6 +18,7 @@ import type { Bookshelf, Notebook } from '../types';
 import { notebookToMarkdown, downloadText, parseImportedMarkdown } from '../lib/markdownIO';
 import { sanitizeFilename } from '../lib/filename';
 import { cn } from '../lib/utils';
+import { useAppDialogs } from '../context/AppDialogsContext';
 
 const WOOD_BOOK_COLORS = ['#2c7be5', '#e5533d', '#2eb85c', '#f9b115', '#6f42c1'] as const;
 /** Books per shelf row: fill row 1 (up to 12), then row 2, etc. */
@@ -632,6 +633,7 @@ export default function BookshelfPage({
   onLibraryChanged,
   onRefreshBookshelves,
 }: BookshelfPageProps) {
+  const { confirm, promptText } = useAppDialogs();
   const [newShelfName, setNewShelfName] = useState('');
   const [tab, setTab] = useState<'active' | 'archived'>('active');
   const [manageShelfId, setManageShelfId] = useState<string | null>(null);
@@ -701,7 +703,13 @@ export default function BookshelfPage({
   };
 
   const renameShelf = async (id: string, currentTitle: string) => {
-    const name = window.prompt('Shelf name', currentTitle);
+    const name = await promptText({
+      title: 'Rename bookshelf',
+      label: 'Shelf name',
+      defaultValue: currentTitle,
+      placeholder: 'Bookshelf title',
+      confirmLabel: 'Save',
+    });
     if (name === null) return;
     const trimmed = name.trim() || 'Untitled';
     setBusy(id);
@@ -714,7 +722,14 @@ export default function BookshelfPage({
   };
 
   const deleteShelf = async (id: string) => {
-    if (!window.confirm('Delete this bookshelf? It must be empty (no notebooks).')) return;
+    const shelf = bookshelves.find((b) => b.id === id);
+    const ok = await confirm({
+      title: 'Delete bookshelf?',
+      message: `“${shelf?.title?.trim() || 'Bookshelf'}” will be removed. It must be empty (no notebooks). This cannot be undone.`,
+      confirmLabel: 'Delete bookshelf',
+      variant: 'danger',
+    });
+    if (!ok) return;
     setBusy(id);
     try {
       await api.bookshelves.delete(id);
@@ -734,6 +749,14 @@ export default function BookshelfPage({
     nb.sections.reduce((n, s) => n + s.pages.length, 0);
 
   const archive = async (id: string) => {
+    const nb = [...activeList, ...archivedList].find((n) => n.id === id);
+    const ok = await confirm({
+      title: 'Archive notebook?',
+      message: `“${nb?.title?.trim() || 'Notebook'}” will move to Archived. You can restore it from the Archived tab.`,
+      confirmLabel: 'Archive',
+      variant: 'default',
+    });
+    if (!ok) return;
     setBusy(id);
     try {
       await api.notebooks.setArchive(id, true);
@@ -745,13 +768,14 @@ export default function BookshelfPage({
   };
 
   const removeForever = async (id: string) => {
-    if (
-      !window.confirm(
-        'Permanently delete this notebook and all sections and pages? This cannot be undone.'
-      )
-    ) {
-      return;
-    }
+    const nb = archivedList.find((n) => n.id === id);
+    const ok = await confirm({
+      title: 'Delete notebook forever?',
+      message: `“${nb?.title?.trim() || 'Notebook'}” and all its sections and pages will be permanently removed. This cannot be undone.`,
+      confirmLabel: 'Delete forever',
+      variant: 'danger',
+    });
+    if (!ok) return;
     setBusy(id);
     try {
       await api.notebooks.delete(id);

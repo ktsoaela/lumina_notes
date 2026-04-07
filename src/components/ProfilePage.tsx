@@ -6,6 +6,7 @@ import { formatBytes } from '../lib/markdownIO';
 import type { User, UserStats } from '../types';
 import { writeSession } from '../lib/authCache';
 import { cn } from '../lib/utils';
+import { useAppDialogs } from '../context/AppDialogsContext';
 
 interface ProfilePageProps {
   user: User;
@@ -22,6 +23,7 @@ export default function ProfilePage({
   onBack,
   onUserUpdated,
 }: ProfilePageProps) {
+  const { confirm } = useAppDialogs();
   const [name, setName] = useState(user.name);
   const [email, setEmail] = useState(user.email);
   const [stats, setStats] = useState<UserStats | null>(null);
@@ -46,9 +48,25 @@ export default function ProfilePage({
     };
   }, []);
 
+  useEffect(() => {
+    setName(user.name);
+    setEmail(user.email);
+  }, [user.name, user.email]);
+
   const save = async (e: React.FormEvent) => {
     e.preventDefault();
     setErr(null);
+    const nameChanged = name.trim() !== user.name.trim();
+    const emailChanged = email.trim() !== user.email.trim();
+    if (!nameChanged && !emailChanged) return;
+    const ok = await confirm({
+      title: 'Save profile changes?',
+      message:
+        'Your name and email will be updated on your account. Continue?',
+      confirmLabel: 'Save changes',
+      variant: 'default',
+    });
+    if (!ok) return;
     setSaving(true);
     try {
       const { token: newToken, user: u } = await api.auth.updateProfile({
