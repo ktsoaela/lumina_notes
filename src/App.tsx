@@ -26,6 +26,7 @@ import {
   Edit3, 
   Search,
   HelpCircle,
+  ChevronDown,
   ChevronRight,
   Menu,
   FileText,
@@ -61,6 +62,7 @@ import {
   pageToMarkdown,
   parseImportedMarkdown,
 } from './lib/markdownIO';
+import { useAppDialogs } from './context/AppDialogsContext';
 
 function findPageInState(state: AppState, pageId: string): Page | undefined {
   for (const nb of state.notebooks) {
@@ -87,6 +89,7 @@ function secondaryStillValid(
 }
 
 export default function App() {
+  const { confirm } = useAppDialogs();
   const [auth, setAuth] = useState<AuthState>(getInitialAuthState);
 
   const [state, setState] = useState<AppState>({
@@ -105,6 +108,8 @@ export default function App() {
   const [demoPrefill, setDemoPrefill] = useState(false);
   const [demoLoginLoading, setDemoLoginLoading] = useState(false);
   const [searchOpen, setSearchOpen] = useState(false);
+  const [profileMenuOpen, setProfileMenuOpen] = useState(false);
+  const profileMenuRef = useRef<HTMLDivElement>(null);
   const openSearch = useCallback(() => setSearchOpen(true), []);
   useSearchHotkey(openSearch, !!auth.user);
 
@@ -124,8 +129,35 @@ export default function App() {
     writeActiveBookshelfId(activeBookshelfId);
   }, [activeBookshelfId]);
 
+  useEffect(() => {
+    if (!profileMenuOpen) return;
+    const onDoc = (e: MouseEvent) => {
+      if (
+        profileMenuRef.current &&
+        !profileMenuRef.current.contains(e.target as Node)
+      ) {
+        setProfileMenuOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', onDoc);
+    return () => document.removeEventListener('mousedown', onDoc);
+  }, [profileMenuOpen]);
+
+  useEffect(() => {
+    if (!profileMenuOpen) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') setProfileMenuOpen(false);
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [profileMenuOpen]);
+
   type MainView = 'notes' | 'profile' | 'bookshelf';
   const [mainView, setMainView] = useState<MainView>('notes');
+
+  useEffect(() => {
+    setProfileMenuOpen(false);
+  }, [mainView]);
 
   // Re-validate JWT on load; signed-in users with a cached profile skip the landing/sign-in flow
   useEffect(() => {
@@ -515,6 +547,14 @@ export default function App() {
   };
 
   const handleArchiveNotebook = async (id: string) => {
+    const nb = state.notebooks.find((n) => n.id === id);
+    const ok = await confirm({
+      title: 'Archive notebook?',
+      message: `“${nb?.title?.trim() || 'Notebook'}” will move to Archived. You can restore it from Bookshelf → Archived.`,
+      confirmLabel: 'Archive',
+      variant: 'default',
+    });
+    if (!ok) return;
     try {
       await api.notebooks.setArchive(id, true);
       await fetchData();
@@ -570,6 +610,15 @@ export default function App() {
   };
 
   const handleDeleteSection = async (notebookId: string, sectionId: string) => {
+    const nb = state.notebooks.find((n) => n.id === notebookId);
+    const sec = nb?.sections.find((s) => s.id === sectionId);
+    const ok = await confirm({
+      title: 'Remove section?',
+      message: `“${sec?.title?.trim() || 'Section'}” and all pages inside it will be permanently deleted.`,
+      confirmLabel: 'Remove section',
+      variant: 'danger',
+    });
+    if (!ok) return;
     try {
       await api.sections.delete(sectionId);
       setState(prev => {
@@ -596,6 +645,17 @@ export default function App() {
   };
 
   const handleDeletePage = async (sectionId: string, pageId: string) => {
+    const page = state.notebooks
+      .flatMap((n) => n.sections)
+      .find((s) => s.id === sectionId)
+      ?.pages.find((p) => p.id === pageId);
+    const ok = await confirm({
+      title: 'Remove page?',
+      message: `“${page?.title?.trim() || 'Page'}” will be permanently deleted.`,
+      confirmLabel: 'Remove page',
+      variant: 'danger',
+    });
+    if (!ok) return;
     try {
       await api.pages.delete(pageId);
       setState(prev => {
@@ -783,35 +843,63 @@ export default function App() {
             </button>
           )}
 
-          <div className="flex items-center gap-2 px-2 py-1 hover:bg-white/10 rounded-md transition-colors cursor-default group relative">
-            <UserIcon className="w-4 h-4 shrink-0" />
-            <span className="text-xs font-medium max-w-[80px] sm:max-w-[120px] truncate hidden sm:inline">
-              {auth.user.name}
-            </span>
-            <div className="absolute top-full right-0 z-50 mt-1 hidden w-48 rounded-xl border border-gray-100 bg-white p-1 text-gray-900 shadow-xl group-hover:block dark:border-[var(--app-border)] dark:bg-[var(--app-surface)] dark:text-[var(--app-fg)]">
-              <button
-                type="button"
-                onClick={() => setMainView('profile')}
-                className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-xs hover:bg-gray-50 dark:hover:bg-[var(--app-bg)]"
+          <div className="relative" ref={profileMenuRef}>
+            <button
+              type="button"
+              onClick={() => setProfileMenuOpen((o) => !o)}
+              aria-expanded={profileMenuOpen}
+              aria-haspopup="menu"
+              className="flex items-center gap-2 rounded-md px-2 py-1.5 text-left transition-colors hover:bg-white/10 focus:outline-none focus-visible:ring-2 focus-visible:ring-white/80 focus-visible:ring-offset-2 focus-visible:ring-offset-brand-700"
+            >
+              <UserIcon className="w-4 h-4 shrink-0" aria-hidden />
+              <span className="text-xs font-medium max-w-[80px] sm:max-w-[120px] truncate hidden sm:inline">
+                {auth.user.name}
+              </span>
+              <ChevronDown
+                className={cn(
+                  'hidden h-3.5 w-3.5 shrink-0 opacity-80 transition-transform sm:block',
+                  profileMenuOpen && 'rotate-180'
+                )}
+                aria-hidden
+              />
+            </button>
+            {profileMenuOpen ? (
+              <div
+                className="absolute top-full right-0 z-50 mt-1 w-48 rounded-xl border border-gray-100 bg-white p-1 text-gray-900 shadow-xl dark:border-[var(--app-border)] dark:bg-[var(--app-surface)] dark:text-[var(--app-fg)]"
+                role="menu"
               >
-                <UserIcon className="w-4 h-4 shrink-0 opacity-80" />
-                Profile
-              </button>
-              <div className="border-t border-gray-100 px-3 py-2 dark:border-[var(--app-border)]">
-                <div className="truncate text-xs font-bold">{auth.user.name}</div>
-                <div className="truncate text-[10px] text-gray-500 dark:text-[var(--app-muted)]">
-                  {auth.user.email}
+                <button
+                  type="button"
+                  role="menuitem"
+                  onClick={() => {
+                    setMainView('profile');
+                    setProfileMenuOpen(false);
+                  }}
+                  className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-xs hover:bg-gray-50 dark:hover:bg-[var(--app-bg)]"
+                >
+                  <UserIcon className="w-4 h-4 shrink-0 opacity-80" />
+                  Profile
+                </button>
+                <div className="border-t border-gray-100 px-3 py-2 dark:border-[var(--app-border)]">
+                  <div className="truncate text-xs font-bold">{auth.user.name}</div>
+                  <div className="truncate text-[10px] text-gray-500 dark:text-[var(--app-muted)]">
+                    {auth.user.email}
+                  </div>
                 </div>
+                <button
+                  type="button"
+                  role="menuitem"
+                  onClick={() => {
+                    setProfileMenuOpen(false);
+                    handleLogout();
+                  }}
+                  className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-xs text-red-600 transition-colors hover:bg-red-50 dark:text-red-400 dark:hover:bg-red-950/40"
+                >
+                  <LogOut className="w-3 h-3 shrink-0" />
+                  Logout
+                </button>
               </div>
-              <button
-                type="button"
-                onClick={handleLogout}
-                className="w-full flex items-center gap-2 px-3 py-2 text-xs text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-950/40 rounded-lg transition-colors"
-              >
-                <LogOut className="w-3 h-3" />
-                Logout
-              </button>
-            </div>
+            ) : null}
           </div>
         </div>
       </header>

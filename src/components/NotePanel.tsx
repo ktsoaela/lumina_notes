@@ -4,7 +4,7 @@ import {
   Panel,
   Separator as PanelResizeHandle,
 } from 'react-resizable-panels';
-import { Clock, FileDown, FileText, Loader2, Printer, Save } from 'lucide-react';
+import { Clock, Download, FileDown, Loader2, Printer, Save } from 'lucide-react';
 import { format } from 'date-fns';
 import { Page } from '../types';
 import { cn } from '../lib/utils';
@@ -83,11 +83,11 @@ const NotePanel: React.FC<NotePanelProps> = ({
             <button
               type="button"
               onClick={onExportMarkdown}
-              className="inline-flex items-center gap-1.5 rounded-lg border border-gray-200 bg-white px-2.5 py-1.5 text-[11px] font-semibold text-gray-700 transition-colors hover:border-brand-300 hover:bg-gray-50 dark:border-[var(--app-border)] dark:bg-[var(--app-surface)] dark:text-[var(--app-fg)] dark:hover:bg-[var(--app-bg)]"
-              title="Download this page as a Markdown file"
+              className="inline-flex items-center gap-1.5 rounded-lg border border-gray-200 bg-white px-2.5 py-1.5 text-[11px] font-semibold text-gray-700 transition-colors hover:border-brand-300 hover:bg-gray-50 dark:border-[var(--app-border)] dark:bg-[var(--app-surface)] dark:text-[var(--app-fg)] dark:hover:border-brand-600 dark:hover:bg-[var(--app-bg)]"
+              title="Download this page as a Markdown (.md) file"
             >
-              <FileText className="w-3.5 h-3.5" />
-              Markdown
+              <Download className="w-3.5 h-3.5" />
+              Download
             </button>
             <button
               type="button"

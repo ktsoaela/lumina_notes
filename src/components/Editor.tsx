@@ -11,12 +11,18 @@ const Editor: React.FC<EditorProps> = ({ value, onChange, className }) => {
   return (
     <div
       className={cn(
-        'flex flex-col h-full bg-gray-50 dark:bg-[var(--app-bg)]/85',
+        'flex flex-col h-full bg-[#dceaf4] dark:bg-[var(--app-bg)]/85',
         className
       )}
     >
       <textarea
-        className="flex-1 resize-none bg-transparent p-8 font-mono text-sm leading-relaxed text-gray-800 placeholder:text-gray-400 focus:outline-none dark:text-[var(--app-fg)] dark:placeholder:text-[var(--app-muted)]"
+        className={cn(
+          'flex-1 resize-none rounded-md border border-brand-300 bg-transparent p-8',
+          'font-mono text-sm leading-relaxed text-gray-800 placeholder:text-gray-400',
+          'focus:outline-none focus-visible:border-brand-600 focus-visible:ring-2 focus-visible:ring-brand-600 focus-visible:ring-offset-2 focus-visible:ring-offset-[#dceaf4]',
+          'dark:border-[var(--app-border)] dark:text-[var(--app-fg)] dark:placeholder:text-[var(--app-muted)]',
+          'dark:focus-visible:border-brand-400 dark:focus-visible:ring-brand-400 dark:focus-visible:ring-offset-[var(--app-bg)]'
+        )}
         value={value}
         onChange={(e) => onChange(e.target.value)}
         placeholder="Start writing in Markdown..."
