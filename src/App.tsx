@@ -607,7 +607,7 @@ export default function App() {
     const nb = state.notebooks.find((n) => n.id === id);
     const ok = await confirm({
       title: 'Archive notebook?',
-      message: `“${nb?.title?.trim() || 'Notebook'}” will move to Archived. You can restore it from Bookshelf → Archived.`,
+      message: `“${nb?.title?.trim() || 'Memory'}” will move to Archived. Restore it from Mind → Archived.`,
       confirmLabel: 'Archive',
       variant: 'default',
     });
@@ -790,15 +790,10 @@ export default function App() {
     );
   }
 
-  const activeShelfTitle =
-    activeBookshelfId != null
-      ? bookshelves.find((b) => b.id === activeBookshelfId)?.title
-      : undefined;
-
   return (
     <div className="flex h-screen flex-col overflow-hidden font-sans studio-shell notes-atelier text-[var(--app-fg)]">
-      <header className="app-topbar flex h-12 shrink-0 select-none items-center justify-between gap-2 px-3 sm:px-4">
-        <div className="flex min-w-0 items-center gap-2 sm:gap-3">
+      <header className="app-topbar flex h-14 shrink-0 select-none items-center justify-between gap-2 px-3 sm:px-5">
+        <div className="flex min-w-0 items-center gap-2 sm:gap-4">
           {mainView === 'notes' && (
             <button
               type="button"
@@ -812,36 +807,37 @@ export default function App() {
           )}
           <div className="flex min-w-0 shrink-0 items-center gap-2">
             <Logo className="h-6 w-auto" />
-            <span className="hidden text-sm font-medium tracking-tight sm:inline">
+            <span className="hidden text-sm font-medium tracking-[0.04em] sm:inline">
               Lumina
             </span>
-            {mainView === 'notes' && activeShelfTitle && (
-              <span
-                className="hidden max-w-[160px] truncate text-xs font-normal text-[var(--app-muted)] lg:inline"
-                title={activeShelfTitle}
-              >
-                · {activeShelfTitle}
-              </span>
-            )}
           </div>
-          <nav className="ml-1 hidden items-center gap-0.5 md:flex" aria-label="Main">
+          <nav className="mind-nav" aria-label="Main">
             <button
               type="button"
-              onClick={() => setMainView('notes')}
-              data-active={mainView === 'notes'}
-              className="app-topbar-btn"
+              onClick={() => setMainView('profile')}
+              data-active={mainView === 'profile'}
+              className="mind-nav-btn"
             >
-              <BookOpen className="h-4 w-4" />
-              Notes
+              <UserIcon className="h-3.5 w-3.5" />
+              Profile
             </button>
             <button
               type="button"
               onClick={() => setMainView('bookshelf')}
               data-active={mainView === 'bookshelf'}
-              className="app-topbar-btn"
+              className="mind-nav-btn"
             >
-              <Library className="h-4 w-4" />
-              Library
+              <Library className="h-3.5 w-3.5" />
+              Mind
+            </button>
+            <button
+              type="button"
+              onClick={() => setMainView('notes')}
+              data-active={mainView === 'notes'}
+              className="mind-nav-btn"
+            >
+              <BookOpen className="h-3.5 w-3.5" />
+              Notes
             </button>
           </nav>
         </div>
@@ -1038,12 +1034,12 @@ export default function App() {
           <div className="flex h-full flex-col items-center justify-center px-6 text-[var(--app-muted)]">
             <Library className="mb-4 h-12 w-12 text-[var(--spine)]" />
             <p className="mb-4 max-w-md text-center font-display text-lg text-[var(--app-fg)]">
-              Open a bookshelf
+              Enter a room
             </p>
             <p className="mb-6 max-w-md text-center text-sm">
               {bookshelves.length === 0
-                ? 'Create a bookshelf in Library, then add notebooks and open a page to write Markdown.'
-                : 'Choose a bookshelf from Library to load your notebooks and pages.'}
+                ? 'In Library, create a room in your mind, place memory books inside, then open a page to write.'
+                : 'Choose a room in Library — its memory books become the notebooks you write in Notes.'}
             </p>
             <button
               type="button"
@@ -1188,12 +1184,12 @@ export default function App() {
                 <div className="flex h-full flex-col items-center justify-center px-6 text-[var(--app-muted)]">
                   <div className="paper-page flex max-w-md flex-col items-center rounded-2xl border border-[var(--app-border)] p-10 text-center">
                     <BookOpen className="mb-4 h-10 w-10 text-[var(--spine)]" />
-                    <h2 className="font-display text-2xl font-medium text-[var(--app-fg)]">
-                      Open a page
+                    <h2 className="font-display text-2xl font-medium tracking-tight text-[var(--app-fg)]">
+                      Begin typing
                     </h2>
-                    <p className="mt-2 text-sm leading-relaxed">
-                      Pick a book, open a chapter, then a page — and write in
-                      Markdown. Quiet space for projects, journaling, and daily notes.
+                    <p className="mt-2 text-sm leading-relaxed tracking-[0.02em]">
+                      Open a book, chapter, and page — or speak a thought into Markdown.
+                      The Acoustic Pillar waits without noise.
                     </p>
                   </div>
                 </div>
@@ -1215,7 +1211,13 @@ export default function App() {
           ) : null}
         </div>
         <div className="flex items-center gap-4">
-          <span>Quiet writing</span>
+          <span>
+            {mainView === 'notes'
+              ? 'Acoustic pillar'
+              : mainView === 'bookshelf'
+                ? 'Rooms of memory'
+                : 'Inner resonance'}
+          </span>
         </div>
       </footer>
 
