@@ -43,6 +43,7 @@ import { api } from './lib/api';
 import {
   clearSession,
   getInitialAuthState,
+
   readActiveBookshelfId,
   readToken,
   writeActiveBookshelfId,
@@ -62,6 +63,7 @@ import {
   pageToMarkdown,
   parseImportedMarkdown,
 } from './lib/markdownIO';
+import { isElectronApp } from './lib/platform';
 import { useAppDialogs } from './context/AppDialogsContext';
 
 function findPageInState(state: AppState, pageId: string): Page | undefined {
@@ -90,6 +92,7 @@ function secondaryStillValid(
 
 export default function App() {
   const { confirm } = useAppDialogs();
+  const desktopShell = isElectronApp();
   const [auth, setAuth] = useState<AuthState>(getInitialAuthState);
 
   const [state, setState] = useState<AppState>({
@@ -104,7 +107,8 @@ export default function App() {
   const [viewMode, setViewMode] = useState<EditorViewMode>('split');
   const [isSidebarVisible, setIsSidebarVisible] = useState(true);
   const [isAppLoading, setIsAppLoading] = useState(false);
-  const [showAuth, setShowAuth] = useState(false);
+  // Desktop app skips the marketing landing page and opens Sign In.
+  const [showAuth, setShowAuth] = useState(desktopShell);
   const [demoPrefill, setDemoPrefill] = useState(false);
   const [demoLoginLoading, setDemoLoginLoading] = useState(false);
   const [searchOpen, setSearchOpen] = useState(false);
@@ -693,14 +697,18 @@ export default function App() {
   }
 
   if (!auth.user) {
-    if (showAuth) {
+    if (showAuth || desktopShell) {
       return (
         <Auth
           onAuthSuccess={handleAuthSuccess}
-          onBack={() => {
-            setDemoPrefill(false);
-            setShowAuth(false);
-          }}
+          onBack={
+            desktopShell
+              ? undefined
+              : () => {
+                  setDemoPrefill(false);
+                  setShowAuth(false);
+                }
+          }
           prefillDemo={demoPrefill}
         />
       );
@@ -933,6 +941,14 @@ export default function App() {
             onThemeChange={setTheme}
             onBack={() => setMainView('notes')}
             onUserUpdated={handleUserUpdated}
+            onLibraryChanged={() => {
+              void fetchData();
+              void refreshBookshelves();
+            }}
+            onAccountClosed={() => {
+              setMainView('notes');
+              handleLogout();
+            }}
           />
         ) : mainView === 'bookshelf' ? (
           <BookshelfPage

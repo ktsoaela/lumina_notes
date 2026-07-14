@@ -40,7 +40,11 @@ export const api = {
       if (!res.ok) throw new Error('Auth failed');
       return res.json();
     },
-    updateProfile: async (body: { name?: string; email?: string }) => {
+    updateProfile: async (body: {
+      name?: string;
+      email?: string;
+      username?: string | null;
+    }) => {
       const res = await fetch('/api/auth/profile', {
         method: 'PUT',
         headers: getHeaders(),
@@ -61,12 +65,49 @@ export const api = {
       }
       return res.json() as Promise<{ token: string; user: User }>;
     },
+    closeAccount: async () => {
+      const res = await fetch('/api/auth/account', {
+        method: 'DELETE',
+        headers: getHeaders(),
+      });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({})) as { detail?: string };
+        throw new Error(err.detail || 'Failed to close account');
+      }
+    },
   },
   user: {
     stats: async () => {
       const res = await fetch('/api/user/stats', { headers: getHeaders() });
       if (!res.ok) throw new Error('Failed to load stats');
       return res.json() as Promise<UserStats>;
+    },
+    backup: async () => {
+      const res = await fetch('/api/user/backup', { headers: getHeaders() });
+      if (!res.ok) throw new Error('Failed to create backup');
+      return res.json() as Promise<Record<string, unknown>>;
+    },
+    importBackup: async (payload: Record<string, unknown>) => {
+      const res = await fetch('/api/user/backup/import', {
+        method: 'POST',
+        headers: getHeaders(),
+        body: JSON.stringify(payload),
+      });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({})) as { detail?: string };
+        throw new Error(err.detail || 'Import failed');
+      }
+      return res.json() as Promise<{ ok: boolean; stats?: UserStats }>;
+    },
+    deleteData: async () => {
+      const res = await fetch('/api/user/data', {
+        method: 'DELETE',
+        headers: getHeaders(),
+      });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({})) as { detail?: string };
+        throw new Error(err.detail || 'Failed to delete data');
+      }
     },
   },
   bookshelves: {
