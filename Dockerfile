@@ -26,7 +26,7 @@ RUN pip install --no-cache-dir -r requirements.txt \
     && mkdir -p /data \
     && chown -R lumina:lumina /app /data
 
-COPY app.py run_api.py manage.py ./
+COPY app.py db.py run_api.py manage.py ./
 COPY lumina ./lumina
 COPY core ./core
 COPY --from=frontend /app/dist ./dist

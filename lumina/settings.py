@@ -93,15 +93,31 @@ TEMPLATES = [
 
 WSGI_APPLICATION = "lumina.wsgi.application"
 
-_db_path = os.environ.get("DATABASE_PATH")
-DATABASES = {
-    "default": {
-        "ENGINE": "django.db.backends.sqlite3",
-        "NAME": Path(_db_path).expanduser().resolve()
-        if _db_path
-        else BASE_DIR / "database.sqlite",
+_database_url = (os.environ.get("DATABASE_URL") or "").strip()
+if _database_url.startswith(("postgres://", "postgresql://")):
+    from urllib.parse import urlparse
+
+    _u = urlparse(_database_url)
+    DATABASES = {
+        "default": {
+            "ENGINE": "django.db.backends.postgresql",
+            "NAME": (_u.path or "/").lstrip("/") or "lumina",
+            "USER": _u.username or "",
+            "PASSWORD": _u.password or "",
+            "HOST": _u.hostname or "",
+            "PORT": str(_u.port or 5432),
+        }
     }
-}
+else:
+    _db_path = os.environ.get("DATABASE_PATH")
+    DATABASES = {
+        "default": {
+            "ENGINE": "django.db.backends.sqlite3",
+            "NAME": Path(_db_path).expanduser().resolve()
+            if _db_path
+            else BASE_DIR / "database.sqlite",
+        }
+    }
 
 AUTH_PASSWORD_VALIDATORS = [
     {"NAME": "django.contrib.auth.password_validation.UserAttributeSimilarityValidator"},

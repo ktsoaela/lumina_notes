@@ -1,9 +1,8 @@
-"""Lumina Notes API: FastAPI + SQLite."""
+"""Lumina Notes API: FastAPI + SQLite (desktop) / PostgreSQL (server prod)."""
 from __future__ import annotations
 
 import os
 import re
-import sqlite3
 import sys
 import time
 import logging
@@ -20,6 +19,9 @@ import bcrypt
 from jose import JWTError, jwt
 from pydantic import BaseModel, Field, field_validator, model_validator
 
+import db as database
+from db import Connection, IntegrityError, OperationalError, SQLITE_PATH, USE_POSTGRES
+
 
 def _paths() -> tuple[Path, Path]:
     """DB next to the executable when frozen (writable); static assets from bundle."""
@@ -31,9 +33,8 @@ def _paths() -> tuple[Path, Path]:
     return root / "database.sqlite", root / "dist"
 
 
-DB_PATH, DIST_DIR = _paths()
-if os.environ.get("DATABASE_PATH"):
-    DB_PATH = Path(os.environ["DATABASE_PATH"]).expanduser().resolve()
+_DB_PATH_LEGACY, DIST_DIR = _paths()
+DB_PATH = SQLITE_PATH
 
 LUMINA_ENV = os.environ.get("LUMINA_ENV", "development").strip().lower()
 IS_PRODUCTION = LUMINA_ENV in ("production", "prod")
@@ -158,75 +159,27 @@ def verify_password(plain: str, hashed: str) -> bool:
     except (ValueError, TypeError):
         return False
 
-SCHEMA = """
-CREATE TABLE IF NOT EXISTS schema_meta (
-  key TEXT PRIMARY KEY,
-  value TEXT NOT NULL
-);
-
-CREATE TABLE IF NOT EXISTS users (
-  id INTEGER PRIMARY KEY AUTOINCREMENT,
-  email TEXT UNIQUE,
-  username TEXT,
-  password TEXT,
-  name TEXT
-);
-
-CREATE TABLE IF NOT EXISTS bookshelves (
-  id TEXT PRIMARY KEY,
-  userId INTEGER NOT NULL,
-  name TEXT NOT NULL,
-  createdAt DATETIME DEFAULT CURRENT_TIMESTAMP,
-  FOREIGN KEY(userId) REFERENCES users(id)
-);
-
-CREATE TABLE IF NOT EXISTS notebooks (
-  id TEXT PRIMARY KEY,
-  userId INTEGER,
-  name TEXT,
-  bookshelfId TEXT,
-  archived INTEGER NOT NULL DEFAULT 0,
-  createdAt DATETIME DEFAULT CURRENT_TIMESTAMP,
-  FOREIGN KEY(userId) REFERENCES users(id),
-  FOREIGN KEY(bookshelfId) REFERENCES bookshelves(id)
-);
-
-CREATE TABLE IF NOT EXISTS sections (
-  id TEXT PRIMARY KEY,
-  notebookId TEXT,
-  name TEXT,
-  createdAt DATETIME DEFAULT CURRENT_TIMESTAMP,
-  FOREIGN KEY(notebookId) REFERENCES notebooks(id)
-);
-
-CREATE TABLE IF NOT EXISTS pages (
-  id TEXT PRIMARY KEY,
-  sectionId TEXT,
-  title TEXT,
-  content TEXT,
-  updatedAt DATETIME DEFAULT CURRENT_TIMESTAMP,
-  FOREIGN KEY(sectionId) REFERENCES sections(id)
-);
-"""
+SCHEMA = database.SCHEMA_SQLITE
 
 
-def _migrate_bookshelves(conn: sqlite3.Connection) -> None:
+def _migrate_bookshelves(conn: Connection) -> None:
     """Create bookshelves table, add notebooks.bookshelfId, backfill per-user defaults."""
-    conn.execute(
-        """
-        CREATE TABLE IF NOT EXISTS bookshelves (
-            id TEXT PRIMARY KEY,
-            userId INTEGER NOT NULL,
-            name TEXT NOT NULL,
-            createdAt DATETIME DEFAULT CURRENT_TIMESTAMP,
-            FOREIGN KEY(userId) REFERENCES users(id)
+    if conn.dialect == "sqlite":
+        conn.execute(
+            """
+            CREATE TABLE IF NOT EXISTS bookshelves (
+                id TEXT PRIMARY KEY,
+                userId INTEGER NOT NULL,
+                name TEXT NOT NULL,
+                createdAt DATETIME DEFAULT CURRENT_TIMESTAMP,
+                FOREIGN KEY(userId) REFERENCES users(id)
+            )
+            """
         )
-        """
-    )
-    try:
-        conn.execute("ALTER TABLE notebooks ADD COLUMN bookshelfId TEXT")
-    except sqlite3.OperationalError:
-        pass
+        try:
+            conn.execute("ALTER TABLE notebooks ADD COLUMN bookshelfId TEXT")
+        except OperationalError:
+            pass
     for row in conn.execute("SELECT id FROM users").fetchall():
         uid = int(row["id"])
         bid = f"bs-{uid}-default"
@@ -243,7 +196,7 @@ def _migrate_bookshelves(conn: sqlite3.Connection) -> None:
         )
 
 
-def _insert_default_bookshelf(db: sqlite3.Connection, user_id: int) -> None:
+def _insert_default_bookshelf(db: Connection, user_id: int) -> None:
     """Ensure a new Lumina user has a default shelf (same id pattern as migration)."""
     bid = f"bs-{user_id}-default"
     db.execute(
@@ -252,7 +205,7 @@ def _insert_default_bookshelf(db: sqlite3.Connection, user_id: int) -> None:
     )
 
 
-def _seed_demo_user(conn: sqlite3.Connection) -> None:
+def _seed_demo_user(conn: Connection) -> None:
     """Public demo account: username and password `demo_user`; two notebooks on the default shelf."""
     demo_email = "demo_user@demo.lumina.local"
     demo_login = "demo_user"
@@ -440,39 +393,13 @@ Use a backslash to show literal formatting characters: \\*not italic\\*
 
 
 def init_db() -> None:
-    conn = sqlite3.connect(DB_PATH)
-    conn.row_factory = sqlite3.Row
+    conn = database.connect()
     try:
-        conn.executescript(SCHEMA)
-        try:
-            conn.execute("ALTER TABLE users ADD COLUMN username TEXT")
-        except sqlite3.OperationalError:
-            pass
-        try:
-            conn.execute(
-                "CREATE UNIQUE INDEX IF NOT EXISTS idx_users_username "
-                "ON users(username) WHERE username IS NOT NULL"
-            )
-        except sqlite3.OperationalError:
-            pass
-        try:
-            conn.execute(
-                "ALTER TABLE notebooks ADD COLUMN archived INTEGER NOT NULL DEFAULT 0"
-            )
-        except sqlite3.OperationalError:
-            pass
+        database.init_schema(conn)
         _migrate_bookshelves(conn)
         conn.execute(
-            """
-            CREATE TABLE IF NOT EXISTS schema_meta (
-              key TEXT PRIMARY KEY,
-              value TEXT NOT NULL
-            )
-            """
-        )
-        conn.execute(
-            "INSERT OR REPLACE INTO schema_meta (key, value) VALUES ('version', ?)",
-            (SCHEMA_VERSION,),
+            "INSERT OR REPLACE INTO schema_meta (key, value) VALUES (?, ?)",
+            ("version", SCHEMA_VERSION),
         )
         if SEED_DEMO_USER:
             _seed_demo_user(conn)
@@ -482,10 +409,7 @@ def init_db() -> None:
 
 
 def get_db():
-    # FastAPI runs sync deps in a thread pool; enter/exit can run on different threads.
-    # check_same_thread=False is required for sqlite3 in that model (single writer is still fine).
-    conn = sqlite3.connect(DB_PATH, check_same_thread=False)
-    conn.row_factory = sqlite3.Row
+    conn = database.connect()
     try:
         yield conn
         conn.commit()
@@ -496,7 +420,7 @@ def get_db():
         conn.close()
 
 
-Db = Annotated[sqlite3.Connection, Depends(get_db)]
+Db = Annotated[Connection, Depends(get_db)]
 
 
 def create_token(user_id: int, email: str, name: str) -> str:
@@ -539,7 +463,7 @@ def _normalize_username(raw: str | None) -> str | None:
     return s
 
 
-def _link_django_user(db: sqlite3.Connection, body: "LoginBody", dj: sqlite3.Row) -> tuple[int, str, str]:
+def _link_django_user(db: Connection, body: "LoginBody", dj: Any) -> tuple[int, str, str]:
     """Create or update Lumina users row after successful Django password check."""
     login_key = body.login_key()
     email_from_dj = (dj["email"] or "").strip()
@@ -610,7 +534,7 @@ def get_current_user(
 CurrentUser = Annotated[dict[str, Any], Depends(get_current_user)]
 
 
-def _row_to_user(row: sqlite3.Row) -> dict[str, Any]:
+def _row_to_user(row: Any) -> dict[str, Any]:
     d = {k: row[k] for k in row.keys()}
     return {
         "id": int(d["id"]),
@@ -829,7 +753,7 @@ class SectionUpdate(BaseModel):
         return name
 
 
-def _bookshelf_owned(db: sqlite3.Connection, bookshelf_id: str, user_id: int) -> bool:
+def _bookshelf_owned(db: Connection, bookshelf_id: str, user_id: int) -> bool:
     row = db.execute(
         "SELECT 1 FROM bookshelves WHERE id = ? AND userId = ?",
         (bookshelf_id, user_id),
@@ -837,7 +761,7 @@ def _bookshelf_owned(db: sqlite3.Connection, bookshelf_id: str, user_id: int) ->
     return row is not None
 
 
-def _notebook_owned(db: sqlite3.Connection, notebook_id: str, user_id: int) -> bool:
+def _notebook_owned(db: Connection, notebook_id: str, user_id: int) -> bool:
     row = db.execute(
         "SELECT 1 FROM notebooks WHERE id = ? AND userId = ?",
         (notebook_id, user_id),
@@ -845,7 +769,7 @@ def _notebook_owned(db: sqlite3.Connection, notebook_id: str, user_id: int) -> b
     return row is not None
 
 
-def _section_owned(db: sqlite3.Connection, section_id: str, user_id: int) -> bool:
+def _section_owned(db: Connection, section_id: str, user_id: int) -> bool:
     row = db.execute(
         """
         SELECT 1 FROM sections s
@@ -857,7 +781,7 @@ def _section_owned(db: sqlite3.Connection, section_id: str, user_id: int) -> boo
     return row is not None
 
 
-def _page_owned(db: sqlite3.Connection, page_id: str, user_id: int) -> bool:
+def _page_owned(db: Connection, page_id: str, user_id: int) -> bool:
     row = db.execute(
         """
         SELECT 1 FROM pages p
@@ -922,7 +846,7 @@ def _startup() -> None:
         LUMINA_ENV,
         ENABLE_DOCS,
         SEED_DEMO_USER,
-        DB_PATH,
+        "postgres" if USE_POSTGRES else str(DB_PATH),
     )
 
 
@@ -930,20 +854,7 @@ def _startup() -> None:
 def health():
     """Liveness + DB readiness for container / Kubernetes probes."""
     try:
-        conn = sqlite3.connect(str(DB_PATH), timeout=2.0)
-        try:
-            conn.execute("SELECT 1").fetchone()
-            schema_version: str | None = None
-            try:
-                row = conn.execute(
-                    "SELECT value FROM schema_meta WHERE key = 'version'"
-                ).fetchone()
-                if row is not None:
-                    schema_version = str(row[0])
-            except sqlite3.OperationalError:
-                pass
-        finally:
-            conn.close()
+        info = database.ping()
     except Exception as exc:
         return JSONResponse(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
@@ -955,8 +866,9 @@ def health():
         )
     return {
         "status": "ok",
-        "database": "ok",
-        "schema_version": schema_version,
+        "database": info.get("database", "ok"),
+        "driver": info.get("driver"),
+        "schema_version": info.get("schema_version"),
         "env": LUMINA_ENV,
     }
 
@@ -985,7 +897,7 @@ def auth_signup(request: Request, body: SignupBody, db: Db):
             (email, hashed, body.name, uname),
         )
         user_id = int(cur.lastrowid)
-    except sqlite3.IntegrityError:
+    except IntegrityError:
         raise HTTPException(
             status.HTTP_400_BAD_REQUEST,
             detail="Email or username already exists",
@@ -1036,7 +948,7 @@ def auth_login(request: Request, body: LoginBody, db: Db):
             """,
             (key, key),
         ).fetchone()
-    except sqlite3.OperationalError:
+    except OperationalError:
         dj = None
 
     if dj is None or not _django_check_password(body.password, dj["password"]):
@@ -1166,7 +1078,7 @@ def user_stats(user: CurrentUser, db: Db):
     }
 
 
-def _export_user_library(db: sqlite3.Connection, user_id: int) -> dict[str, Any]:
+def _export_user_library(db: Connection, user_id: int) -> dict[str, Any]:
     shelves = db.execute(
         "SELECT id, name, createdAt FROM bookshelves WHERE userId = ? ORDER BY createdAt ASC, id ASC",
         (user_id,),
@@ -1234,7 +1146,7 @@ def _export_user_library(db: sqlite3.Connection, user_id: int) -> dict[str, Any]
     return {"bookshelves": shelf_payload}
 
 
-def _delete_user_library(db: sqlite3.Connection, user_id: int) -> None:
+def _delete_user_library(db: Connection, user_id: int) -> None:
     notebooks = db.execute(
         "SELECT id FROM notebooks WHERE userId = ?", (user_id,)
     ).fetchall()
@@ -1249,7 +1161,7 @@ def _delete_user_library(db: sqlite3.Connection, user_id: int) -> None:
     db.execute("DELETE FROM bookshelves WHERE userId = ?", (user_id,))
 
 
-def _import_user_library(db: sqlite3.Connection, user_id: int, payload: dict[str, Any]) -> None:
+def _import_user_library(db: Connection, user_id: int, payload: dict[str, Any]) -> None:
     shelves = payload.get("bookshelves")
     if not isinstance(shelves, list):
         raise HTTPException(
@@ -1267,7 +1179,7 @@ def _import_user_library(db: sqlite3.Connection, user_id: int, payload: dict[str
                 "INSERT INTO bookshelves (id, userId, name) VALUES (?, ?, ?)",
                 (str(sh["id"]), user_id, str(sh["name"])),
             )
-        except sqlite3.IntegrityError:
+        except IntegrityError:
             sid = f"bs-{user_id}-{int(time.time() * 1000)}"
             db.execute(
                 "INSERT INTO bookshelves (id, userId, name) VALUES (?, ?, ?)",
@@ -1292,7 +1204,7 @@ def _import_user_library(db: sqlite3.Connection, user_id: int, payload: dict[str
                         1 if nb.get("archived") else 0,
                     ),
                 )
-            except sqlite3.IntegrityError:
+            except IntegrityError:
                 nb_id = f"nb-{user_id}-{int(time.time() * 1000)}"
                 db.execute(
                     """
@@ -1316,7 +1228,7 @@ def _import_user_library(db: sqlite3.Connection, user_id: int, payload: dict[str
                         "INSERT INTO sections (id, notebookId, name) VALUES (?, ?, ?)",
                         (sec_id, nb_id, str(sec["name"])),
                     )
-                except sqlite3.IntegrityError:
+                except IntegrityError:
                     sec_id = f"sec-{user_id}-{int(time.time() * 1000)}"
                     db.execute(
                         "INSERT INTO sections (id, notebookId, name) VALUES (?, ?, ?)",
@@ -1336,7 +1248,7 @@ def _import_user_library(db: sqlite3.Connection, user_id: int, payload: dict[str
                             """,
                             (page_id, sec_id, title, content),
                         )
-                    except sqlite3.IntegrityError:
+                    except IntegrityError:
                         page_id = f"page-{user_id}-{int(time.time() * 1000)}"
                         db.execute(
                             """
@@ -1401,7 +1313,7 @@ def create_bookshelf(user: CurrentUser, body: BookshelfCreate, db: Db):
             "INSERT INTO bookshelves (id, userId, name) VALUES (?, ?, ?)",
             (body.id, user["id"], body.name),
         )
-    except sqlite3.IntegrityError:
+    except IntegrityError:
         raise HTTPException(
             status.HTTP_400_BAD_REQUEST,
             detail="Bookshelf id already exists",
@@ -1473,7 +1385,7 @@ def create_notebook(user: CurrentUser, body: NotebookCreate, db: Db):
             """,
             (body.id, user["id"], body.name, body.bookshelfId),
         )
-    except sqlite3.IntegrityError:
+    except IntegrityError:
         raise HTTPException(
             status.HTTP_400_BAD_REQUEST,
             detail="Notebook id already exists",
