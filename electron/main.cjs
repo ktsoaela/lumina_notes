@@ -88,7 +88,8 @@ async function createWindow() {
         contextIsolation: true,
       },
     });
-    await mainWindow.loadURL("http://127.0.0.1:5173");
+    // desktop=1 reinforces app shell routing (Sign In, not marketing site)
+    await mainWindow.loadURL("http://127.0.0.1:5173/?desktop=1");
   } else {
     await startBackend();
     mainWindow = new BrowserWindow({
@@ -100,7 +101,7 @@ async function createWindow() {
         contextIsolation: true,
       },
     });
-    await mainWindow.loadURL(PROD_URL);
+    await mainWindow.loadURL(`${PROD_URL}?desktop=1`);
   }
 
   mainWindow.on("closed", () => {

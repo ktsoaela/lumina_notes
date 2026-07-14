@@ -6,7 +6,8 @@ import { api } from '../lib/api';
 
 interface AuthProps {
   onAuthSuccess: (user: any, token: string) => void;
-  onBack: () => void;
+  /** Omit in Electron so Sign In has no back-to-website control. */
+  onBack?: () => void;
   /** Pre-fill demo credentials (after View Demo failed or manual sign-in help) */
   prefillDemo?: boolean;
 }
@@ -69,13 +70,17 @@ export default function Auth({ onAuthSuccess, onBack, prefillDemo }: AuthProps) 
         animate={{ opacity: 1, y: 0 }}
         className="w-full max-w-md"
       >
-        <button 
-          onClick={onBack}
-          className="flex items-center gap-2 text-sm font-medium text-gray-500 dark:text-[var(--app-muted)] hover:text-brand-600 dark:hover:text-brand-400 transition-colors mb-8 group"
-        >
-          <ArrowLeft className="w-4 h-4 group-hover:-translate-x-1 transition-transform" />
-          Back to Home
-        </button>
+        {onBack ? (
+          <button 
+            onClick={onBack}
+            className="flex items-center gap-2 text-sm font-medium text-gray-500 dark:text-[var(--app-muted)] hover:text-brand-600 dark:hover:text-brand-400 transition-colors mb-8 group"
+          >
+            <ArrowLeft className="w-4 h-4 group-hover:-translate-x-1 transition-transform" />
+            Back to Home
+          </button>
+        ) : (
+          <div className="mb-8" />
+        )}
 
         <div className="bg-white dark:bg-[var(--app-surface)] rounded-3xl shadow-xl shadow-brand-100 dark:shadow-black/30 border border-gray-100 dark:border-[var(--app-border)] overflow-hidden">
           <div className="p-8 pb-0 text-center">
