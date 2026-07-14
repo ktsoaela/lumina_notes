@@ -56,6 +56,12 @@ import {
   type ThemeMode,
 } from './lib/theme';
 import {
+  applyA11y,
+  getStoredA11y,
+  setStoredA11y,
+  type A11yPrefs,
+} from './lib/a11y';
+import {
   downloadText,
   pageToMarkdown,
   parseImportedMarkdown,
@@ -126,6 +132,12 @@ export default function App() {
     applyTheme(theme);
     setStoredTheme(theme);
   }, [theme]);
+
+  const [a11y, setA11y] = useState<A11yPrefs>(() => getStoredA11y());
+  useEffect(() => {
+    applyA11y(a11y);
+    setStoredA11y(a11y);
+  }, [a11y]);
 
   const [bookshelves, setBookshelves] = useState<Bookshelf[]>([]);
   const [activeBookshelfId, setActiveBookshelfId] = useState<string | null>(() =>
@@ -784,105 +796,96 @@ export default function App() {
       : undefined;
 
   return (
-    <div className="flex h-screen flex-col overflow-hidden bg-[var(--app-bg)] font-sans text-[var(--app-fg)] notes-atelier">
-      <header className="h-12 bg-brand-700 text-white flex items-center px-3 sm:px-4 justify-between shrink-0 select-none gap-2">
-        <div className="flex items-center gap-2 sm:gap-4 min-w-0">
+    <div className="flex h-screen flex-col overflow-hidden font-sans studio-shell notes-atelier text-[var(--app-fg)]">
+      <header className="app-topbar flex h-12 shrink-0 select-none items-center justify-between gap-2 px-3 sm:px-4">
+        <div className="flex min-w-0 items-center gap-2 sm:gap-3">
           {mainView === 'notes' && (
             <button
               type="button"
               onClick={() => setIsSidebarVisible(!isSidebarVisible)}
-              className="p-1.5 hover:bg-white/10 rounded-md transition-colors shrink-0"
+              className="app-topbar-btn shrink-0 !p-1.5"
               title="Toggle sidebar"
+              aria-label="Toggle sidebar"
             >
-              <Menu className="w-5 h-5" />
+              <Menu className="h-5 w-5" />
             </button>
           )}
-          <div className="flex items-center gap-2 font-semibold shrink-0 min-w-0">
-            <Logo variant="mono" className="h-7 w-auto" />
-            <span className="text-sm hidden sm:inline">Lumina Notes</span>
+          <div className="flex min-w-0 shrink-0 items-center gap-2">
+            <Logo className="h-6 w-auto" />
+            <span className="hidden text-sm font-medium tracking-tight sm:inline">
+              Lumina
+            </span>
             {mainView === 'notes' && activeShelfTitle && (
               <span
-                className="hidden lg:inline text-xs font-normal text-white/75 truncate max-w-[160px]"
+                className="hidden max-w-[160px] truncate text-xs font-normal text-[var(--app-muted)] lg:inline"
                 title={activeShelfTitle}
               >
                 · {activeShelfTitle}
               </span>
             )}
           </div>
-          <nav className="hidden md:flex items-center gap-0.5 ml-1">
+          <nav className="ml-1 hidden items-center gap-0.5 md:flex" aria-label="Main">
             <button
               type="button"
               onClick={() => setMainView('notes')}
-              className={cn(
-                'flex items-center gap-1.5 rounded-md px-2.5 py-1.5 text-xs font-medium transition-colors',
-                mainView === 'notes' ? 'bg-white/20' : 'hover:bg-white/10'
-              )}
+              data-active={mainView === 'notes'}
+              className="app-topbar-btn"
             >
-              <BookOpen className="w-4 h-4" />
+              <BookOpen className="h-4 w-4" />
               Notes
             </button>
             <button
               type="button"
               onClick={() => setMainView('bookshelf')}
-              className={cn(
-                'flex items-center gap-1.5 rounded-md px-2.5 py-1.5 text-xs font-medium transition-colors',
-                mainView === 'bookshelf' ? 'bg-white/20' : 'hover:bg-white/10'
-              )}
+              data-active={mainView === 'bookshelf'}
+              className="app-topbar-btn"
             >
-              <Library className="w-4 h-4" />
+              <Library className="h-4 w-4" />
               Library
             </button>
           </nav>
         </div>
 
-        <div className="flex items-center gap-0.5 sm:gap-1 shrink-0">
+        <div className="flex shrink-0 items-center gap-0.5 sm:gap-1">
           {mainView === 'notes' && (
             <>
               <button
                 type="button"
                 onClick={() => setViewMode('edit')}
-                className={cn(
-                  'p-2 hover:bg-white/10 rounded-md transition-colors',
-                  viewMode === 'edit' && 'bg-white/20'
-                )}
-                title="Edit Mode"
+                data-active={viewMode === 'edit'}
+                className="app-topbar-btn !p-2"
+                title="Edit"
               >
-                <Edit3 className="w-4 h-4" />
+                <Edit3 className="h-4 w-4" />
               </button>
               <button
                 type="button"
                 onClick={() => setViewMode('split')}
-                className={cn(
-                  'p-2 hover:bg-white/10 rounded-md transition-colors',
-                  viewMode === 'split' && 'bg-white/20'
-                )}
-                title="Split View"
+                data-active={viewMode === 'split'}
+                className="app-topbar-btn !p-2"
+                title="Split"
               >
-                <Columns className="w-4 h-4" />
+                <Columns className="h-4 w-4" />
               </button>
               <button
                 type="button"
                 onClick={() => setViewMode('preview')}
-                className={cn(
-                  'p-2 hover:bg-white/10 rounded-md transition-colors',
-                  viewMode === 'preview' && 'bg-white/20'
-                )}
-                title="Preview Mode"
+                data-active={viewMode === 'preview'}
+                className="app-topbar-btn !p-2"
+                title="Preview"
               >
-                <Eye className="w-4 h-4" />
+                <Eye className="h-4 w-4" />
               </button>
               <button
                 type="button"
                 onClick={() => setDualPageOpen((v) => !v)}
-                className={cn(
-                  'p-2 hover:bg-white/10 rounded-md transition-colors',
-                  dualPageOpen && 'bg-white/20'
-                )}
-                title="Two notes side by side — Shift+click a page for the right pane"
+                data-active={dualPageOpen}
+                className="app-topbar-btn !p-2"
+                title="Two pages side by side — Shift+click a page for the right pane"
               >
-                <SquareSplitHorizontal className="w-4 h-4" />
+                <SquareSplitHorizontal className="h-4 w-4" />
               </button>
-              <div className="w-px h-4 bg-white/20 mx-1 hidden sm:block" />
+              <div className="mx-1 hidden h-4 w-px bg-[var(--app-border)] sm:block" />
             </>
           )}
 
@@ -890,12 +893,12 @@ export default function App() {
             <button
               type="button"
               onClick={() => setSearchOpen(true)}
-              className="flex items-center gap-2 rounded-md px-2 py-1.5 text-xs text-white/90 hover:bg-white/10 transition-colors"
+              className="app-topbar-btn"
               title="Search (Ctrl+K)"
             >
-              <Search className="w-4 h-4" />
+              <Search className="h-4 w-4" />
               <span className="hidden lg:inline">Search</span>
-              <kbd className="hidden lg:inline rounded border border-white/20 bg-white/10 px-1 font-mono text-[10px]">
+              <kbd className="hidden rounded border border-[var(--app-border)] bg-[var(--gutter)] px-1 font-mono text-[10px] lg:inline">
                 {typeof navigator !== 'undefined' &&
                 /Mac|iPhone|iPod|iPad/i.test(navigator.platform)
                   ? '⌘K'
@@ -910,15 +913,15 @@ export default function App() {
               onClick={() => setProfileMenuOpen((o) => !o)}
               aria-expanded={profileMenuOpen}
               aria-haspopup="menu"
-              className="flex items-center gap-2 rounded-md px-2 py-1.5 text-left transition-colors hover:bg-white/10 focus:outline-none focus-visible:ring-2 focus-visible:ring-white/80 focus-visible:ring-offset-2 focus-visible:ring-offset-brand-700"
+              className="app-topbar-btn"
             >
-              <UserIcon className="w-4 h-4 shrink-0" aria-hidden />
-              <span className="text-xs font-medium max-w-[80px] sm:max-w-[120px] truncate hidden sm:inline">
+              <UserIcon className="h-4 w-4 shrink-0" aria-hidden />
+              <span className="hidden max-w-[80px] truncate text-xs font-medium sm:inline sm:max-w-[120px]">
                 {auth.user.name}
               </span>
               <ChevronDown
                 className={cn(
-                  'hidden h-3.5 w-3.5 shrink-0 opacity-80 transition-transform sm:block',
+                  'hidden h-3.5 w-3.5 shrink-0 opacity-70 transition-transform sm:block',
                   profileMenuOpen && 'rotate-180'
                 )}
                 aria-hidden
@@ -926,7 +929,7 @@ export default function App() {
             </button>
             {profileMenuOpen ? (
               <div
-                className="absolute top-full right-0 z-50 mt-1 w-48 rounded-xl border border-gray-100 bg-white p-1 text-gray-900 shadow-xl dark:border-[var(--app-border)] dark:bg-[var(--app-surface)] dark:text-[var(--app-fg)]"
+                className="studio-panel absolute top-full right-0 z-50 mt-1 w-52 bg-[var(--paper)] p-1"
                 role="menu"
               >
                 <button
@@ -936,14 +939,14 @@ export default function App() {
                     setMainView('profile');
                     setProfileMenuOpen(false);
                   }}
-                  className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-xs hover:bg-gray-50 dark:hover:bg-[var(--app-bg)]"
+                  className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-xs hover:bg-[var(--gutter)]"
                 >
-                  <UserIcon className="w-4 h-4 shrink-0 opacity-80" />
+                  <UserIcon className="h-4 w-4 shrink-0 opacity-80" />
                   Profile
                 </button>
-                <div className="border-t border-gray-100 px-3 py-2 dark:border-[var(--app-border)]">
-                  <div className="truncate text-xs font-bold">{auth.user.name}</div>
-                  <div className="truncate text-[10px] text-gray-500 dark:text-[var(--app-muted)]">
+                <div className="border-t border-[var(--app-border)] px-3 py-2">
+                  <div className="truncate text-xs font-semibold">{auth.user.name}</div>
+                  <div className="truncate text-[10px] text-[var(--app-muted)]">
                     {auth.user.email}
                   </div>
                 </div>
@@ -956,7 +959,7 @@ export default function App() {
                   }}
                   className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-xs text-red-600 transition-colors hover:bg-red-50 dark:text-red-400 dark:hover:bg-red-950/40"
                 >
-                  <LogOut className="w-3 h-3 shrink-0" />
+                  <LogOut className="h-3 w-3 shrink-0" />
                   Logout
                 </button>
               </div>
@@ -999,6 +1002,8 @@ export default function App() {
               user={auth.user}
               theme={theme}
               onThemeChange={setTheme}
+              a11y={a11y}
+              onA11yChange={setA11y}
               onBack={() => setMainView('notes')}
               onUserUpdated={handleUserUpdated}
               onLibraryChanged={() => {
@@ -1030,19 +1035,22 @@ export default function App() {
             />
           </React.Suspense>
         ) : !activeBookshelfId ? (
-          <div className="flex h-full flex-col items-center justify-center bg-[var(--app-bg)] px-6 text-gray-500 dark:text-[var(--app-muted)]">
-            <Library className="w-12 h-12 mb-4 text-brand-400" />
-            <p className="text-center text-sm max-w-md mb-4">
+          <div className="flex h-full flex-col items-center justify-center px-6 text-[var(--app-muted)]">
+            <Library className="mb-4 h-12 w-12 text-[var(--spine)]" />
+            <p className="mb-4 max-w-md text-center font-display text-lg text-[var(--app-fg)]">
+              Open a bookshelf
+            </p>
+            <p className="mb-6 max-w-md text-center text-sm">
               {bookshelves.length === 0
-                ? 'Create a bookshelf first, then add notebooks and open them here.'
-                : 'Choose a bookshelf from the Bookshelves tab to load your notes.'}
+                ? 'Create a bookshelf in Library, then add notebooks and open a page to write Markdown.'
+                : 'Choose a bookshelf from Library to load your notebooks and pages.'}
             </p>
             <button
               type="button"
               onClick={() => setMainView('bookshelf')}
-              className="rounded-lg bg-brand-700 hover:bg-brand-800 text-white text-sm font-medium px-4 py-2"
+              className="studio-btn-primary"
             >
-              Open Bookshelves
+              Open Library
             </button>
           </div>
         ) : (
@@ -1180,12 +1188,12 @@ export default function App() {
                 <div className="flex h-full flex-col items-center justify-center px-6 text-[var(--app-muted)]">
                   <div className="paper-page flex max-w-md flex-col items-center rounded-2xl border border-[var(--app-border)] p-10 text-center">
                     <BookOpen className="mb-4 h-10 w-10 text-[var(--spine)]" />
-                    <h2 className="font-display text-2xl text-[var(--app-fg)]">
+                    <h2 className="font-display text-2xl font-medium text-[var(--app-fg)]">
                       Open a page
                     </h2>
                     <p className="mt-2 text-sm leading-relaxed">
-                      Choose a book in the table of contents, open a chapter, then
-                      pick a page — or create a new book to begin writing.
+                      Pick a book, open a chapter, then a page — and write in
+                      Markdown. Quiet space for projects, journaling, and daily notes.
                     </p>
                   </div>
                 </div>
@@ -1207,7 +1215,7 @@ export default function App() {
           ) : null}
         </div>
         <div className="flex items-center gap-4">
-          <span>Book studio</span>
+          <span>Quiet writing</span>
         </div>
       </footer>
 

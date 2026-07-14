@@ -1,6 +1,8 @@
 import React, { useEffect, useRef, useState } from 'react';
 import {
+  Accessibility,
   ArrowLeft,
+  Contrast,
   Database,
   Download,
   FileDown,
@@ -15,6 +17,7 @@ import {
 } from 'lucide-react';
 import { api } from '../lib/api';
 import type { ThemeMode } from '../lib/theme';
+import type { A11yPrefs } from '../lib/a11y';
 import { downloadText, formatBytes, notebookToMarkdown } from '../lib/markdownIO';
 import { sanitizeFilename } from '../lib/filename';
 import type { Notebook, User, UserStats } from '../types';
@@ -23,7 +26,7 @@ import { cn } from '../lib/utils';
 import { useAppDialogs } from '../context/AppDialogsContext';
 import { validateProfileInput } from '../lib/validation';
 
-type ProfileSection = 'account' | 'appearance' | 'storage' | 'danger';
+type ProfileSection = 'account' | 'appearance' | 'accessibility' | 'storage' | 'danger';
 
 const NAV: {
   id: ProfileSection;
@@ -33,6 +36,11 @@ const NAV: {
 }[] = [
   { id: 'account', label: 'Account', icon: <UserIcon className="w-4 h-4" /> },
   { id: 'appearance', label: 'Appearance', icon: <Palette className="w-4 h-4" /> },
+  {
+    id: 'accessibility',
+    label: 'Accessibility',
+    icon: <Accessibility className="w-4 h-4" />,
+  },
   { id: 'storage', label: 'Storage', icon: <Database className="w-4 h-4" /> },
   {
     id: 'danger',
@@ -46,6 +54,8 @@ interface ProfilePageProps {
   user: User;
   theme: ThemeMode;
   onThemeChange: (t: ThemeMode) => void;
+  a11y: A11yPrefs;
+  onA11yChange: (p: A11yPrefs) => void;
   onBack: () => void;
   onUserUpdated: (user: User, token: string) => void;
   /** After delete-data / import: refresh notes UI state */
@@ -69,16 +79,49 @@ function confirmPhrase(user: User): string {
   return (user.username || user.email || '').trim();
 }
 
-const fieldClass =
-  'w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm text-gray-900 dark:border-[var(--app-border)] dark:bg-[var(--app-bg)] dark:text-[var(--app-fg)]';
+const fieldClass = 'studio-input';
 
 const labelClass =
-  'mb-1 block text-xs font-medium text-gray-600 dark:text-[var(--app-muted)]';
+  'mb-1 block text-xs font-medium text-[var(--app-muted)]';
+
+const sectionClass = 'studio-panel bg-[var(--paper)] p-6 shadow-sm';
+
+const mutedText = 'text-sm text-[var(--app-muted)]';
+
+
+function A11yToggle({
+  checked,
+  onChange,
+  label,
+  description,
+}: {
+  checked: boolean;
+  onChange: (v: boolean) => void;
+  label: string;
+  description: string;
+}) {
+  return (
+    <label className="flex cursor-pointer items-start gap-3 rounded-[var(--radius-ui)] border border-[var(--app-border)] bg-[var(--gutter)]/40 px-4 py-3">
+      <input
+        type="checkbox"
+        checked={checked}
+        onChange={(e) => onChange(e.target.checked)}
+        className="mt-1 h-4 w-4 accent-[var(--spine)]"
+      />
+      <span className="min-w-0">
+        <span className="block text-sm font-medium text-[var(--app-fg)]">{label}</span>
+        <span className="mt-0.5 block text-xs text-[var(--app-muted)]">{description}</span>
+      </span>
+    </label>
+  );
+}
 
 export default function ProfilePage({
   user,
   theme,
   onThemeChange,
+  a11y,
+  onA11yChange,
   onBack,
   onUserUpdated,
   onLibraryChanged,
@@ -310,42 +353,47 @@ export default function ProfilePage({
   };
 
   const dangerBtn =
-    'inline-flex shrink-0 items-center justify-center gap-2 rounded-lg border border-red-300 bg-white px-3 py-1.5 text-sm font-medium text-red-700 hover:bg-red-50 disabled:opacity-50 dark:border-red-800 dark:bg-transparent dark:text-red-400 dark:hover:bg-red-950/40';
+    'inline-flex shrink-0 items-center justify-center gap-2 rounded-lg border border-red-400/60 bg-[var(--paper)] px-3 py-1.5 text-sm font-medium text-red-700 hover:bg-red-50 disabled:opacity-50 dark:border-red-800 dark:text-red-400 dark:hover:bg-red-950/40';
 
   const storageBtn =
-    'inline-flex shrink-0 items-center justify-center gap-2 rounded-lg border border-gray-200 bg-white px-3 py-1.5 text-sm font-medium text-brand-800 hover:bg-brand-50 disabled:opacity-50 dark:border-[var(--app-border)] dark:bg-transparent dark:text-brand-300 dark:hover:bg-brand-900/20';
+    'studio-btn shrink-0 text-sm text-[var(--spine)]';
 
   return (
-    <div className="flex h-full min-h-0 flex-col bg-[var(--app-bg)] text-[var(--app-fg)]">
-      <div className="shrink-0 border-b border-gray-200 dark:border-[var(--app-border)] px-6 py-4 flex items-center gap-4 bg-white dark:bg-[var(--app-surface)]">
+    <div className="flex h-full min-h-0 flex-col studio-shell text-[var(--app-fg)]">
+      <div className="flex shrink-0 items-center gap-4 border-b border-[var(--app-border)] bg-[var(--app-surface)]/90 px-6 py-4 backdrop-blur-xl">
         <button
           type="button"
           onClick={onBack}
-          className="inline-flex items-center gap-2 text-sm font-medium text-brand-700 dark:text-brand-300 hover:underline"
+          className="inline-flex items-center gap-2 text-sm font-medium text-[var(--spine)] hover:underline"
         >
           <ArrowLeft className="w-4 h-4" />
           Back to notes
         </button>
-        <h1 className="text-lg font-semibold text-gray-900 dark:text-[var(--app-fg)]">
-          Profile & settings
-        </h1>
+        <div>
+          <p className="font-mono text-[10px] uppercase tracking-[0.28em] text-[var(--spine)]/70">
+            Account
+          </p>
+          <h1 className="font-display text-lg font-semibold text-[var(--app-fg)]">
+            Profile & settings
+          </h1>
+        </div>
       </div>
 
-      <div className="flex-1 min-h-0 overflow-y-auto">
+      <div className="min-h-0 flex-1 overflow-y-auto">
         <div className="mx-auto w-full max-w-6xl p-4 sm:p-6">
           <div className="grid grid-cols-1 gap-6 lg:grid-cols-12">
             {/* col-4 sidebar */}
             <aside className="lg:col-span-4">
-              <div className="rounded-2xl border border-gray-200 bg-white p-3 shadow-sm dark:border-[var(--app-border)] dark:bg-[var(--app-surface)] lg:sticky lg:top-4">
-                <div className="mb-3 flex items-center gap-3 border-b border-gray-100 px-2 pb-3 dark:border-[var(--app-border)]">
-                  <div className="flex h-10 w-10 items-center justify-center rounded-full bg-brand-100 text-sm font-bold text-brand-800 dark:bg-brand-900/40 dark:text-brand-200">
+              <div className="studio-panel bg-[var(--paper)] p-3 shadow-sm lg:sticky lg:top-4">
+                <div className="mb-3 flex items-center gap-3 border-b border-[var(--app-border)] px-2 pb-3">
+                  <div className="flex h-10 w-10 items-center justify-center rounded-full bg-[color-mix(in_srgb,var(--spine)_15%,var(--paper))] text-sm font-bold text-[var(--spine)]">
                     {(user.name || user.email || '?').charAt(0).toUpperCase()}
                   </div>
                   <div className="min-w-0">
                     <p className="truncate text-sm font-semibold text-[var(--app-fg)]">
                       {user.name}
                     </p>
-                    <p className="truncate text-xs text-gray-500 dark:text-[var(--app-muted)]">
+                    <p className="truncate text-xs text-[var(--app-muted)]">
                       {user.username ? `@${user.username}` : user.email}
                     </p>
                   </div>
@@ -361,11 +409,11 @@ export default function ProfilePage({
                         className={cn(
                           'inline-flex shrink-0 items-center gap-2 rounded-lg px-3 py-2 text-sm font-medium transition-colors',
                           active && !item.danger &&
-                            'bg-brand-50 text-brand-800 dark:bg-brand-900/30 dark:text-brand-200',
+                            'bg-[color-mix(in_srgb,var(--spine)_12%,var(--paper))] text-[var(--spine)]',
                           active && item.danger &&
                             'bg-red-50 text-red-700 dark:bg-red-950/40 dark:text-red-400',
                           !active && !item.danger &&
-                            'text-gray-600 hover:bg-gray-50 dark:text-[var(--app-muted)] dark:hover:bg-[var(--app-bg)]',
+                            'text-[var(--app-muted)] hover:bg-[var(--gutter)]',
                           !active && item.danger &&
                             'text-red-600 hover:bg-red-50/70 dark:text-red-400 dark:hover:bg-red-950/20'
                         )}
@@ -382,10 +430,10 @@ export default function ProfilePage({
             {/* col-8 fields */}
             <main className="min-w-0 lg:col-span-8">
               {section === 'account' ? (
-                <section className="rounded-2xl border border-gray-200 bg-white p-6 shadow-sm dark:border-[var(--app-border)] dark:bg-[var(--app-surface)]">
-                  <h2 className="mb-1 text-base font-semibold text-[var(--app-fg)]">Account</h2>
-                  <p className="mb-6 text-sm text-gray-500 dark:text-[var(--app-muted)]">
-                    Public profile details used across Lumina Notes.
+                <section className={sectionClass}>
+                  <h2 className="mb-1 font-display text-base font-semibold text-[var(--app-fg)]">Account</h2>
+                  <p className={cn(mutedText, 'mb-6')}>
+                    Details used when you sign in and write Markdown notebooks.
                   </p>
                   <form onSubmit={save} className="space-y-5">
                     <div className="grid grid-cols-1 gap-5 sm:grid-cols-12 sm:items-start">
@@ -408,7 +456,7 @@ export default function ProfilePage({
                           placeholder="letters, numbers, underscore (3–32)"
                           className={fieldClass}
                         />
-                        <p className="mt-1.5 text-xs text-gray-500 dark:text-[var(--app-muted)]">
+                        <p className="mt-1.5 text-xs text-[var(--app-muted)]">
                           Used for sign-in and Danger Zone confirmation.
                         </p>
                       </div>
@@ -427,11 +475,11 @@ export default function ProfilePage({
                     {err ? (
                       <p className="text-sm text-red-600 dark:text-red-400">{err}</p>
                     ) : null}
-                    <div className="flex justify-end border-t border-gray-100 pt-4 dark:border-[var(--app-border)]">
+                    <div className="flex justify-end border-t border-[var(--app-border)] pt-4">
                       <button
                         type="submit"
                         disabled={saving}
-                        className="inline-flex items-center gap-2 rounded-lg bg-brand-700 px-4 py-2 text-sm font-medium text-white hover:bg-brand-800 disabled:opacity-50"
+                        className="studio-btn-primary disabled:opacity-50"
                       >
                         {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : null}
                         Save changes
@@ -442,23 +490,26 @@ export default function ProfilePage({
               ) : null}
 
               {section === 'appearance' ? (
-                <section className="rounded-2xl border border-gray-200 bg-white p-6 shadow-sm dark:border-[var(--app-border)] dark:bg-[var(--app-surface)]">
-                  <h2 className="mb-1 text-base font-semibold text-[var(--app-fg)]">Appearance</h2>
-                  <p className="mb-6 text-sm text-gray-500 dark:text-[var(--app-muted)]">
-                    Choose how Lumina looks on this device.
+                <section className={sectionClass}>
+                  <h2 className="mb-1 font-display text-base font-medium text-[var(--app-fg)]">
+                    Appearance
+                  </h2>
+                  <p className={cn(mutedText, 'mb-6')}>
+                    One calm theme everywhere — Notes, Library, and Profile. Choose light or dark for
+                    everyday writing; use Accessibility for high contrast and other vision help.
                   </p>
                   <div className="grid grid-cols-1 gap-5 sm:grid-cols-12 sm:items-center">
                     <span className={cn(labelClass, 'mb-0 sm:col-span-4')}>Theme</span>
                     <div className="sm:col-span-8">
-                      <div className="inline-flex rounded-lg border border-[var(--app-border)] bg-gray-50 p-0.5 dark:bg-[var(--app-bg)]">
+                      <div className="inline-flex flex-wrap rounded-lg border border-[var(--app-border)] bg-[var(--gutter)] p-0.5">
                         <button
                           type="button"
                           onClick={() => onThemeChange('light')}
                           className={cn(
                             'inline-flex items-center gap-1.5 rounded-md px-3 py-1.5 text-xs font-medium transition-colors',
                             theme === 'light'
-                              ? 'bg-white text-brand-800 shadow dark:bg-[var(--app-surface)] dark:text-[var(--app-fg)]'
-                              : 'text-gray-600 dark:text-[var(--app-muted)]'
+                              ? 'bg-[var(--paper)] text-[var(--spine)] shadow-sm'
+                              : 'text-[var(--app-muted)]'
                           )}
                         >
                           <Sun className="w-3.5 h-3.5" />
@@ -470,8 +521,8 @@ export default function ProfilePage({
                           className={cn(
                             'inline-flex items-center gap-1.5 rounded-md px-3 py-1.5 text-xs font-medium transition-colors',
                             theme === 'dark'
-                              ? 'bg-white text-brand-800 shadow dark:bg-[var(--app-surface)] dark:text-[var(--app-fg)]'
-                              : 'text-gray-600 dark:text-[var(--app-muted)]'
+                              ? 'bg-[var(--paper)] text-[var(--spine)] shadow-sm'
+                              : 'text-[var(--app-muted)]'
                           )}
                         >
                           <Moon className="w-3.5 h-3.5" />
@@ -483,61 +534,130 @@ export default function ProfilePage({
                 </section>
               ) : null}
 
+              {section === 'accessibility' ? (
+                <section className={sectionClass}>
+                  <h2 className="mb-1 font-display text-base font-medium text-[var(--app-fg)]">
+                    Accessibility
+                  </h2>
+                  <p className={cn(mutedText, 'mb-6')}>
+                    Options for vision, motion sensitivity, and clearer reading while you write
+                    Markdown.
+                  </p>
+
+                  <div className="mb-6">
+                    <p className={cn(labelClass, 'mb-2')}>Contrast</p>
+                    <div className="inline-flex flex-wrap rounded-lg border border-[var(--app-border)] bg-[var(--gutter)] p-0.5">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          if (theme === 'contrast') onThemeChange('light');
+                        }}
+                        className={cn(
+                          'inline-flex items-center gap-1.5 rounded-md px-3 py-1.5 text-xs font-medium transition-colors',
+                          theme !== 'contrast'
+                            ? 'bg-[var(--paper)] text-[var(--spine)] shadow-sm'
+                            : 'text-[var(--app-muted)]'
+                        )}
+                      >
+                        Standard
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => onThemeChange('contrast')}
+                        className={cn(
+                          'inline-flex items-center gap-1.5 rounded-md px-3 py-1.5 text-xs font-medium transition-colors',
+                          theme === 'contrast'
+                            ? 'bg-[var(--paper)] text-[var(--spine)] shadow-sm'
+                            : 'text-[var(--app-muted)]'
+                        )}
+                      >
+                        <Contrast className="w-3.5 h-3.5" />
+                        High contrast
+                      </button>
+                    </div>
+                    <p className="mt-2 text-xs text-[var(--app-muted)]">
+                      High contrast uses strong borders and bright text for low-vision comfort.
+                    </p>
+                  </div>
+
+                  <div className="space-y-3">
+                    <A11yToggle
+                      checked={a11y.largeText}
+                      onChange={(largeText) => onA11yChange({ ...a11y, largeText })}
+                      label="Larger text"
+                      description="Increase base type size across Notes, Library, and Profile."
+                    />
+                    <A11yToggle
+                      checked={a11y.reduceMotion}
+                      onChange={(reduceMotion) => onA11yChange({ ...a11y, reduceMotion })}
+                      label="Reduce motion"
+                      description="Minimize animations (including the storage rail aisle motion)."
+                    />
+                    <A11yToggle
+                      checked={a11y.underlineLinks}
+                      onChange={(underlineLinks) => onA11yChange({ ...a11y, underlineLinks })}
+                      label="Underline links"
+                      description="Always underline links in preview and settings for clearer navigation."
+                    />
+                  </div>
+                </section>
+              ) : null}
+
               {section === 'storage' ? (
                 <div className="space-y-6">
-                  <section className="rounded-2xl border border-gray-200 bg-white p-6 shadow-sm dark:border-[var(--app-border)] dark:bg-[var(--app-surface)]">
+                  <section className="studio-panel bg-[var(--paper)] p-6 shadow-sm">
                     <h2 className="mb-1 text-base font-semibold text-[var(--app-fg)]">
                       Storage & library
                     </h2>
-                    <p className="mb-6 text-sm text-gray-500 dark:text-[var(--app-muted)]">
+                    <p className="mb-6 text-sm text-[var(--app-muted)]">
                       Overview of space used by your notebooks and pages.
                     </p>
                     {loading ? (
                       <Loader2 className="w-6 h-6 animate-spin text-brand-600" />
                     ) : stats ? (
                       <dl className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-                        <div className="rounded-xl border border-gray-100 bg-gray-50 p-4 dark:border-[var(--app-border)] dark:bg-[var(--app-bg)]">
-                          <dt className="text-xs text-gray-500 dark:text-[var(--app-muted)]">
+                        <div className="rounded-xl border border-[var(--app-border)] bg-[var(--gutter)] p-4">
+                          <dt className="text-xs text-[var(--app-muted)]">
                             Estimated storage
                           </dt>
                           <dd className="mt-1 text-xl font-semibold text-[var(--app-fg)]">
                             {formatBytes(stats.storageBytes)}
                           </dd>
                         </div>
-                        <div className="rounded-xl border border-gray-100 bg-gray-50 p-4 dark:border-[var(--app-border)] dark:bg-[var(--app-bg)]">
-                          <dt className="text-xs text-gray-500 dark:text-[var(--app-muted)]">
+                        <div className="rounded-xl border border-[var(--app-border)] bg-[var(--gutter)] p-4">
+                          <dt className="text-xs text-[var(--app-muted)]">
                             Active notebooks
                           </dt>
                           <dd className="mt-1 text-xl font-semibold text-[var(--app-fg)]">
                             {stats.notebooksActive}
                           </dd>
                         </div>
-                        <div className="rounded-xl border border-gray-100 bg-gray-50 p-4 dark:border-[var(--app-border)] dark:bg-[var(--app-bg)]">
-                          <dt className="text-xs text-gray-500 dark:text-[var(--app-muted)]">
+                        <div className="rounded-xl border border-[var(--app-border)] bg-[var(--gutter)] p-4">
+                          <dt className="text-xs text-[var(--app-muted)]">
                             Archived notebooks
                           </dt>
                           <dd className="mt-1 text-xl font-semibold text-[var(--app-fg)]">
                             {stats.notebooksArchived}
                           </dd>
                         </div>
-                        <div className="rounded-xl border border-gray-100 bg-gray-50 p-4 dark:border-[var(--app-border)] dark:bg-[var(--app-bg)]">
-                          <dt className="text-xs text-gray-500 dark:text-[var(--app-muted)]">
+                        <div className="rounded-xl border border-[var(--app-border)] bg-[var(--gutter)] p-4">
+                          <dt className="text-xs text-[var(--app-muted)]">
                             Sections (active)
                           </dt>
                           <dd className="mt-1 text-xl font-semibold text-[var(--app-fg)]">
                             {stats.sectionsActive}
                           </dd>
                         </div>
-                        <div className="rounded-xl border border-gray-100 bg-gray-50 p-4 dark:border-[var(--app-border)] dark:bg-[var(--app-bg)]">
-                          <dt className="text-xs text-gray-500 dark:text-[var(--app-muted)]">
+                        <div className="rounded-xl border border-[var(--app-border)] bg-[var(--gutter)] p-4">
+                          <dt className="text-xs text-[var(--app-muted)]">
                             Pages (active)
                           </dt>
                           <dd className="mt-1 text-xl font-semibold text-[var(--app-fg)]">
                             {stats.pagesActive}
                           </dd>
                         </div>
-                        <div className="rounded-xl border border-gray-100 bg-gray-50 p-4 dark:border-[var(--app-border)] dark:bg-[var(--app-bg)]">
-                          <dt className="text-xs text-gray-500 dark:text-[var(--app-muted)]">
+                        <div className="rounded-xl border border-[var(--app-border)] bg-[var(--gutter)] p-4">
+                          <dt className="text-xs text-[var(--app-muted)]">
                             Pages (archived)
                           </dt>
                           <dd className="mt-1 text-xl font-semibold text-[var(--app-fg)]">
@@ -546,28 +666,28 @@ export default function ProfilePage({
                         </div>
                       </dl>
                     ) : (
-                      <p className="text-sm text-gray-500 dark:text-[var(--app-muted)]">
+                      <p className="text-sm text-[var(--app-muted)]">
                         Could not load stats.
                       </p>
                     )}
                   </section>
 
-                  <section className="overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-sm dark:border-[var(--app-border)] dark:bg-[var(--app-surface)]">
-                    <div className="border-b border-gray-100 px-6 py-4 dark:border-[var(--app-border)]">
+                  <section className="overflow-hidden studio-panel bg-[var(--paper)] shadow-sm">
+                    <div className="border-b border-[var(--app-border)] px-6 py-4">
                       <h2 className="text-base font-semibold text-[var(--app-fg)]">
                         Backup & transfer
                       </h2>
-                      <p className="mt-1 text-sm text-gray-500 dark:text-[var(--app-muted)]">
+                      <p className="mt-1 text-sm text-[var(--app-muted)]">
                         Download backups, export Markdown, or restore from a Lumina JSON file.
                         Import replaces all current library data — confirm by typing your username
                         {user.username ? '' : ' (or email)'} when prompted.
                       </p>
                     </div>
-                    <ul className="divide-y divide-gray-100 dark:divide-[var(--app-border)]">
+                    <ul className="divide-y divide-[var(--app-border)]">
                       <li className="flex flex-col gap-3 px-6 py-4 sm:flex-row sm:items-center sm:justify-between">
                         <div className="min-w-0 sm:max-w-[60%]">
                           <p className="text-sm font-semibold text-[var(--app-fg)]">Backup data</p>
-                          <p className="text-xs text-gray-500 dark:text-[var(--app-muted)]">
+                          <p className="text-xs text-[var(--app-muted)]">
                             Download a full JSON backup of bookshelves, notebooks, and pages.
                           </p>
                         </div>
@@ -588,7 +708,7 @@ export default function ProfilePage({
                       <li className="flex flex-col gap-3 px-6 py-4 sm:flex-row sm:items-center sm:justify-between">
                         <div className="min-w-0 sm:max-w-[60%]">
                           <p className="text-sm font-semibold text-[var(--app-fg)]">Export files</p>
-                          <p className="text-xs text-gray-500 dark:text-[var(--app-muted)]">
+                          <p className="text-xs text-[var(--app-muted)]">
                             Export your library as a single Markdown file.
                           </p>
                         </div>
@@ -609,7 +729,7 @@ export default function ProfilePage({
                       <li className="flex flex-col gap-3 px-6 py-4 sm:flex-row sm:items-center sm:justify-between">
                         <div className="min-w-0 sm:max-w-[60%]">
                           <p className="text-sm font-semibold text-[var(--app-fg)]">Import file</p>
-                          <p className="text-xs text-gray-500 dark:text-[var(--app-muted)]">
+                          <p className="text-xs text-[var(--app-muted)]">
                             Restore from a Lumina JSON backup. Replaces all current library data.
                           </p>
                         </div>
@@ -638,7 +758,7 @@ export default function ProfilePage({
                       </li>
                     </ul>
                     {zoneErr ? (
-                      <div className="border-t border-gray-100 px-6 py-3 text-sm text-red-600 dark:border-[var(--app-border)] dark:text-red-400">
+                      <div className="border-t border-[var(--app-border)] px-6 py-3 text-sm text-red-600 dark:text-red-400">
                         {zoneErr}
                       </div>
                     ) : null}
@@ -648,7 +768,7 @@ export default function ProfilePage({
 
               {section === 'danger' ? (
                 <section
-                  className="overflow-hidden rounded-2xl border border-red-300 bg-white shadow-sm dark:border-red-900/70 dark:bg-[var(--app-surface)]"
+                  className="studio-panel overflow-hidden border-red-400/70 bg-[var(--paper)] shadow-sm dark:border-red-900/70"
                   aria-labelledby="danger-zone-heading"
                 >
                   <div className="border-b border-red-200 bg-red-50/80 px-6 py-4 dark:border-red-900/50 dark:bg-red-950/30">
@@ -668,7 +788,7 @@ export default function ProfilePage({
                     <li className="flex flex-col gap-3 px-6 py-4 sm:flex-row sm:items-center sm:justify-between">
                       <div className="min-w-0 sm:max-w-[60%]">
                         <p className="text-sm font-semibold text-[var(--app-fg)]">Delete data</p>
-                        <p className="text-xs text-gray-500 dark:text-[var(--app-muted)]">
+                        <p className="text-xs text-[var(--app-muted)]">
                           Permanently erase all notebooks. Keeps your login. Cannot be undone.
                         </p>
                       </div>
@@ -690,7 +810,7 @@ export default function ProfilePage({
                     <li className="flex flex-col gap-3 px-6 py-4 sm:flex-row sm:items-center sm:justify-between">
                       <div className="min-w-0 sm:max-w-[60%]">
                         <p className="text-sm font-semibold text-[var(--app-fg)]">Close account</p>
-                        <p className="text-xs text-gray-500 dark:text-[var(--app-muted)]">
+                        <p className="text-xs text-[var(--app-muted)]">
                           Delete your account and all data permanently. You will be signed out.
                         </p>
                       </div>

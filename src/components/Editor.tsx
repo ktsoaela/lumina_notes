@@ -20,12 +20,12 @@ const Editor: React.FC<EditorProps> = ({ value, onChange, className }) => {
         )}
         value={value}
         onChange={(e) => onChange(e.target.value)}
-        placeholder="Write this page… Markdown welcome."
+        placeholder="Begin writing… Markdown supported."
         spellCheck
         aria-label="Page content"
       />
       <div className="flex items-center justify-between border-t border-[var(--app-border)]/70 px-4 py-2 text-[10px] font-medium uppercase tracking-[0.14em] text-[var(--app-muted)]">
-        <span>Writing desk</span>
+        <span>Markdown</span>
         <div className="flex gap-4 normal-case tracking-normal">
           <span>{value.length} chars</span>
           <span>{words} words</span>
