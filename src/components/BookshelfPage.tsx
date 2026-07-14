@@ -1,7 +1,8 @@
-import React, { useCallback, useEffect, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   ArrowLeft,
   Archive,
+  BookMarked,
   BookOpen,
   Loader2,
   Trash2,
@@ -12,6 +13,9 @@ import {
   Plus,
   Pencil,
   X,
+  DoorOpen,
+  FolderOpen,
+  ShieldAlert,
 } from 'lucide-react';
 import { api } from '../lib/api';
 import type { Bookshelf, Notebook } from '../types';
@@ -20,13 +24,23 @@ import { sanitizeFilename } from '../lib/filename';
 import { cn } from '../lib/utils';
 import { useAppDialogs } from '../context/AppDialogsContext';
 
-const WOOD_BOOK_COLORS = ['#2c7be5', '#e5533d', '#2eb85c', '#f9b115', '#6f42c1'] as const;
-/** Books per shelf row: fill row 1 (up to 12), then row 2, etc. */
-const BOOKS_PER_ROW = 12;
-/** Renders wood shelf frame + spine pixel sizes at 2× base metrics. */
-const SHELF_VISUAL_SCALE = 2;
+const CHART_SPINE_COLORS = [
+  '#0e7490',
+  '#b45309',
+  '#047857',
+  '#be123c',
+  '#4338ca',
+  '#0369a1',
+  '#a16207',
+  '#6d28d9',
+] as const;
 
-/** Chunk notebooks into rows of at most `perRow` items, in order. */
+const BOOKS_PER_ROW = 12;
+const SHELF_VISUAL_SCALE = 2;
+const CARRIAGE_W = 112;
+const CARRIAGE_GAP = 14;
+const AISLE_SHIFT_PX = 148;
+
 function chunkIntoRows<T>(items: T[], perRow: number): T[][] {
   if (items.length === 0) return [];
   const rows: T[][] = [];
@@ -36,213 +50,12 @@ function chunkIntoRows<T>(items: T[], perRow: number): T[][] {
   return rows;
 }
 
-const RAIL_SLOTS = 4;
-const CARRIAGE_W = 130;
-const CARRIAGE_GAP = 10;
-const SECTION_LETTERS = ['A', 'B', 'C', 'D'] as const;
-const CARRIAGE_GRADIENTS = [
-  'linear-gradient(145deg, #7d6b4a, #5e4b2f)',
-  'linear-gradient(145deg, #567d5e, #3b5a43)',
-  'linear-gradient(145deg, #9e6b4b, #784f32)',
-  'linear-gradient(145deg, #4a6d8c, #2e4e6b)',
-] as const;
-
-/** Aisle width (mm-scale proxy): carriages to the right of the selected bay shift right together. */
-const AISLE_SHIFT_PX = 130;
-
-function aisleStatusLines(activeSlot: number): { lead: string; rest: string } {
-  const L = SECTION_LETTERS[activeSlot];
-  const toRight = SECTION_LETTERS.slice(activeSlot + 1);
-  if (activeSlot >= RAIL_SLOTS - 1) {
-    return {
-      lead: `Aisle for bay ${L} · Safety bar deployed.`,
-      rest:
-        'This is the last bay on the rail: nothing sits to the right to shift. Carriages stay on the support rails; only one aisle is open at a time.',
-    };
-  }
-  const range = toRight.length === 1 ? toRight[0] : `${toRight[0]}–${toRight[toRight.length - 1]}`;
-  return {
-    lead: `Aisle for bay ${L} · Safety bar deployed.`,
-    rest: `Bays ${range} shift together toward the right. Bay A stays at the starting position on the rail. You do not “open aisle 1 to reach aisle 2”—you move the block so the gap sits where you need it (one aisle at a time).`,
-  };
+function bayCode(index: number): string {
+  const letter = String.fromCharCode(65 + (index % 26));
+  const n = Math.floor(index / 26) + 1;
+  return `${letter}${String(n).padStart(2, '0')}`;
 }
 
-/** Bulk filer / high-density rail: selected bay stays; bays to its right translate +aisle to open access. */
-function CompactMobileRail({
-  railMotion,
-  bookshelves,
-  selectedShelfId,
-  busyShelfId,
-  onSelectCarriage,
-  onOpenShelfForNotes,
-  onRenameShelf,
-  onDeleteShelf,
-}: {
-  railMotion: boolean;
-  bookshelves: Bookshelf[];
-  selectedShelfId: string | null;
-  busyShelfId: string | null;
-  onSelectCarriage: (index: number) => void;
-  onOpenShelfForNotes: (shelfId: string) => void;
-  onRenameShelf: (shelfId: string, title: string) => void;
-  onDeleteShelf: (shelfId: string) => void;
-}) {
-  const selectedIdx = bookshelves.findIndex((s) => s.id === selectedShelfId);
-  const activeSlot = selectedIdx >= 0 && selectedIdx < RAIL_SLOTS ? selectedIdx : null;
-  const aisleCopy = activeSlot !== null ? aisleStatusLines(activeSlot) : null;
-
-  const showAisleColumn = railMotion && activeSlot !== null;
-  const selectedBayLetter = activeSlot !== null ? SECTION_LETTERS[activeSlot] : null;
-  const aisleShelf =
-    showAisleColumn && activeSlot !== null ? bookshelves[activeSlot] : undefined;
-
-  return (
-    <div className="mx-auto w-full max-w-[980px]">
-      <div className="grid grid-cols-12 items-start gap-3">
-        <div className={showAisleColumn ? 'col-span-10' : 'col-span-12'}>
-          <div className="rounded-[48px] rounded-b-[28px] bg-[#cfdde6] px-4 py-6 shadow-[inset_0_0_0_2px_#eef3fc,0_12px_24px_rgba(0,0,0,0.1)] dark:bg-slate-800/90 dark:shadow-[inset_0_0_0_1px_var(--app-border)]">
-        <div
-          className="relative mx-auto h-[220px] w-full max-w-[900px] overflow-x-hidden overflow-y-visible rounded-3xl bg-[#b7c7d4] pr-2 shadow-[inset_0_4px_8px_rgba(0,0,0,0.1),0_6px_12px_rgba(0,0,0,0.1)] dark:bg-slate-700/90 sm:h-[260px] sm:pr-4"
-          style={{ paddingRight: AISLE_SHIFT_PX + 8 }}
-        >
-          {Array.from({ length: RAIL_SLOTS }, (_, i) => {
-            const shelf = bookshelves[i];
-            const disabled = !shelf;
-            const selected = Boolean(shelf && selectedShelfId === shelf.id);
-            /** High-density rule: only carriages with index > selectedSlot shift right; bay A never leaves the start rail. */
-            const shiftsRight = Boolean(
-              railMotion && activeSlot !== null && i > activeSlot
-            );
-            return (
-              <button
-                key={i}
-                type="button"
-                disabled={disabled}
-                onClick={() => shelf && onSelectCarriage(i)}
-                className={cn(
-                  'absolute top-0 z-10 flex h-full max-w-none flex-col items-center justify-center border border-black/20 px-2 text-center text-white shadow-[4px_0_12px_rgba(0,0,0,0.3),inset_-1px_0_0_rgba(255,255,255,0.2)] transition-[transform,box-shadow,filter] duration-[550ms]',
-                  'rounded-r-lg rounded-l-2xl hover:brightness-105 hover:ring-2 hover:ring-[#ffd966] disabled:cursor-not-allowed disabled:opacity-40',
-                  shiftsRight && 'z-20 translate-x-[130px]',
-                  selected &&
-                    'shadow-[0_0_0_3px_#f5b042,0_0_0_6px_rgba(245,176,66,0.3)] ring-0'
-                )}
-                style={{
-                  left: `${i * (CARRIAGE_W + CARRIAGE_GAP)}px`,
-                  width: CARRIAGE_W,
-                  background: disabled ? '#4c5e6e' : CARRIAGE_GRADIENTS[i],
-                  transitionTimingFunction: 'cubic-bezier(0.2, 0.9, 0.3, 1.1)',
-                }}
-                title={shelf?.title ?? 'Empty slot'}
-              >
-                <span className="pointer-events-none absolute bottom-3 right-3 text-lg opacity-70" aria-hidden>
-                  ⚙️
-                </span>
-                <span className="font-mono text-2xl font-bold leading-none drop-shadow sm:text-3xl">
-                  {SECTION_LETTERS[i]}
-                </span>
-                <span className="mt-2 line-clamp-3 max-w-[6.5rem] text-[10px] font-bold leading-snug sm:text-[11px]">
-                  {shelf ? shelf.title : '—'}
-                </span>
-              </button>
-            );
-          })}
-
-          <div
-            className={cn(
-              'absolute -bottom-2 left-0 z-[25] h-2.5 w-full origin-left rounded-2xl border border-[#a12218] shadow-[0_-2px_4px_rgba(0,0,0,0.4)] transition-transform duration-[450ms] ease-out',
-              'bg-[repeating-linear-gradient(90deg,#dd3b2e_0,#dd3b2e_12px,#ff7e5e_12px,#ff7e5e_24px)]',
-              railMotion ? 'scale-x-100' : 'scale-x-0'
-            )}
-            aria-hidden
-          />
-          <div
-            className={cn(
-              'pointer-events-none absolute -bottom-5 left-0 h-5 w-full rounded-xl bg-[repeating-linear-gradient(90deg,#e0aa3e_0,#e0aa3e_20px,#f7d98c_20px,#f7d98c_40px)] transition-opacity duration-300',
-              railMotion ? 'opacity-80' : 'opacity-0'
-            )}
-            aria-hidden
-          />
-        </div>
-
-        <p
-          className={cn(
-            'mx-auto mt-8 max-w-[900px] rounded-[28px] px-3 py-3 text-center text-xs font-medium leading-relaxed',
-            railMotion
-              ? 'bg-[#e3f0e8] text-[#1e4d3a] dark:bg-emerald-950/40 dark:text-emerald-100'
-              : 'bg-[#fff2df] text-[#aa6f3c] dark:bg-amber-950/30 dark:text-amber-100'
-          )}
-        >
-          {railMotion && aisleCopy ? (
-            <>
-              <span className="font-semibold text-[#143d2e] dark:text-emerald-100">
-                {aisleCopy.lead}
-              </span>{' '}
-              {aisleCopy.rest}
-            </>
-          ) : (
-            <>
-              Select a bay (A–D). Bay A stays at the start rail; bays to the right shift together to
-              open <span className="font-semibold">one</span> aisle for access. Safety bar extends
-              when the aisle is active.
-            </>
-          )}
-        </p>
-      </div>
-        </div>
-
-        {aisleShelf && selectedBayLetter !== null ? (
-          <div className="col-span-2 min-w-0">
-            <div className="rounded-xl border border-[var(--app-border)] bg-[var(--app-surface)] px-3 py-3 text-center shadow-sm">
-              <p className="text-[10px] font-semibold uppercase tracking-wider text-[var(--app-muted)]">
-                Aisle
-              </p>
-              <p className="mt-1 font-mono text-2xl font-bold text-[var(--app-fg)]">
-                Bay {selectedBayLetter}
-              </p>
-              <p className="mt-2 line-clamp-4 text-left text-xs leading-snug text-[var(--app-fg)]">
-                {aisleShelf.title}
-              </p>
-              <div className="mt-3 flex w-full flex-col gap-1.5 border-t border-[var(--app-border)] pt-3 text-left">
-                <button
-                  type="button"
-                  onClick={() => onOpenShelfForNotes(aisleShelf.id)}
-                  className="inline-flex items-center justify-center gap-1 rounded-md bg-brand-700 px-1.5 py-1.5 text-[10px] font-medium text-white hover:bg-brand-800"
-                >
-                  <BookOpen className="h-3 w-3 shrink-0" />
-                  Open
-                </button>
-                <button
-                  type="button"
-                  disabled={busyShelfId === aisleShelf.id}
-                  onClick={() => onRenameShelf(aisleShelf.id, aisleShelf.title)}
-                  className="inline-flex items-center justify-center gap-1 rounded-md border border-[var(--app-border)] px-1.5 py-1.5 text-[10px] font-medium hover:bg-gray-50 disabled:opacity-50 dark:hover:bg-[var(--app-surface)]"
-                >
-                  {busyShelfId === aisleShelf.id ? (
-                    <Loader2 className="h-3 w-3 animate-spin" />
-                  ) : (
-                    <Pencil className="h-3 w-3" />
-                  )}
-                  Rename
-                </button>
-                <button
-                  type="button"
-                  disabled={busyShelfId === aisleShelf.id}
-                  onClick={() => onDeleteShelf(aisleShelf.id)}
-                  className="inline-flex items-center justify-center gap-1 rounded-md border border-red-200 px-1.5 py-1.5 text-[10px] font-medium text-red-700 hover:bg-red-50 disabled:opacity-50 dark:border-red-900 dark:text-red-300 dark:hover:bg-red-950/30"
-                >
-                  <Trash2 className="h-3 w-3" />
-                  Delete
-                </button>
-              </div>
-            </div>
-          </div>
-        ) : null}
-      </div>
-    </div>
-  );
-}
-
-/** Stable hash so spine “noise” does not change on re-render. */
 function hashStringToInt(s: string): number {
   let h = 2166136261;
   for (let i = 0; i < s.length; i++) {
@@ -275,45 +88,182 @@ function notebookContentMetrics(nb: Notebook) {
       chars += p.title.length + (p.content?.length ?? 0);
     }
   }
-  const sections = nb.sections.length;
-  const images = countMarkdownImagesInNotebook(nb);
-  return { chars, pages, sections, images };
+  return {
+    chars,
+    pages,
+    sections: nb.sections.length,
+    images: countMarkdownImagesInNotebook(nb),
+  };
 }
 
-/**
- * Spine size from content: width tracks approximate “bulk” (text + structure + images),
- * height tracks page count and media (similar to shelf HTML prototype).
- * Values are deterministic for a given notebook.
- */
 function spineSizeFromNotebook(nb: Notebook): { width: number; height: number } {
   const { chars, pages, sections, images } = notebookContentMetrics(nb);
-  // ~MB proxy from stored text (no server file size — chars are a stand-in)
   const approxMB = Math.min(52, chars / 18000);
-  // Prototype-style width: 12 + mb*0.6, plus spine thickness for sections & embedded images
   let w = 12 + approxMB * 0.62 + sections * 1.15 + images * 1.35;
   w = Math.min(72, Math.max(22, w));
-  // Height: prototype uses 38 + pages*0.07 (short spines); we add growth for text volume & images
   const contentLift = Math.min(32, chars / 14000);
   let h =
-    38 +
-    pages * 0.07 +
-    contentLift +
-    Math.min(images * 2.4, 36) +
-    sections * 0.35;
+    38 + pages * 0.07 + contentLift + Math.min(images * 2.4, 36) + sections * 0.35;
   h = Math.min(188, Math.max(46, h));
-  // Small stable variation so near-identical stats still look distinct
   const jitter = hashStringToInt(nb.id);
-  const wNudge = ((jitter % 11) - 5) * 0.45;
-  const hNudge = (((jitter >> 5) % 11) - 5) * 0.5;
-  w = Math.min(72, Math.max(22, w + wNudge));
-  h = Math.min(188, Math.max(46, h + hNudge));
+  w = Math.min(72, Math.max(22, w + ((jitter % 11) - 5) * 0.45));
+  h = Math.min(188, Math.max(46, h + (((jitter >> 5) % 11) - 5) * 0.5));
   return { width: Math.round(w), height: Math.round(h) };
 }
 
-/** Full-width book preview: cover + metadata (6) | chapters (6). */
+/** Hospital mobile shelving rail — carriages shift to open one aisle. */
+function CompactMobileRail({
+  railMotion,
+  bookshelves,
+  selectedShelfId,
+  onSelectCarriage,
+}: {
+  railMotion: boolean;
+  bookshelves: Bookshelf[];
+  selectedShelfId: string | null;
+  onSelectCarriage: (index: number) => void;
+}) {
+  const selectedIdx = bookshelves.findIndex((s) => s.id === selectedShelfId);
+  const activeSlot = selectedIdx >= 0 ? selectedIdx : null;
+  const trackWidth = Math.max(
+    bookshelves.length * (CARRIAGE_W + CARRIAGE_GAP) + AISLE_SHIFT_PX + 48,
+    640
+  );
+
+  return (
+    <div className="relative overflow-hidden rounded-3xl border border-slate-400/40 bg-gradient-to-b from-slate-300 via-slate-400 to-slate-500 p-1 shadow-[0_24px_60px_-20px_rgba(15,23,42,0.55)] dark:border-slate-600 dark:from-slate-700 dark:via-slate-800 dark:to-slate-900">
+      <div className="rounded-[1.35rem] bg-[linear-gradient(180deg,#94a3b8_0%,#64748b_18%,#475569_100%)] p-4 dark:bg-[linear-gradient(180deg,#334155_0%,#1e293b_100%)]">
+        {/* Overhead gantry */}
+        <div className="mb-3 flex items-center justify-between gap-3 px-1">
+          <div className="flex items-center gap-2">
+            <span
+              className={cn(
+                'h-2.5 w-2.5 rounded-full shadow-[0_0_12px_currentColor]',
+                railMotion ? 'bg-emerald-400 text-emerald-400' : 'bg-amber-400 text-amber-400'
+              )}
+              aria-hidden
+            />
+            <p className="font-mono text-[10px] uppercase tracking-[0.28em] text-slate-100/90">
+              {railMotion && activeSlot !== null
+                ? `Aisle open · Bay ${bayCode(activeSlot)}`
+                : 'Select a carriage to deploy aisle'}
+            </p>
+          </div>
+          <p className="font-mono text-[10px] text-slate-200/70">
+            {bookshelves.length} unit{bookshelves.length === 1 ? '' : 's'} on rail
+          </p>
+        </div>
+
+        <div className="overflow-x-auto pb-2 [-ms-overflow-style:none] [scrollbar-width:thin]">
+          <div
+            className="relative mx-auto h-[240px] rounded-2xl bg-[radial-gradient(ellipse_at_top,#cbd5e1_0%,#94a3b8_45%,#64748b_100%)] shadow-[inset_0_8px_24px_rgba(15,23,42,0.35)] dark:bg-[radial-gradient(ellipse_at_top,#475569_0%,#1e293b_70%)] sm:h-[280px]"
+            style={{ width: trackWidth, minWidth: '100%' }}
+          >
+            {/* Floor rails */}
+            <div
+              className="pointer-events-none absolute inset-x-4 bottom-10 h-1.5 rounded-full bg-slate-700/50 shadow-[0_1px_0_rgba(255,255,255,0.2)]"
+              aria-hidden
+            />
+            <div
+              className="pointer-events-none absolute inset-x-4 bottom-6 h-1 rounded-full bg-slate-800/40"
+              aria-hidden
+            />
+
+            {bookshelves.map((shelf, i) => {
+              const selected = selectedShelfId === shelf.id;
+              const shiftsRight = Boolean(
+                railMotion && activeSlot !== null && i > activeSlot
+              );
+              return (
+                <button
+                  key={shelf.id}
+                  type="button"
+                  onClick={() => onSelectCarriage(i)}
+                  className={cn(
+                    'group absolute top-3 z-10 flex h-[calc(100%-3.25rem)] flex-col overflow-hidden rounded-t-lg border border-slate-900/40 text-left shadow-[6px_0_18px_rgba(15,23,42,0.35),inset_0_1px_0_rgba(255,255,255,0.25)] transition-[transform,box-shadow,filter] duration-700 ease-[cubic-bezier(0.22,1,0.36,1)]',
+                    'bg-[linear-gradient(135deg,#e2e8f0_0%,#94a3b8_42%,#64748b_100%)] hover:brightness-105',
+                    'dark:bg-[linear-gradient(135deg,#64748b_0%,#334155_55%,#1e293b_100%)]',
+                    shiftsRight && 'z-20',
+                    selected &&
+                      'ring-2 ring-cyan-300 ring-offset-2 ring-offset-slate-500/40'
+                  )}
+                  style={{
+                    left: `${24 + i * (CARRIAGE_W + CARRIAGE_GAP)}px`,
+                    width: CARRIAGE_W,
+                    transform: shiftsRight
+                      ? `translateX(${AISLE_SHIFT_PX}px)`
+                      : 'translateX(0)',
+                  }}
+                  title={`${bayCode(i)} · ${shelf.title}`}
+                >
+                  {/* Handle + end panel rivets */}
+                  <span
+                    className="absolute inset-y-3 left-1 w-1.5 rounded-full bg-slate-500/80 shadow-inner"
+                    aria-hidden
+                  />
+                  <span
+                    className="absolute right-2 top-3 h-2 w-2 rounded-full bg-slate-600/70"
+                    aria-hidden
+                  />
+                  <span
+                    className="absolute bottom-8 right-2 h-2 w-2 rounded-full bg-slate-600/70"
+                    aria-hidden
+                  />
+
+                  <div className="flex flex-1 flex-col items-center justify-center px-3 pt-4 text-center">
+                    <span className="font-mono text-[11px] font-semibold tracking-[0.2em] text-slate-700 dark:text-slate-200">
+                      {bayCode(i)}
+                    </span>
+                    <span className="mt-2 line-clamp-3 text-[11px] font-bold leading-snug text-slate-900 dark:text-slate-50">
+                      {shelf.title}
+                    </span>
+                  </div>
+
+                  <div className="border-t border-slate-900/20 bg-slate-900/10 px-2 py-2 text-center dark:bg-black/20">
+                    <span className="font-mono text-[9px] uppercase tracking-wider text-slate-700 dark:text-slate-300">
+                      {selected && railMotion ? 'Access' : 'Locked'}
+                    </span>
+                  </div>
+                </button>
+              );
+            })}
+
+            {/* Safety bar */}
+            <div
+              className={cn(
+                'absolute bottom-3 left-4 z-30 h-2 origin-left rounded-full border border-rose-900/50 transition-transform duration-500 ease-out',
+                'bg-[repeating-linear-gradient(90deg,#e11d48_0,#e11d48_10px,#fda4af_10px,#fda4af_20px)] shadow-[0_0_16px_rgba(225,29,72,0.45)]',
+                railMotion ? 'scale-x-100' : 'scale-x-0'
+              )}
+              style={{ width: Math.min(trackWidth - 48, 520) }}
+              aria-hidden
+            />
+          </div>
+        </div>
+
+        <p className="mt-3 text-center text-xs leading-relaxed text-slate-100/85">
+          {railMotion && activeSlot !== null ? (
+            <>
+              Safety bar deployed. Units to the right of{' '}
+              <span className="font-semibold text-cyan-100">{bayCode(activeSlot)}</span> shift as
+              one block — classic hospital high-density access.
+            </>
+          ) : (
+            <>
+              Click a steel carriage to open a single aisle. Only one gap is open at a time, like
+              physical medical-records kompakt shelving.
+            </>
+          )}
+        </p>
+      </div>
+    </div>
+  );
+}
+
 function BookDetailView({
   notebook,
   shelfTitle,
+  bayLabel,
   tab,
   pageCount,
   sectionCount,
@@ -327,6 +277,7 @@ function BookDetailView({
 }: {
   notebook: Notebook;
   shelfTitle: string;
+  bayLabel: string;
   tab: 'active' | 'archived';
   pageCount: (nb: Notebook) => number;
   sectionCount: (nb: Notebook) => number;
@@ -338,54 +289,58 @@ function BookDetailView({
   onRestoreNotebook: (nb: Notebook) => void;
   onDeleteNotebookForever: (id: string) => void;
 }) {
-  const idx =
-    notebook.title.length % WOOD_BOOK_COLORS.length;
-  const accent = WOOD_BOOK_COLORS[idx];
+  const accent =
+    CHART_SPINE_COLORS[notebook.title.length % CHART_SPINE_COLORS.length];
   const pages = pageCount(notebook);
   const sections = sectionCount(notebook);
   const busy = busyNotebookId === notebook.id;
 
   return (
-    <div className="w-full max-w-6xl rounded-xl border border-[var(--app-border)] bg-[var(--app-bg)] p-4 shadow-xl md:p-6">
-      <div className="mb-4 flex flex-wrap items-center justify-between gap-2">
-        <button
-          type="button"
-          onClick={onClose}
-          className="inline-flex items-center gap-2 rounded-lg border border-[var(--app-border)] px-3 py-1.5 text-xs font-medium text-[var(--app-fg)] hover:bg-gray-50 dark:hover:bg-[var(--app-surface)]"
-        >
-          <X className="h-3.5 w-3.5" />
-          Close preview
-        </button>
+    <div className="w-full overflow-hidden rounded-2xl border border-slate-200/80 bg-white/90 shadow-[0_20px_50px_-24px_rgba(15,23,42,0.45)] backdrop-blur-md dark:border-[var(--app-border)] dark:bg-[var(--app-surface)]/95">
+      <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-200/80 bg-slate-50/80 px-4 py-3 dark:border-[var(--app-border)] dark:bg-[var(--app-bg)]/60">
+        <div className="flex items-center gap-2">
+          <button
+            type="button"
+            onClick={onClose}
+            className="inline-flex items-center gap-2 rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs font-medium text-slate-700 hover:bg-slate-50 dark:border-[var(--app-border)] dark:bg-[var(--app-surface)] dark:text-[var(--app-fg)] dark:hover:bg-[var(--app-bg)]"
+          >
+            <X className="h-3.5 w-3.5" />
+            Close chart
+          </button>
+          <span className="font-mono text-[10px] uppercase tracking-[0.2em] text-slate-500 dark:text-[var(--app-muted)]">
+            {bayLabel} · chart preview
+          </span>
+        </div>
         <button
           type="button"
           onClick={onOpenInNotes}
-          className="inline-flex items-center gap-2 rounded-lg bg-brand-700 px-4 py-2 text-sm font-medium text-white hover:bg-brand-800"
+          className="inline-flex items-center gap-2 rounded-lg bg-cyan-700 px-4 py-2 text-sm font-semibold text-white shadow-sm hover:bg-cyan-800"
         >
           <BookOpen className="h-4 w-4" />
           Open in Notes
         </button>
       </div>
 
-      <div className="grid grid-cols-1 gap-6 md:grid-cols-12 md:gap-8">
-        <div className="md:col-span-6">
+      <div className="grid grid-cols-1 gap-6 p-5 md:grid-cols-12 md:gap-8 md:p-6">
+        <div className="md:col-span-5">
           <div
-            className="mx-auto flex aspect-[3/4] max-h-[min(420px,55vh)] w-full max-w-sm flex-col justify-between rounded-r-lg rounded-l-sm border-l-[6px] border-black/25 p-6 text-white shadow-2xl"
+            className="mx-auto flex aspect-[3/4] max-h-[min(400px,52vh)] w-full max-w-sm flex-col justify-between rounded-r-xl rounded-l-md border-l-[7px] border-black/30 p-6 text-white shadow-2xl"
             style={{
-              background: `linear-gradient(155deg, ${accent} 0%, ${accent}99 45%, #0f172a 100%)`,
+              background: `linear-gradient(155deg, ${accent} 0%, ${accent}cc 48%, #0f172a 100%)`,
             }}
           >
             <span className="text-[10px] font-semibold uppercase tracking-[0.35em] text-white/70">
-              Notebook
+              Medical chart binder
             </span>
             <div>
               <h2 className="text-balance text-2xl font-bold leading-tight drop-shadow-md">
                 {notebook.title?.trim() || 'Untitled'}
               </h2>
-              {shelfTitle ? (
-                <p className="mt-2 text-sm text-white/85">Shelf · {shelfTitle}</p>
-              ) : null}
+              <p className="mt-2 text-sm text-white/85">
+                {bayLabel} · {shelfTitle || 'Unit'}
+              </p>
             </div>
-            <div className="rounded-md bg-black/25 px-3 py-2 text-xs backdrop-blur-sm">
+            <div className="rounded-lg bg-black/25 px-3 py-2 text-xs backdrop-blur-sm">
               <dl className="grid grid-cols-2 gap-x-3 gap-y-1">
                 <dt className="text-white/65">Sections</dt>
                 <dd className="font-semibold">{sections}</dd>
@@ -399,106 +354,93 @@ function BookDetailView({
             </div>
           </div>
 
-          <dl className="mt-4 space-y-2 text-sm text-[var(--app-fg)]">
-            <div className="flex justify-between gap-4 border-b border-[var(--app-border)] py-2">
-              <dt className="text-[var(--app-muted)]">Notebook</dt>
-              <dd className="truncate font-medium">{notebook.title || 'Untitled'}</dd>
-            </div>
-            <div className="flex justify-between gap-4 border-b border-[var(--app-border)] py-2">
-              <dt className="text-[var(--app-muted)]">Shelf</dt>
-              <dd className="truncate">{shelfTitle || '—'}</dd>
-            </div>
-            <div className="flex justify-between gap-4 border-b border-[var(--app-border)] py-2">
-              <dt className="text-[var(--app-muted)]">Structure</dt>
-              <dd>
-                {sections} sections · {pages} pages
-              </dd>
-            </div>
-            <div className="flex flex-wrap items-center gap-1 border-b border-[var(--app-border)] py-2">
-              <span className="sr-only">Notebook actions</span>
-              {tab === 'active' ? (
-                <>
-                  <button
-                    type="button"
-                    title="Open in Notes"
-                    onClick={onOpenInNotes}
-                    className="rounded border border-[var(--app-border)] bg-[var(--app-surface)] p-1.5 text-[var(--app-fg)] shadow-sm hover:bg-gray-50 dark:hover:bg-[var(--app-bg)]"
-                  >
-                    <BookOpen className="h-3.5 w-3.5" />
-                  </button>
-                  <button
-                    type="button"
-                    title="Export Markdown"
-                    onClick={() => onExportNotebook(notebook)}
-                    className="rounded border border-[var(--app-border)] bg-[var(--app-surface)] p-1.5 text-[var(--app-fg)] shadow-sm hover:bg-gray-50 dark:hover:bg-[var(--app-bg)]"
-                  >
-                    <FileDown className="h-3.5 w-3.5" />
-                  </button>
-                  <button
-                    type="button"
-                    title="Archive"
-                    disabled={busy}
-                    onClick={() => onArchiveNotebook(notebook.id)}
-                    className="rounded border border-[var(--app-border)] bg-[var(--app-surface)] p-1.5 text-[var(--app-fg)] shadow-sm hover:bg-gray-50 disabled:opacity-50 dark:hover:bg-[var(--app-bg)]"
-                  >
-                    {busy ? (
-                      <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                    ) : (
-                      <Archive className="h-3.5 w-3.5" />
-                    )}
-                  </button>
-                </>
-              ) : (
-                <>
-                  <button
-                    type="button"
-                    title="Restore"
-                    onClick={() => onRestoreNotebook(notebook)}
-                    className="rounded border border-[var(--app-border)] bg-[var(--app-surface)] p-1.5 text-[var(--app-fg)] shadow-sm hover:bg-gray-50 dark:hover:bg-[var(--app-bg)]"
-                  >
-                    <BookOpen className="h-3.5 w-3.5" />
-                  </button>
-                  <button
-                    type="button"
-                    title="Delete forever"
-                    disabled={busy}
-                    onClick={() => onDeleteNotebookForever(notebook.id)}
-                    className="rounded border border-[var(--app-border)] bg-[var(--app-surface)] p-1.5 text-[var(--app-fg)] shadow-sm hover:bg-gray-50 disabled:opacity-50 dark:hover:bg-[var(--app-bg)]"
-                  >
-                    <Trash2 className="h-3.5 w-3.5" />
-                  </button>
-                </>
-              )}
-            </div>
-          </dl>
+          <div className="mt-4 flex flex-wrap gap-2">
+            {tab === 'active' ? (
+              <>
+                <button
+                  type="button"
+                  onClick={onOpenInNotes}
+                  className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs font-medium text-slate-800 hover:bg-slate-50 dark:border-[var(--app-border)] dark:bg-[var(--app-bg)] dark:text-[var(--app-fg)]"
+                >
+                  <BookOpen className="h-3.5 w-3.5" /> Open
+                </button>
+                <button
+                  type="button"
+                  onClick={() => onExportNotebook(notebook)}
+                  className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs font-medium text-slate-800 hover:bg-slate-50 dark:border-[var(--app-border)] dark:bg-[var(--app-bg)] dark:text-[var(--app-fg)]"
+                >
+                  <FileDown className="h-3.5 w-3.5" /> Export
+                </button>
+                <button
+                  type="button"
+                  disabled={busy}
+                  onClick={() => onArchiveNotebook(notebook.id)}
+                  className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs font-medium text-slate-800 hover:bg-slate-50 disabled:opacity-50 dark:border-[var(--app-border)] dark:bg-[var(--app-bg)] dark:text-[var(--app-fg)]"
+                >
+                  {busy ? (
+                    <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                  ) : (
+                    <Archive className="h-3.5 w-3.5" />
+                  )}
+                  Archive
+                </button>
+              </>
+            ) : (
+              <>
+                <button
+                  type="button"
+                  onClick={() => onRestoreNotebook(notebook)}
+                  className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs font-medium text-slate-800 hover:bg-slate-50 dark:border-[var(--app-border)] dark:bg-[var(--app-bg)] dark:text-[var(--app-fg)]"
+                >
+                  <BookOpen className="h-3.5 w-3.5" /> Restore
+                </button>
+                <button
+                  type="button"
+                  disabled={busy}
+                  onClick={() => onDeleteNotebookForever(notebook.id)}
+                  className="inline-flex items-center gap-1.5 rounded-lg border border-rose-200 bg-rose-50 px-3 py-1.5 text-xs font-medium text-rose-700 hover:bg-rose-100 disabled:opacity-50 dark:border-rose-900 dark:bg-rose-950/40 dark:text-rose-300"
+                >
+                  <Trash2 className="h-3.5 w-3.5" /> Delete forever
+                </button>
+              </>
+            )}
+          </div>
         </div>
 
-        <div className="md:col-span-6">
-          <div className="mb-3 flex items-center gap-2 text-sm font-semibold text-[var(--app-fg)]">
-            <List className="h-4 w-4 text-brand-600 dark:text-brand-400" />
-            Chapters
+        <div className="md:col-span-7">
+          <div className="mb-3 flex items-center gap-2 text-sm font-semibold text-slate-800 dark:text-[var(--app-fg)]">
+            <List className="h-4 w-4 text-cyan-700 dark:text-cyan-400" />
+            Chart contents
           </div>
-          <div className="max-h-[min(55vh,480px)] space-y-4 overflow-y-auto pr-1">
+          <div className="max-h-[min(55vh,480px)] space-y-3 overflow-y-auto pr-1">
             {notebook.sections.length === 0 ? (
-              <p className="text-sm text-[var(--app-muted)]">No sections yet.</p>
+              <p className="text-sm text-slate-500 dark:text-[var(--app-muted)]">
+                No sections yet.
+              </p>
             ) : (
               notebook.sections.map((sec) => (
                 <div
                   key={sec.id}
-                  className="rounded-lg border border-[var(--app-border)] bg-[var(--app-surface)] p-3"
+                  className="rounded-xl border border-slate-200 bg-slate-50/80 p-3 dark:border-[var(--app-border)] dark:bg-[var(--app-bg)]"
                 >
-                  <h4 className="font-medium text-[var(--app-fg)]">{sec.title || 'Untitled section'}</h4>
+                  <h4 className="font-medium text-slate-900 dark:text-[var(--app-fg)]">
+                    {sec.title || 'Untitled section'}
+                  </h4>
                   {sec.pages.length === 0 ? (
-                    <p className="mt-1 text-xs text-[var(--app-muted)]">No pages</p>
+                    <p className="mt-1 text-xs text-slate-500 dark:text-[var(--app-muted)]">
+                      No pages
+                    </p>
                   ) : (
-                    <ul className="mt-2 space-y-1.5 border-t border-[var(--app-border)] pt-2">
+                    <ul className="mt-2 space-y-1.5 border-t border-slate-200/80 pt-2 dark:border-[var(--app-border)]">
                       {sec.pages.map((p) => (
                         <li
                           key={p.id}
-                          className="flex items-start gap-2 text-sm text-[var(--app-muted)]"
+                          className="flex items-start gap-2 text-sm text-slate-600 dark:text-[var(--app-muted)]"
                         >
                           <FileText className="mt-0.5 h-3.5 w-3.5 shrink-0 opacity-70" />
-                          <span className="text-[var(--app-fg)]">{p.title?.trim() || 'Untitled page'}</span>
+                          <span className="text-slate-800 dark:text-[var(--app-fg)]">
+                            {p.title?.trim() || 'Untitled page'}
+                          </span>
                         </li>
                       ))}
                     </ul>
@@ -513,9 +455,9 @@ function BookDetailView({
   );
 }
 
-/** Wooden shelf frame with book spines (title on spine; preview opens detail with actions). */
-function WoodBookshelfVisualization({
+function ChartCabinetVisualization({
   shelfTitle,
+  bayLabel,
   notebooks,
   tab,
   pageCount,
@@ -524,6 +466,7 @@ function WoodBookshelfVisualization({
   onSpineClick,
 }: {
   shelfTitle: string;
+  bayLabel: string;
   notebooks: Notebook[];
   tab: 'active' | 'archived';
   pageCount: (nb: Notebook) => number;
@@ -534,31 +477,39 @@ function WoodBookshelfVisualization({
   const rows = chunkIntoRows(notebooks, BOOKS_PER_ROW);
 
   return (
-    <div className="mx-auto mt-2 w-full max-w-[min(100%,1800px)] overflow-hidden">
-      <p className="mb-4 text-center text-lg font-bold text-slate-800 dark:text-[var(--app-fg)]">
-        {shelfTitle ? shelfTitle : 'Bookshelf'}
-      </p>
-      <div
-        className="relative overflow-hidden border-[12px] border-[#8b5a2b] bg-[#d2a679] px-3 py-6 shadow-[inset_0_0_10px_rgba(0,0,0,0.25)] dark:border-amber-950 dark:bg-[#4a3424] dark:shadow-[inset_0_0_14px_rgba(0,0,0,0.45)]"
-      >
-        <span
-          className="pointer-events-none absolute inset-y-0 -left-[12px] w-3 bg-[#6e4621] dark:bg-amber-950"
-          aria-hidden
-        />
-        <span
-          className="pointer-events-none absolute inset-y-0 -right-[12px] w-3 bg-[#6e4621] dark:bg-amber-950"
-          aria-hidden
-        />
-        {notebooks.length === 0 ? (
-          <p className="py-20 text-center text-base text-[#5c3d28] dark:text-[var(--app-muted)]">
-            No notebooks on this shelf yet.
+    <div className="mx-auto w-full max-w-[min(100%,1800px)]">
+      <div className="mb-4 flex flex-wrap items-end justify-between gap-2">
+        <div>
+          <p className="font-mono text-[10px] uppercase tracking-[0.28em] text-cyan-800/80 dark:text-cyan-300/80">
+            Open bay {bayLabel}
           </p>
-        ) : (
-          <div className="space-y-4">
-            {rows.map((row, ri) => (
+          <h3 className="text-lg font-semibold tracking-tight text-slate-900 dark:text-[var(--app-fg)]">
+            {shelfTitle || 'Storage unit'}
+          </h3>
+        </div>
+        <p className="text-xs text-slate-500 dark:text-[var(--app-muted)]">
+          {notebooks.length} chart{notebooks.length === 1 ? '' : 's'} · click a spine to preview
+        </p>
+      </div>
+
+      <div className="relative overflow-hidden rounded-2xl border border-slate-500/30 bg-[linear-gradient(180deg,#cbd5e1_0%,#94a3b8_12%,#64748b_100%)] p-3 shadow-[inset_0_1px_0_rgba(255,255,255,0.35),0_18px_40px_-20px_rgba(15,23,42,0.5)] dark:border-slate-600 dark:bg-[linear-gradient(180deg,#475569_0%,#1e293b_100%)]">
+        <div className="rounded-xl bg-[linear-gradient(180deg,#e2e8f0_0%,#cbd5e1_100%)] px-3 py-5 shadow-[inset_0_6px_18px_rgba(15,23,42,0.12)] dark:bg-[linear-gradient(180deg,#334155_0%,#1e293b_100%)]">
+          {notebooks.length === 0 ? (
+            <div className="flex flex-col items-center justify-center gap-2 py-16 text-center">
+              <FolderOpen className="h-10 w-10 text-slate-500/70" />
+              <p className="text-sm font-medium text-slate-700 dark:text-slate-300">
+                This bay is empty
+              </p>
+              <p className="max-w-sm text-xs text-slate-500 dark:text-slate-400">
+                Create a chart binder or import Markdown to stock this unit.
+              </p>
+            </div>
+          ) : (
+            <div className="space-y-4">
+              {rows.map((row, ri) => (
                 <div
                   key={ri}
-                  className="relative flex min-h-[9rem] flex-nowrap content-end items-end justify-start gap-x-2 overflow-x-auto border-b-[6px] border-[#8b5a2b] pb-4 pt-2 dark:border-amber-950 after:pointer-events-none after:absolute after:inset-x-0 after:-bottom-2 after:h-2 after:bg-black/15"
+                  className="relative flex min-h-[9rem] flex-nowrap content-end items-end justify-start gap-x-2 overflow-x-auto border-b-[5px] border-slate-500/70 pb-4 pt-2 dark:border-slate-600 after:pointer-events-none after:absolute after:inset-x-0 after:-bottom-1.5 after:h-1.5 after:bg-black/15"
                 >
                   {row.map((nb, bi) => {
                     const pages = pageCount(nb);
@@ -567,48 +518,46 @@ function WoodBookshelfVisualization({
                     const w = width * SHELF_VISUAL_SCALE;
                     const h = height * SHELF_VISUAL_SCALE;
                     const bg =
-                      WOOD_BOOK_COLORS[
-                        (ri * BOOKS_PER_ROW + bi + nb.title.length) % WOOD_BOOK_COLORS.length
+                      CHART_SPINE_COLORS[
+                        (ri * BOOKS_PER_ROW + bi + nb.title.length) %
+                          CHART_SPINE_COLORS.length
                       ];
-                    const muted = tab === 'archived';
                     const title = nb.title?.trim() || 'Untitled';
                     return (
-                      <div
+                      <button
                         key={nb.id}
-                        className="flex flex-col items-center gap-2"
+                        type="button"
+                        title={`${title} · ${pages} pages · ${sections} sections`}
+                        onClick={() => onSpineClick(nb)}
+                        className={cn(
+                          'relative flex shrink-0 flex-col items-center justify-between overflow-hidden rounded-md border border-black/25 px-1 py-2 shadow-md transition-transform hover:-translate-y-1 focus:outline-none focus-visible:ring-2 focus-visible:ring-cyan-400',
+                          tab === 'archived' && 'opacity-65 saturate-75',
+                          previewBookId === nb.id &&
+                            'ring-2 ring-cyan-300 ring-offset-2 ring-offset-slate-300'
+                        )}
+                        style={{
+                          width: `${w}px`,
+                          height: `${h}px`,
+                          backgroundColor: bg,
+                        }}
                       >
-                        <button
-                          type="button"
-                          title={`${title} · ${pages} pages · ${sections} sections — click for preview`}
-                          onClick={() => onSpineClick(nb)}
-                          className={cn(
-                            'relative flex shrink-0 flex-col items-center justify-between overflow-hidden rounded-md border border-black/25 px-1 py-2 shadow-md focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-500',
-                            muted && 'opacity-65 saturate-75',
-                            previewBookId === nb.id && 'ring-2 ring-amber-300 ring-offset-2'
-                          )}
+                        <span
+                          className="max-h-[calc(100%-8px)] flex-1 overflow-hidden px-1 text-center text-[13px] font-semibold leading-snug tracking-wide text-white drop-shadow-sm sm:text-[14px]"
                           style={{
-                            width: `${w}px`,
-                            height: `${h}px`,
-                            backgroundColor: bg,
+                            writingMode: 'vertical-rl',
+                            textOrientation: 'mixed',
                           }}
                         >
-                          <span
-                            className="max-h-[calc(100%-8px)] flex-1 overflow-hidden px-1 text-center text-[13px] font-semibold leading-snug tracking-wide text-white drop-shadow-sm sm:text-[14px]"
-                            style={{
-                              writingMode: 'vertical-rl',
-                              textOrientation: 'mixed',
-                            }}
-                          >
-                            {title.length > 56 ? `${title.slice(0, 54)}…` : title}
-                          </span>
-                        </button>
-                      </div>
+                          {title.length > 56 ? `${title.slice(0, 54)}…` : title}
+                        </span>
+                      </button>
                     );
                   })}
                 </div>
-            ))}
-          </div>
-        )}
+              ))}
+            </div>
+          )}
+        </div>
       </div>
     </div>
   );
@@ -641,7 +590,6 @@ export default function BookshelfPage({
   const [archivedList, setArchivedList] = useState<Notebook[]>([]);
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState<string | null>(null);
-  /** True after clicking a carriage — drives rail translate + red safety strip (HTML prototype). */
   const [railMotion, setRailMotion] = useState(false);
   const [previewBook, setPreviewBook] = useState<Notebook | null>(null);
   const importRef = useRef<HTMLInputElement>(null);
@@ -686,8 +634,15 @@ export default function BookshelfPage({
     loadNotebooks();
   }, [loadNotebooks]);
 
+  const selectedIndex = useMemo(
+    () => bookshelves.findIndex((b) => b.id === manageShelfId),
+    [bookshelves, manageShelfId]
+  );
+  const selectedShelf = selectedIndex >= 0 ? bookshelves[selectedIndex] : null;
+  const selectedBay = selectedIndex >= 0 ? bayCode(selectedIndex) : '—';
+
   const createShelf = async () => {
-    const name = newShelfName.trim() || 'New bookshelf';
+    const name = newShelfName.trim() || 'New storage unit';
     const id = `bs-${Date.now()}`;
     setBusy('new-shelf');
     try {
@@ -695,6 +650,7 @@ export default function BookshelfPage({
       setNewShelfName('');
       await onRefreshBookshelves();
       setManageShelfId(id);
+      setRailMotion(true);
     } catch (e) {
       console.error(e);
     } finally {
@@ -704,14 +660,14 @@ export default function BookshelfPage({
 
   const renameShelf = async (id: string, currentTitle: string) => {
     const name = await promptText({
-      title: 'Rename bookshelf',
-      label: 'Shelf name',
+      title: 'Rename storage unit',
+      label: 'Unit name',
       defaultValue: currentTitle,
-      placeholder: 'Bookshelf title',
+      placeholder: 'e.g. Ward 3 · Outpatients',
       confirmLabel: 'Save',
     });
     if (name === null) return;
-    const trimmed = name.trim() || 'Untitled';
+    const trimmed = name.trim() || 'Untitled unit';
     setBusy(id);
     try {
       await api.bookshelves.update(id, trimmed);
@@ -724,26 +680,59 @@ export default function BookshelfPage({
   const deleteShelf = async (id: string) => {
     const shelf = bookshelves.find((b) => b.id === id);
     const ok = await confirm({
-      title: 'Delete bookshelf?',
-      message: `“${shelf?.title?.trim() || 'Bookshelf'}” will be removed. It must be empty (no notebooks). This cannot be undone.`,
-      confirmLabel: 'Delete bookshelf',
+      title: 'Decommission storage unit?',
+      message: `“${shelf?.title?.trim() || 'Unit'}” will be removed. It must be empty (no chart binders). This cannot be undone.`,
+      confirmLabel: 'Delete unit',
       variant: 'danger',
     });
     if (!ok) return;
     setBusy(id);
     try {
       await api.bookshelves.delete(id);
+      setRailMotion(false);
       await onRefreshBookshelves();
       onLibraryChanged();
     } catch (e) {
-      window.alert(e instanceof Error ? e.message : 'Could not delete');
+      await confirm({
+        title: 'Could not delete unit',
+        message: e instanceof Error ? e.message : 'Could not delete',
+        confirmLabel: 'OK',
+        variant: 'default',
+      });
+    } finally {
+      setBusy(null);
+    }
+  };
+
+  const createNotebook = async () => {
+    if (!manageShelfId) return;
+    const name = await promptText({
+      title: 'New chart binder',
+      label: 'Notebook title',
+      placeholder: 'e.g. Intake notes',
+      confirmLabel: 'Create',
+    });
+    if (name === null) return;
+    const title = name.trim() || 'Untitled chart';
+    setBusy('new-notebook');
+    try {
+      const nbId = `nb-${Date.now()}`;
+      const secId = `sec-${Date.now()}`;
+      const pageId = `page-${Date.now()}`;
+      await api.notebooks.create(nbId, title.slice(0, 80), manageShelfId);
+      await api.sections.create(secId, nbId, 'Notes');
+      await api.pages.create(pageId, secId, 'Untitled page', '');
+      await loadNotebooks();
+      onLibraryChanged();
+      setTab('active');
+    } catch (e) {
+      console.error(e);
     } finally {
       setBusy(null);
     }
   };
 
   const list = tab === 'active' ? activeList : archivedList;
-
   const sectionCount = (nb: Notebook) => nb.sections.length;
   const pageCount = (nb: Notebook) =>
     nb.sections.reduce((n, s) => n + s.pages.length, 0);
@@ -751,8 +740,8 @@ export default function BookshelfPage({
   const archive = async (id: string) => {
     const nb = [...activeList, ...archivedList].find((n) => n.id === id);
     const ok = await confirm({
-      title: 'Archive notebook?',
-      message: `“${nb?.title?.trim() || 'Notebook'}” will move to Archived. You can restore it from the Archived tab.`,
+      title: 'Archive chart binder?',
+      message: `“${nb?.title?.trim() || 'Notebook'}” will move to Archived. You can restore it later.`,
       confirmLabel: 'Archive',
       variant: 'default',
     });
@@ -762,6 +751,7 @@ export default function BookshelfPage({
       await api.notebooks.setArchive(id, true);
       await loadNotebooks();
       onLibraryChanged();
+      setPreviewBook(null);
     } finally {
       setBusy(null);
     }
@@ -770,8 +760,8 @@ export default function BookshelfPage({
   const removeForever = async (id: string) => {
     const nb = archivedList.find((n) => n.id === id);
     const ok = await confirm({
-      title: 'Delete notebook forever?',
-      message: `“${nb?.title?.trim() || 'Notebook'}” and all its sections and pages will be permanently removed. This cannot be undone.`,
+      title: 'Delete chart forever?',
+      message: `“${nb?.title?.trim() || 'Notebook'}” and all sections/pages will be permanently removed.`,
       confirmLabel: 'Delete forever',
       variant: 'danger',
     });
@@ -781,14 +771,17 @@ export default function BookshelfPage({
       await api.notebooks.delete(id);
       await loadNotebooks();
       onLibraryChanged();
+      setPreviewBook(null);
     } finally {
       setBusy(null);
     }
   };
 
   const exportNb = (nb: Notebook) => {
-    const md = notebookToMarkdown(nb);
-    downloadText(`${sanitizeFilename(nb.title || 'notebook')}.md`, md);
+    downloadText(
+      `${sanitizeFilename(nb.title || 'notebook')}.md`,
+      notebookToMarkdown(nb)
+    );
   };
 
   const openAndFocus = (nb: Notebook) => {
@@ -804,8 +797,7 @@ export default function BookshelfPage({
       const text = await f.text();
       const { title, content } = parseImportedMarkdown(text);
       const base =
-        f.name.replace(/\.md$/i, '').replace(/[^\w\s-]+/g, '').trim() ||
-        'Imported';
+        f.name.replace(/\.md$/i, '').replace(/[^\w\s-]+/g, '').trim() || 'Imported';
       const nbId = `nb-${Date.now()}`;
       const secId = `sec-${Date.now()}`;
       const pageId = `page-${Date.now()}`;
@@ -834,237 +826,311 @@ export default function BookshelfPage({
     }
   };
 
-  const handleSpineClick = (nb: Notebook) => {
-    setPreviewBook(nb);
-  };
-
-  const closeBookPreview = () => {
-    setPreviewBook(null);
-  };
-
   return (
-    <div className="flex h-full min-h-0 flex-col bg-[var(--app-bg)] text-[var(--app-fg)]">
-      <div className="shrink-0 border-b border-slate-300/80 bg-gradient-to-r from-slate-100 via-white to-slate-100 px-6 py-4 dark:border-[var(--app-border)] dark:from-[var(--app-surface)] dark:via-[var(--app-bg)] dark:to-[var(--app-surface)]">
-        <div className="flex flex-wrap items-center gap-4">
-          <button
-            type="button"
-            onClick={onBack}
-            className="inline-flex items-center gap-2 text-sm font-medium text-brand-700 dark:text-brand-300 hover:underline"
-          >
-            <ArrowLeft className="w-4 h-4" />
-            Back to notes
-          </button>
-          <div>
-            <h1 className="text-lg font-semibold tracking-tight text-slate-900 dark:text-[var(--app-fg)]">
-              Kompakt storage
-            </h1>
-            <p className="font-mono text-[10px] uppercase tracking-[0.22em] text-slate-500 dark:text-[var(--app-muted)]">
-              Mobile high-density shelving · bookshelves
-            </p>
+    <div className="flex h-full min-h-0 flex-col bg-[radial-gradient(ellipse_at_top,#e8eef5_0%,#f8fafc_42%,#eef2f7_100%)] text-slate-900 dark:bg-[radial-gradient(ellipse_at_top,#132238_0%,#0a1628_55%,#07101c_100%)] dark:text-[var(--app-fg)]">
+      <header className="shrink-0 border-b border-slate-200/80 bg-white/80 px-5 py-4 backdrop-blur-xl dark:border-[var(--app-border)] dark:bg-[var(--app-surface)]/80">
+        <div className="mx-auto flex w-full max-w-7xl flex-wrap items-center justify-between gap-4">
+          <div className="flex flex-wrap items-center gap-4">
+            <button
+              type="button"
+              onClick={onBack}
+              className="inline-flex items-center gap-2 text-sm font-medium text-cyan-800 hover:underline dark:text-cyan-300"
+            >
+              <ArrowLeft className="h-4 w-4" />
+              Back to notes
+            </button>
+            <div className="h-8 w-px bg-slate-200 dark:bg-[var(--app-border)]" />
+            <div>
+              <p className="font-mono text-[10px] uppercase tracking-[0.3em] text-cyan-800/70 dark:text-cyan-300/70">
+                Records vault
+              </p>
+              <h1 className="text-lg font-semibold tracking-tight">
+                High-density storage units
+              </h1>
+            </div>
+          </div>
+          <div className="flex items-center gap-2 rounded-full border border-slate-200 bg-slate-50 px-3 py-1.5 text-[11px] text-slate-600 dark:border-[var(--app-border)] dark:bg-[var(--app-bg)] dark:text-[var(--app-muted)]">
+            <ShieldAlert className="h-3.5 w-3.5 text-amber-600" />
+            One aisle open at a time
           </div>
         </div>
-      </div>
+      </header>
 
-      <div className="flex-1 overflow-y-auto p-6 space-y-10">
-        <section>
-          <h2 className="mb-1 text-sm font-semibold text-slate-800 dark:text-[var(--app-fg)]">
-            Storage units (bookshelves)
-          </h2>
-          <p className="mb-4 max-w-xl text-xs text-slate-600 dark:text-[var(--app-muted)]">
-            Add units, then use the carriage rail to pick a shelf (first four appear on the rail).
-            After you open a bay, use Open, Rename, or Delete in the aisle panel beside the rail.
-          </p>
-          <div className="flex flex-wrap gap-2 mb-6">
-            <input
-              type="text"
-              value={newShelfName}
-              onChange={(e) => setNewShelfName(e.target.value)}
-              placeholder="New bookshelf name"
-              className="min-w-[200px] rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm text-gray-900 placeholder:text-gray-400 dark:border-[var(--app-border)] dark:bg-[var(--app-surface)] dark:text-[var(--app-fg)] dark:placeholder:text-[var(--app-muted)]"
-            />
-            <button
-              type="button"
-              disabled={busy === 'new-shelf'}
-              onClick={createShelf}
-              className="inline-flex items-center gap-1.5 rounded-lg bg-brand-700 hover:bg-brand-800 text-white text-sm font-medium px-4 py-2 disabled:opacity-50"
-            >
-              {busy === 'new-shelf' ? (
-                <Loader2 className="w-4 h-4 animate-spin" />
-              ) : (
-                <Plus className="w-4 h-4" />
-              )}
-              Add bookshelf
-            </button>
-          </div>
-          {bookshelves.length > 0 && (
-            <CompactMobileRail
-              railMotion={railMotion}
-              bookshelves={bookshelves}
-              selectedShelfId={manageShelfId}
-              busyShelfId={busy}
-              onSelectCarriage={(i) => {
-                const s = bookshelves[i];
-                if (!s) return;
-                setManageShelfId(s.id);
-                setRailMotion(true);
-              }}
-              onOpenShelfForNotes={onOpenShelfForNotes}
-              onRenameShelf={renameShelf}
-              onDeleteShelf={deleteShelf}
-            />
-          )}
-          {bookshelves.length === 0 && (
-            <p className="py-8 text-center text-gray-500 dark:text-[var(--app-muted)]">
-              No bookshelves yet. Add one above.
-            </p>
-          )}
-        </section>
-
-        <section className="border-t border-slate-200 pt-8 dark:border-[var(--app-border)]">
-          <div className="mb-4 flex flex-wrap items-center justify-between gap-4">
-            <div>
-              <h2 className="text-sm font-semibold text-slate-800 dark:text-[var(--app-fg)]">
-                Active bay · notebooks on shelf
-              </h2>
-              <p className="mt-0.5 font-mono text-[9px] uppercase tracking-widest text-slate-500 dark:text-[var(--app-muted)]">
-                Up to 12 books per row (row 1 fills, then row 2…); spine size follows sections & pages
-              </p>
-            </div>
-            {bookshelves.length > 0 && (
-              <label className="flex items-center gap-2 text-xs text-gray-600 dark:text-[var(--app-muted)]">
-                <span>Shelf:</span>
-                <select
-                  value={manageShelfId ?? ''}
-                  onChange={(e) => {
-                    setManageShelfId(e.target.value || null);
-                    setRailMotion(false);
-                  }}
-                  className="rounded-lg border border-[var(--app-border)] bg-[var(--app-surface)] px-2 py-1.5 text-xs text-[var(--app-fg)]"
-                >
-                  {bookshelves.map((s) => (
-                    <option key={s.id} value={s.id}>
-                      {s.title}
-                    </option>
-                  ))}
-                </select>
-              </label>
-            )}
-          </div>
-          <div className="flex flex-wrap items-center gap-2 mb-4">
-            <input
-              ref={importRef}
-              type="file"
-              accept=".md,.markdown,text/markdown"
-              className="hidden"
-              onChange={onImportFile}
-            />
-            <button
-              type="button"
-              disabled={busy === 'import' || !manageShelfId}
-              onClick={() => importRef.current?.click()}
-              className="inline-flex items-center gap-1.5 rounded-lg border border-[var(--app-border)] bg-[var(--app-surface)] px-3 py-1.5 text-xs font-medium text-[var(--app-fg)] hover:bg-gray-50 disabled:opacity-50 dark:hover:bg-[var(--app-bg)]"
-            >
-              {busy === 'import' ? (
-                <Loader2 className="w-3.5 h-3.5 animate-spin" />
-              ) : (
-                <Upload className="w-3.5 h-3.5" />
-              )}
-              Import Markdown
-            </button>
-            <div className="inline-flex rounded-lg border border-[var(--app-border)] bg-gray-50 p-0.5 dark:bg-[var(--app-bg)]">
-              <button
-                type="button"
-                onClick={() => setTab('active')}
-                className={cn(
-                  'rounded-md px-3 py-1.5 text-xs font-medium',
-                  tab === 'active'
-                    ? 'bg-white shadow dark:bg-[var(--app-surface)] dark:text-[var(--app-fg)]'
-                    : 'text-gray-600 dark:text-[var(--app-muted)]'
-                )}
-              >
-                Active ({activeList.length})
-              </button>
-              <button
-                type="button"
-                onClick={() => setTab('archived')}
-                className={cn(
-                  'rounded-md px-3 py-1.5 text-xs font-medium',
-                  tab === 'archived'
-                    ? 'bg-white shadow dark:bg-[var(--app-surface)] dark:text-[var(--app-fg)]'
-                    : 'text-gray-600 dark:text-[var(--app-muted)]'
-                )}
-              >
-                Archived ({archivedList.length})
-              </button>
-            </div>
-          </div>
-
-          {loading ? (
-            <div className="flex justify-center py-20">
-              <Loader2 className="w-8 h-8 animate-spin text-brand-600" />
-            </div>
-          ) : !manageShelfId ? (
-            <p className="py-16 text-center text-gray-500 dark:text-[var(--app-muted)]">
-              Create a bookshelf to add notebooks.
-            </p>
-          ) : (
-            <div className="mx-auto max-w-6xl space-y-6">
-              {list.length === 0 && (
-                <p className="text-center text-sm text-gray-500 dark:text-[var(--app-muted)]">
-                  {tab === 'active'
-                    ? 'No notebooks in this shelf yet. Create one from the sidebar in Notes.'
-                    : 'No archived notebooks in this shelf.'}
+      <div className="flex-1 overflow-y-auto">
+        <div className="mx-auto w-full max-w-7xl space-y-8 p-5 sm:p-6">
+          {/* Unit CRUD + rail */}
+          <section className="grid grid-cols-1 gap-6 lg:grid-cols-12">
+            <div className="lg:col-span-4">
+              <div className="rounded-2xl border border-slate-200/90 bg-white/90 p-4 shadow-sm backdrop-blur dark:border-[var(--app-border)] dark:bg-[var(--app-surface)]/90">
+                <div className="mb-4 flex items-center gap-2">
+                  <BookMarked className="h-4 w-4 text-cyan-700 dark:text-cyan-400" />
+                  <h2 className="text-sm font-semibold">Unit registry</h2>
+                </div>
+                <p className="mb-4 text-xs leading-relaxed text-slate-500 dark:text-[var(--app-muted)]">
+                  Create and manage physical-style storage carriages. Select a bay on the rail to
+                  open the aisle and work charts inside.
                 </p>
-              )}
-              <p className="text-center font-mono text-[10px] uppercase tracking-[0.2em] text-slate-600 dark:text-[var(--app-muted)]">
-                {list.length > 0
-                  ? 'Click a spine for cover & chapters · export & archive under Structure in the preview'
-                  : 'Choose a shelf from the rail above or the menu here'}
-              </p>
 
-              <div className="overflow-hidden">
-                {manageShelfId && (
-                  <>
-                    <WoodBookshelfVisualization
-                      shelfTitle={
-                        bookshelves.find((b) => b.id === manageShelfId)?.title?.slice(0, 48) || ''
-                      }
-                      notebooks={list}
-                      tab={tab}
-                      pageCount={pageCount}
-                      sectionCount={sectionCount}
-                      previewBookId={previewBook?.id ?? null}
-                      onSpineClick={handleSpineClick}
-                    />
-                    {previewBook && (
-                      <div className="mt-6 w-full">
-                        <BookDetailView
-                          notebook={previewBook}
-                          shelfTitle={
-                            bookshelves.find((b) => b.id === manageShelfId)?.title?.slice(0, 80) || ''
-                          }
-                          tab={tab}
-                          pageCount={pageCount}
-                          sectionCount={sectionCount}
-                          busyNotebookId={busy}
-                          onClose={closeBookPreview}
-                          onOpenInNotes={() => {
-                            openAndFocus(previewBook);
-                            closeBookPreview();
-                          }}
-                          onExportNotebook={exportNb}
-                          onArchiveNotebook={archive}
-                          onRestoreNotebook={restoreAndOpen}
-                          onDeleteNotebookForever={removeForever}
-                        />
-                      </div>
+                <form
+                  className="mb-4 flex flex-col gap-2"
+                  onSubmit={(e) => {
+                    e.preventDefault();
+                    void createShelf();
+                  }}
+                >
+                  <label className="text-[10px] font-semibold uppercase tracking-wider text-slate-500 dark:text-[var(--app-muted)]">
+                    Commission new unit
+                  </label>
+                  <input
+                    type="text"
+                    value={newShelfName}
+                    onChange={(e) => setNewShelfName(e.target.value)}
+                    placeholder="e.g. Ward 4 · Clinic A"
+                    className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm text-slate-900 placeholder:text-slate-400 dark:border-[var(--app-border)] dark:bg-[var(--app-bg)] dark:text-[var(--app-fg)]"
+                  />
+                  <button
+                    type="submit"
+                    disabled={busy === 'new-shelf'}
+                    className="inline-flex items-center justify-center gap-1.5 rounded-xl bg-cyan-700 px-4 py-2.5 text-sm font-semibold text-white hover:bg-cyan-800 disabled:opacity-50"
+                  >
+                    {busy === 'new-shelf' ? (
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                    ) : (
+                      <Plus className="h-4 w-4" />
                     )}
-                  </>
-                )}
+                    Add storage unit
+                  </button>
+                </form>
+
+                <ul className="max-h-[280px] space-y-1.5 overflow-y-auto">
+                  {bookshelves.length === 0 ? (
+                    <li className="rounded-xl border border-dashed border-slate-300 px-3 py-6 text-center text-xs text-slate-500 dark:border-[var(--app-border)] dark:text-[var(--app-muted)]">
+                      No units yet — commission one above.
+                    </li>
+                  ) : (
+                    bookshelves.map((s, i) => {
+                      const active = manageShelfId === s.id;
+                      return (
+                        <li key={s.id}>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setManageShelfId(s.id);
+                              setRailMotion(true);
+                            }}
+                            className={cn(
+                              'flex w-full items-center gap-3 rounded-xl border px-3 py-2.5 text-left transition-colors',
+                              active
+                                ? 'border-cyan-300 bg-cyan-50 shadow-sm dark:border-cyan-800 dark:bg-cyan-950/30'
+                                : 'border-transparent hover:border-slate-200 hover:bg-slate-50 dark:hover:border-[var(--app-border)] dark:hover:bg-[var(--app-bg)]'
+                            )}
+                          >
+                            <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-slate-800 font-mono text-[11px] font-bold text-cyan-200">
+                              {bayCode(i)}
+                            </span>
+                            <span className="min-w-0 flex-1">
+                              <span className="block truncate text-sm font-medium">
+                                {s.title}
+                              </span>
+                              <span className="block text-[10px] text-slate-500 dark:text-[var(--app-muted)]">
+                                {active && railMotion ? 'Aisle open' : 'On rail'}
+                              </span>
+                            </span>
+                          </button>
+                        </li>
+                      );
+                    })
+                  )}
+                </ul>
               </div>
             </div>
-          )}
-        </section>
+
+            <div className="lg:col-span-8 space-y-4">
+              {bookshelves.length > 0 ? (
+                <CompactMobileRail
+                  railMotion={railMotion}
+                  bookshelves={bookshelves}
+                  selectedShelfId={manageShelfId}
+                  onSelectCarriage={(i) => {
+                    const s = bookshelves[i];
+                    if (!s) return;
+                    setManageShelfId(s.id);
+                    setRailMotion(true);
+                  }}
+                />
+              ) : (
+                <div className="flex min-h-[240px] flex-col items-center justify-center rounded-3xl border border-dashed border-slate-300 bg-white/50 text-center dark:border-[var(--app-border)] dark:bg-[var(--app-surface)]/40">
+                  <DoorOpen className="mb-3 h-10 w-10 text-slate-400" />
+                  <p className="text-sm font-medium text-slate-700 dark:text-[var(--app-fg)]">
+                    Rail is offline
+                  </p>
+                  <p className="mt-1 max-w-sm text-xs text-slate-500 dark:text-[var(--app-muted)]">
+                    Add a storage unit to mount carriages on the mobile track.
+                  </p>
+                </div>
+              )}
+
+              {selectedShelf ? (
+                <div className="flex flex-wrap items-center gap-2 rounded-2xl border border-slate-200/90 bg-white/90 p-3 shadow-sm dark:border-[var(--app-border)] dark:bg-[var(--app-surface)]/90">
+                  <div className="mr-auto min-w-0 px-1">
+                    <p className="font-mono text-[10px] uppercase tracking-[0.22em] text-slate-500 dark:text-[var(--app-muted)]">
+                      Active bay {selectedBay}
+                    </p>
+                    <p className="truncate text-sm font-semibold">{selectedShelf.title}</p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => onOpenShelfForNotes(selectedShelf.id)}
+                    className="inline-flex items-center gap-1.5 rounded-lg bg-slate-900 px-3 py-2 text-xs font-semibold text-white hover:bg-slate-800 dark:bg-cyan-700 dark:hover:bg-cyan-800"
+                  >
+                    <BookOpen className="h-3.5 w-3.5" />
+                    Open in Notes
+                  </button>
+                  <button
+                    type="button"
+                    disabled={busy === selectedShelf.id}
+                    onClick={() => renameShelf(selectedShelf.id, selectedShelf.title)}
+                    className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs font-medium hover:bg-slate-50 disabled:opacity-50 dark:border-[var(--app-border)] dark:bg-[var(--app-bg)] dark:hover:bg-[var(--app-surface)]"
+                  >
+                    {busy === selectedShelf.id ? (
+                      <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                    ) : (
+                      <Pencil className="h-3.5 w-3.5" />
+                    )}
+                    Rename
+                  </button>
+                  <button
+                    type="button"
+                    disabled={busy === selectedShelf.id}
+                    onClick={() => deleteShelf(selectedShelf.id)}
+                    className="inline-flex items-center gap-1.5 rounded-lg border border-rose-200 bg-rose-50 px-3 py-2 text-xs font-medium text-rose-700 hover:bg-rose-100 disabled:opacity-50 dark:border-rose-900 dark:bg-rose-950/30 dark:text-rose-300"
+                  >
+                    <Trash2 className="h-3.5 w-3.5" />
+                    Delete
+                  </button>
+                </div>
+              ) : null}
+            </div>
+          </section>
+
+          {/* Charts in open bay */}
+          <section className="rounded-3xl border border-slate-200/90 bg-white/70 p-5 shadow-sm backdrop-blur dark:border-[var(--app-border)] dark:bg-[var(--app-surface)]/70 sm:p-6">
+            <div className="mb-5 flex flex-wrap items-center justify-between gap-3">
+              <div>
+                <h2 className="text-sm font-semibold tracking-tight">
+                  Charts in open bay
+                </h2>
+                <p className="mt-0.5 text-xs text-slate-500 dark:text-[var(--app-muted)]">
+                  Binders on the steel shelves — create, import, archive, or open.
+                </p>
+              </div>
+              <div className="flex flex-wrap items-center gap-2">
+                <input
+                  ref={importRef}
+                  type="file"
+                  accept=".md,.markdown,text/markdown"
+                  className="hidden"
+                  onChange={onImportFile}
+                />
+                <button
+                  type="button"
+                  disabled={!manageShelfId || busy === 'new-notebook'}
+                  onClick={() => void createNotebook()}
+                  className="inline-flex items-center gap-1.5 rounded-lg bg-cyan-700 px-3 py-2 text-xs font-semibold text-white hover:bg-cyan-800 disabled:opacity-50"
+                >
+                  {busy === 'new-notebook' ? (
+                    <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                  ) : (
+                    <Plus className="h-3.5 w-3.5" />
+                  )}
+                  New chart
+                </button>
+                <button
+                  type="button"
+                  disabled={busy === 'import' || !manageShelfId}
+                  onClick={() => importRef.current?.click()}
+                  className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs font-medium hover:bg-slate-50 disabled:opacity-50 dark:border-[var(--app-border)] dark:bg-[var(--app-bg)] dark:hover:bg-[var(--app-surface)]"
+                >
+                  {busy === 'import' ? (
+                    <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                  ) : (
+                    <Upload className="h-3.5 w-3.5" />
+                  )}
+                  Import Markdown
+                </button>
+                <div className="inline-flex rounded-lg border border-slate-200 bg-slate-50 p-0.5 dark:border-[var(--app-border)] dark:bg-[var(--app-bg)]">
+                  <button
+                    type="button"
+                    onClick={() => setTab('active')}
+                    className={cn(
+                      'rounded-md px-3 py-1.5 text-xs font-medium',
+                      tab === 'active'
+                        ? 'bg-white text-slate-900 shadow dark:bg-[var(--app-surface)] dark:text-[var(--app-fg)]'
+                        : 'text-slate-500 dark:text-[var(--app-muted)]'
+                    )}
+                  >
+                    Active ({activeList.length})
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setTab('archived')}
+                    className={cn(
+                      'rounded-md px-3 py-1.5 text-xs font-medium',
+                      tab === 'archived'
+                        ? 'bg-white text-slate-900 shadow dark:bg-[var(--app-surface)] dark:text-[var(--app-fg)]'
+                        : 'text-slate-500 dark:text-[var(--app-muted)]'
+                    )}
+                  >
+                    Archived ({archivedList.length})
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            {loading ? (
+              <div className="flex justify-center py-20">
+                <Loader2 className="h-8 w-8 animate-spin text-cyan-700" />
+              </div>
+            ) : !manageShelfId ? (
+              <p className="py-16 text-center text-sm text-slate-500 dark:text-[var(--app-muted)]">
+                Commission a storage unit to stock charts.
+              </p>
+            ) : (
+              <div className="space-y-6">
+                <ChartCabinetVisualization
+                  shelfTitle={selectedShelf?.title?.slice(0, 64) || ''}
+                  bayLabel={selectedBay}
+                  notebooks={list}
+                  tab={tab}
+                  pageCount={pageCount}
+                  sectionCount={sectionCount}
+                  previewBookId={previewBook?.id ?? null}
+                  onSpineClick={setPreviewBook}
+                />
+                {previewBook ? (
+                  <BookDetailView
+                    notebook={previewBook}
+                    shelfTitle={selectedShelf?.title?.slice(0, 80) || ''}
+                    bayLabel={selectedBay}
+                    tab={tab}
+                    pageCount={pageCount}
+                    sectionCount={sectionCount}
+                    busyNotebookId={busy}
+                    onClose={() => setPreviewBook(null)}
+                    onOpenInNotes={() => {
+                      openAndFocus(previewBook);
+                      setPreviewBook(null);
+                    }}
+                    onExportNotebook={exportNb}
+                    onArchiveNotebook={archive}
+                    onRestoreNotebook={restoreAndOpen}
+                    onDeleteNotebookForever={removeForever}
+                  />
+                ) : null}
+              </div>
+            )}
+          </section>
+        </div>
       </div>
     </div>
   );
