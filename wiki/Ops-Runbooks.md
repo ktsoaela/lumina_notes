@@ -1,22 +1,26 @@
 # Ops runbooks
 
-## Backup / restore (SQLite)
+## Backup / restore
+
+### SQLite (desktop / local)
 
 App data is one file (`database.sqlite` or `DATABASE_PATH`).
 
 **Backup**
 ```bash
-# stop writers if possible, then copy
 cp "$DATABASE_PATH" "./backups/database-$(date +%Y%m%d).sqlite"
 ```
-Or use the in-app **Storage → Backup** export for a per-user JSON backup.
 
-**Restore**
+**Restore**: stop the API, replace the file, start again.
+
+### PostgreSQL (server production)
+
 ```bash
-# stop the API, replace the file, start again
-cp ./backups/database-YYYYMMDD.sqlite "$DATABASE_PATH"
+pg_dump "$DATABASE_URL" -Fc -f backup.dump
+pg_restore -d "$DATABASE_URL" --clean --if-exists backup.dump
 ```
-User-level: **Storage → Import** for JSON exported earlier.
+
+User-level JSON: in-app **Storage → Backup / Import**.
 
 ## Secret rotation
 

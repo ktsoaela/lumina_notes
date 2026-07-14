@@ -19,8 +19,10 @@ class ApiIntegrationTests(unittest.TestCase):
         os.environ["ENABLE_DOCS"] = "0"
         os.environ["AUTH_RATE_LIMIT"] = "1000"
         import importlib
+        import db as db_module
         import app as app_module
 
+        importlib.reload(db_module)
         importlib.reload(app_module)
         cls.app_module = app_module
         from fastapi.testclient import TestClient

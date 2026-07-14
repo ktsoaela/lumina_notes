@@ -7,10 +7,11 @@ metadata:
     app.kubernetes.io/name: lumina-notes
 type: Opaque
 stringData:
-  # REQUIRED: replace with a long random secret before any shared/prod cluster
   JWT_SECRET: REPLACE_WITH_STRONG_SECRET
-  # Optional Django admin (if running manage.py against the same DB)
   DJANGO_SECRET_KEY: REPLACE_WITH_STRONG_DJANGO_SECRET
+  # Required in production (server): Postgres DSN
+  DATABASE_URL: postgresql://lumina:REPLACE_DB_PASSWORD@lumina-notes-postgres:5432/lumina
+  POSTGRES_PASSWORD: REPLACE_DB_PASSWORD
 ---
 apiVersion: v1
 kind: ConfigMap
@@ -25,5 +26,6 @@ data:
   SEED_DEMO_USER: "0"
   ENABLE_DOCS: "0"
   JWT_EXPIRE_HOURS: "24"
-  # Explicit origins only — never use "*" with cookie/credentialed clients
   CORS_ORIGINS: "https://lumina-notes.local"
+  POSTGRES_USER: lumina
+  POSTGRES_DB: lumina

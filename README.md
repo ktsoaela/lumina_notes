@@ -101,16 +101,45 @@ Then restart the API / uvicorn so it reloads `app.py`.
 
 ## Docker
 
+Three stacks (separate Compose projects so they can run side-by-side):
+
+| Codename | Role | API port | Postgres host port |
+|----------|------|----------|--------------------|
+| **charlie** | development | 58881 | 5433 |
+| **bravo** | test / QA | 58882 | 5434 |
+| **alpha** | production | 58888 | not published |
+
+```bash
+# Dev
+cp .env.charlie.example .env.charlie   # optional
+npm run compose:charlie -- up --build -d
+
+# QA
+cp .env.bravo.example .env.bravo       # set real secrets
+npm run compose:bravo -- up --build -d
+
+# Prod (requires .env.alpha)
+cp .env.alpha.example .env.alpha       # set real JWT_SECRET + CORS_ORIGINS
+npm run compose:alpha -- up --build -d
+```
+
+Or: `scripts\compose_env.bat charlie up --build -d`
+
+Desktop/Electron keeps **SQLite**. Server stacks (**bravo** / **alpha**) use **Postgres** and `LUMINA_ENV=production`.
+
+Single-container (bring your own Postgres URL):
+
 ```bash
 docker build -t lumina-notes .
 docker run --rm -p 58888:58888 \
   -e JWT_SECRET="$(openssl rand -hex 32)" \
   -e LUMINA_ENV=production \
+  -e DATABASE_URL=postgresql://user:pass@host:5432/lumina \
   -e CORS_ORIGINS=http://127.0.0.1:58888 \
   lumina-notes
 ```
 
-Open http://127.0.0.1:58888 (health: `/health`).
+Health: `/health` on the API port.
 
 ## Kubernetes
 
