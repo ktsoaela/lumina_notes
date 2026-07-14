@@ -14,11 +14,12 @@ const Preview: React.FC<PreviewProps> = ({ content, className }) => {
   return (
     <div
       className={cn(
-        'prose prose-slate dark:prose-invert max-w-none h-full overflow-y-auto bg-white p-8 dark:bg-[var(--app-surface)]',
+        'prose prose-stone dark:prose-invert max-w-none h-full overflow-y-auto bg-transparent p-6 sm:p-8 font-serif',
+        'prose-headings:font-display prose-headings:tracking-tight prose-headings:text-[var(--app-fg)]',
+        'prose-p:leading-relaxed prose-a:text-[var(--spine)]',
         className
       )}
-    >
-      <Markdown
+    >      <Markdown
         remarkPlugins={[remarkGfm]}
         components={{
           code({ inline, className, children, ...props }: {
