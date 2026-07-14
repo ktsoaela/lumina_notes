@@ -1,4 +1,4 @@
-const { app, BrowserWindow, nativeImage } = require("electron");
+const { app, BrowserWindow, dialog, nativeImage } = require("electron");
 const path = require("path");
 const fs = require("fs");
 const { spawn } = require("child_process");
@@ -54,15 +54,36 @@ function backendExePath() {
 
 function startBackend() {
   const exe = backendExePath();
+  if (!fs.existsSync(exe)) {
+    return Promise.reject(
+      new Error(
+        `Backend not found at:\n${exe}\n\nRebuild with npm run build:electron:app`
+      )
+    );
+  }
   backendProc = spawn(exe, [], {
     cwd: path.dirname(exe),
-    stdio: "ignore",
+    stdio: ["ignore", "pipe", "pipe"],
     windowsHide: true,
+  });
+  let stderr = "";
+  backendProc.stderr?.on("data", (chunk) => {
+    stderr += chunk.toString();
+    if (stderr.length > 2000) stderr = stderr.slice(-2000);
   });
   backendProc.on("error", (err) => {
     console.error("Failed to start backend:", err);
   });
-  return waitForServer(PROD_URL);
+  backendProc.on("exit", (code, signal) => {
+    if (code && code !== 0) {
+      console.error(`Backend exited code=${code} signal=${signal}`);
+      if (stderr) console.error(stderr);
+    }
+  });
+  return waitForServer(PROD_URL).catch((err) => {
+    const detail = stderr.trim() ? `\n\nBackend output:\n${stderr.trim()}` : "";
+    throw new Error(`${err.message}${detail}`);
+  });
 }
 
 function killBackend() {
@@ -76,6 +97,15 @@ function killBackend() {
   }
 }
 
+function webPrefs() {
+  return {
+    nodeIntegration: false,
+    contextIsolation: true,
+    sandbox: true,
+    webSecurity: true,
+  };
+}
+
 async function createWindow() {
   if (isDev()) {
     await waitForServer("http://127.0.0.1:5173/");
@@ -83,12 +113,8 @@ async function createWindow() {
       width: 1200,
       height: 800,
       icon: windowIcon(),
-      webPreferences: {
-        nodeIntegration: false,
-        contextIsolation: true,
-      },
+      webPreferences: webPrefs(),
     });
-    // desktop=1 reinforces app shell routing (Sign In, not marketing site)
     await mainWindow.loadURL("http://127.0.0.1:5173/?desktop=1");
   } else {
     await startBackend();
@@ -96,10 +122,7 @@ async function createWindow() {
       width: 1200,
       height: 800,
       icon: windowIcon(),
-      webPreferences: {
-        nodeIntegration: false,
-        contextIsolation: true,
-      },
+      webPreferences: webPrefs(),
     });
     await mainWindow.loadURL(`${PROD_URL}?desktop=1`);
   }
@@ -109,12 +132,21 @@ async function createWindow() {
   });
 }
 
-app.whenReady().then(() => {
-  createWindow().catch((err) => {
+async function boot() {
+  try {
+    await createWindow();
+  } catch (err) {
     console.error(err);
+    const message = err instanceof Error ? err.message : String(err);
+    dialog.showErrorBox(
+      "Lumina Notes failed to start",
+      message || "Unknown error starting the local API."
+    );
     app.quit();
-  });
-});
+  }
+}
+
+app.whenReady().then(boot);
 
 app.on("window-all-closed", () => {
   killBackend();
@@ -129,8 +161,6 @@ app.on("before-quit", () => {
 
 app.on("activate", () => {
   if (BrowserWindow.getAllWindows().length === 0) {
-    createWindow().catch((err) => {
-      console.error(err);
-    });
+    boot();
   }
 });

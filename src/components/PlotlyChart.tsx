@@ -2,7 +2,7 @@ import React from 'react';
 import Plot from 'react-plotly.js';
 
 interface PlotlyChartProps {
-  data: any;
+  data: unknown;
 }
 
 const PlotlyChart: React.FC<PlotlyChartProps> = ({ data }) => {
