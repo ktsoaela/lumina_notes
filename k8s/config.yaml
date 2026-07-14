@@ -7,8 +7,10 @@ metadata:
     app.kubernetes.io/name: lumina-notes
 type: Opaque
 stringData:
-  # Replace before applying to a real cluster
-  JWT_SECRET: change-me-in-production
+  # REQUIRED: replace with a long random secret before any shared/prod cluster
+  JWT_SECRET: REPLACE_WITH_STRONG_SECRET
+  # Optional Django admin (if running manage.py against the same DB)
+  DJANGO_SECRET_KEY: REPLACE_WITH_STRONG_DJANGO_SECRET
 ---
 apiVersion: v1
 kind: ConfigMap
@@ -19,4 +21,9 @@ metadata:
     app.kubernetes.io/name: lumina-notes
 data:
   PORT: "58888"
-  CORS_ORIGINS: "*"
+  LUMINA_ENV: production
+  SEED_DEMO_USER: "0"
+  ENABLE_DOCS: "0"
+  JWT_EXPIRE_HOURS: "24"
+  # Explicit origins only — never use "*" with cookie/credentialed clients
+  CORS_ORIGINS: "https://lumina-notes.local"

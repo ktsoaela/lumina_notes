@@ -1,7 +1,9 @@
 import {StrictMode} from 'react';
 import {createRoot} from 'react-dom/client';
 import App from './App.tsx';
+import { ErrorBoundary } from './components/ErrorBoundary';
 import { AppDialogsProvider } from './context/AppDialogsContext';
+import { ToastProvider } from './context/ToastContext';
 import './index.css';
 import {applyTheme, getStoredTheme} from './lib/theme';
 
@@ -20,8 +22,12 @@ document.title = 'Lumina Notes';
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
-    <AppDialogsProvider>
-      <App />
-    </AppDialogsProvider>
+    <ErrorBoundary>
+      <ToastProvider>
+        <AppDialogsProvider>
+          <App />
+        </AppDialogsProvider>
+      </ToastProvider>
+    </ErrorBoundary>
   </StrictMode>,
 );

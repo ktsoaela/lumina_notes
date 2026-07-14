@@ -11,9 +11,6 @@ export default defineConfig(({mode}) => {
     optimizeDeps: {
       include: ['html2pdf.js', 'html2canvas', 'jspdf'],
     },
-    define: {
-      'process.env.GEMINI_API_KEY': JSON.stringify(env.GEMINI_API_KEY),
-    },
     resolve: {
       alias: {
         '@': path.resolve(__dirname, '.'),

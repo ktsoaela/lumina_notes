@@ -3,6 +3,7 @@ import { motion, AnimatePresence } from 'motion/react';
 import { Mail, Lock, User, ArrowLeft, Loader2, AlertCircle } from 'lucide-react';
 import { Logo } from './Logo';
 import { api } from '../lib/api';
+import { validateLoginInput, validateSignupInput } from '../lib/validation';
 
 interface AuthProps {
   onAuthSuccess: (user: any, token: string) => void;
@@ -42,17 +43,35 @@ export default function Auth({ onAuthSuccess, onBack, prefillDemo }: AuthProps) 
 
     try {
       if (isLogin) {
-        const { user, token } = await api.auth.login({
+        const checked = validateLoginInput({
           identifier: formData.identifier,
-          password: formData.password
+          password: formData.password,
+        });
+        if (checked.ok === false) {
+          setError(checked.error);
+          return;
+        }
+        const { user, token } = await api.auth.login({
+          identifier: checked.data.identifier,
+          password: checked.data.password,
         });
         onAuthSuccess(user, token);
       } else {
-        const { user, token } = await api.auth.signup({
+        const checked = validateSignupInput({
+          name: formData.name,
           email: formData.email,
           password: formData.password,
-          name: formData.name,
-          username: formData.username.trim() || undefined
+          username: formData.username,
+        });
+        if (checked.ok === false) {
+          setError(checked.error);
+          return;
+        }
+        const { user, token } = await api.auth.signup({
+          email: checked.data.email,
+          password: checked.data.password,
+          name: checked.data.name,
+          username: checked.data.username || undefined,
         });
         onAuthSuccess(user, token);
       }

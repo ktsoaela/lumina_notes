@@ -34,16 +34,17 @@ spec:
                 name: lumina-notes-secrets
           readinessProbe:
             httpGet:
-              path: /swagger
+              path: /health
               port: http
             initialDelaySeconds: 5
             periodSeconds: 10
           livenessProbe:
             httpGet:
-              path: /swagger
+              path: /health
               port: http
             initialDelaySeconds: 15
             periodSeconds: 20
+
           resources:
             requests:
               cpu: 100m

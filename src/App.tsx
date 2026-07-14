@@ -64,7 +64,9 @@ import {
   parseImportedMarkdown,
 } from './lib/markdownIO';
 import { isElectronApp } from './lib/platform';
+import { coerceEntityTitle, validatePageContent } from './lib/validation';
 import { useAppDialogs } from './context/AppDialogsContext';
+import { useToast } from './context/ToastContext';
 
 function findPageInState(state: AppState, pageId: string): Page | undefined {
   for (const nb of state.notebooks) {
@@ -92,6 +94,7 @@ function secondaryStillValid(
 
 export default function App() {
   const { confirm } = useAppDialogs();
+  const toast = useToast();
   const desktopShell = isElectronApp();
   const [auth, setAuth] = useState<AuthState>(getInitialAuthState);
 
@@ -202,6 +205,7 @@ export default function App() {
         });
       } catch (e) {
         console.error(e);
+        toast.error('Could not load bookshelves');
       }
     })();
     return () => {
@@ -252,10 +256,11 @@ export default function App() {
       });
     } catch (err) {
       console.error('Failed to fetch data', err);
+      toast.error('Could not load notebooks');
     } finally {
       setIsAppLoading(false);
     }
-  }, [auth.user, activeBookshelfId]);
+  }, [auth.user, activeBookshelfId, toast]);
 
   useEffect(() => {
     if (!auth.user) return;
@@ -341,10 +346,11 @@ export default function App() {
       );
     } catch (err) {
       console.error('PDF export failed', err);
+      toast.error('PDF export failed');
     } finally {
       setPdfExportingPrimary(false);
     }
-  }, [activePage]);
+  }, [activePage, toast]);
 
   const handleExportPdfSecondary = useCallback(async () => {
     if (!secondaryPage) return;
@@ -357,12 +363,19 @@ export default function App() {
       );
     } catch (err) {
       console.error('PDF export failed', err);
+      toast.error('PDF export failed');
     } finally {
       setPdfExportingSecondary(false);
     }
-  }, [secondaryPage]);
+  }, [secondaryPage, toast]);
 
   const updatePageContentById = useCallback(async (pageId: string, content: string) => {
+    const contentCheck = validatePageContent(content);
+    if (contentCheck.ok === false) {
+      console.error(contentCheck.error);
+      toast.error(contentCheck.error);
+      return;
+    }
     let titleForApi = '';
     setState(prev => {
       const page = findPageInState(prev, pageId);
@@ -375,20 +388,24 @@ export default function App() {
           sections: nb.sections.map(sec => ({
             ...sec,
             pages: sec.pages.map(p =>
-              p.id === pageId ? { ...p, content, updatedAt: Date.now() } : p
+              p.id === pageId
+                ? { ...p, content: contentCheck.value, updatedAt: Date.now() }
+                : p
             ),
           })),
         })),
       };
     });
     try {
-      await api.pages.update(pageId, titleForApi, content);
+      await api.pages.update(pageId, titleForApi, contentCheck.value);
     } catch (err) {
       console.error('Failed to save page content', err);
+      toast.error('Failed to save page');
     }
-  }, []);
+  }, [toast]);
 
   const updatePageTitleById = useCallback(async (pageId: string, title: string) => {
+    const trimmed = coerceEntityTitle(title, 'page');
     let contentForApi = '';
     setState(prev => {
       const page = findPageInState(prev, pageId);
@@ -401,18 +418,19 @@ export default function App() {
           sections: nb.sections.map(sec => ({
             ...sec,
             pages: sec.pages.map(p =>
-              p.id === pageId ? { ...p, title, updatedAt: Date.now() } : p
+              p.id === pageId ? { ...p, title: trimmed, updatedAt: Date.now() } : p
             ),
           })),
         })),
       };
     });
     try {
-      await api.pages.update(pageId, title, contentForApi);
+      await api.pages.update(pageId, trimmed, contentForApi);
     } catch (err) {
       console.error('Failed to save page title', err);
+      toast.error('Failed to save page title');
     }
-  }, []);
+  }, [toast]);
 
   const handleAddNotebook = async () => {
     if (!activeBookshelfId) return;
@@ -435,6 +453,7 @@ export default function App() {
       }));
     } catch (err) {
       console.error('Failed to add notebook', err);
+      toast.error('Failed to add notebook');
     }
   };
 
@@ -456,6 +475,7 @@ export default function App() {
       }));
     } catch (err) {
       console.error('Failed to add section', err);
+      toast.error('Failed to add section');
     }
   };
 
@@ -480,11 +500,12 @@ export default function App() {
       }));
     } catch (err) {
       console.error('Failed to add page', err);
+      toast.error('Failed to add page');
     }
   };
 
   const handleRenameNotebook = async (id: string, name: string) => {
-    const trimmed = name.trim() || 'Untitled Notebook';
+    const trimmed = coerceEntityTitle(name, 'notebook');
     try {
       await api.notebooks.update(id, trimmed);
       setState(prev => ({
@@ -495,11 +516,12 @@ export default function App() {
       }));
     } catch (err) {
       console.error('Failed to rename notebook', err);
+      toast.error('Failed to rename notebook');
     }
   };
 
   const handleRenameSection = async (notebookId: string, sectionId: string, name: string) => {
-    const trimmed = name.trim() || 'Untitled Section';
+    const trimmed = coerceEntityTitle(name, 'section');
     try {
       await api.sections.update(sectionId, trimmed);
       setState(prev => ({
@@ -517,11 +539,12 @@ export default function App() {
       }));
     } catch (err) {
       console.error('Failed to rename section', err);
+      toast.error('Failed to rename section');
     }
   };
 
   const handleRenamePage = async (sectionId: string, pageId: string, title: string) => {
-    const trimmed = title.trim() || 'Untitled';
+    const trimmed = coerceEntityTitle(title, 'page');
     const page = state.notebooks
       .flatMap(nb => nb.sections)
       .flatMap(sec => sec.pages)
@@ -547,6 +570,7 @@ export default function App() {
       }));
     } catch (err) {
       console.error('Failed to rename page', err);
+      toast.error('Failed to rename page');
     }
   };
 
@@ -564,6 +588,7 @@ export default function App() {
       await fetchData();
     } catch (err) {
       console.error('Failed to archive notebook', err);
+      toast.error('Failed to archive notebook');
     }
   };
 
@@ -594,6 +619,7 @@ export default function App() {
       }));
     } catch (err) {
       console.error(err);
+      toast.error('Could not open notebook');
     } finally {
       setIsAppLoading(false);
     }
@@ -645,6 +671,7 @@ export default function App() {
       });
     } catch (err) {
       console.error('Failed to delete section', err);
+      toast.error('Failed to delete section');
     }
   };
 
@@ -685,6 +712,7 @@ export default function App() {
       });
     } catch (err) {
       console.error('Failed to delete page', err);
+      toast.error('Failed to delete page');
     }
   };
 

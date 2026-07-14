@@ -51,6 +51,9 @@ jobs:
       - name: Import check
         run: python -c "import app; print(app.app.title)"
 
+      - name: API integration tests
+        run: python -m unittest tests.test_api -v
+
       - name: Django tests
         run: python manage.py test core.tests
 
