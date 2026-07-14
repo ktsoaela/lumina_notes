@@ -28,6 +28,9 @@ jobs:
       - name: Typecheck
         run: npm run lint
 
+      - name: Unit tests
+        run: npm test
+
       - name: Production build
         run: npm run build
 
@@ -47,6 +50,9 @@ jobs:
 
       - name: Import check
         run: python -c "import app; print(app.app.title)"
+
+      - name: Django tests
+        run: python manage.py test core.tests
 
   docker:
     name: Docker image

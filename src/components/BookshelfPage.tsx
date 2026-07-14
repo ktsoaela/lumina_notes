@@ -23,6 +23,21 @@ import { notebookToMarkdown, downloadText, parseImportedMarkdown } from '../lib/
 import { sanitizeFilename } from '../lib/filename';
 import { cn } from '../lib/utils';
 import { useAppDialogs } from '../context/AppDialogsContext';
+import {
+  AISLE_SHIFT_PX,
+  BOOKS_PER_ROW,
+  CARRIAGE_GAP,
+  CARRIAGE_W,
+  CHARTS_PER_CABINET_PAGE,
+  RAIL_VISIBLE_BAYS,
+  SHELF_VISUAL_SCALE,
+  bayCode,
+  chunkIntoRows,
+  densityHint,
+  pageWindow,
+  railPageForIndex,
+  spineSizeFromNotebook,
+} from '../lib/shelfLayout';
 
 const CHART_SPINE_COLORS = [
   '#0e7490',
@@ -35,96 +50,34 @@ const CHART_SPINE_COLORS = [
   '#6d28d9',
 ] as const;
 
-const BOOKS_PER_ROW = 12;
-const SHELF_VISUAL_SCALE = 2;
-const CARRIAGE_W = 112;
-const CARRIAGE_GAP = 14;
-const AISLE_SHIFT_PX = 148;
-
-function chunkIntoRows<T>(items: T[], perRow: number): T[][] {
-  if (items.length === 0) return [];
-  const rows: T[][] = [];
-  for (let i = 0; i < items.length; i += perRow) {
-    rows.push(items.slice(i, i + perRow));
-  }
-  return rows;
-}
-
-function bayCode(index: number): string {
-  const letter = String.fromCharCode(65 + (index % 26));
-  const n = Math.floor(index / 26) + 1;
-  return `${letter}${String(n).padStart(2, '0')}`;
-}
-
-function hashStringToInt(s: string): number {
-  let h = 2166136261;
-  for (let i = 0; i < s.length; i++) {
-    h ^= s.charCodeAt(i);
-    h = Math.imul(h, 16777619);
-  }
-  return h >>> 0;
-}
-
-function countMarkdownImagesInNotebook(nb: Notebook): number {
-  let n = 0;
-  for (const sec of nb.sections) {
-    for (const p of sec.pages) {
-      const c = p.content ?? '';
-      const md = c.match(/!\[[^\]]*\]\([^)]+\)/g);
-      if (md) n += md.length;
-      n += (c.match(/<img\s[^>]*>/gi) ?? []).length;
-    }
-  }
-  return n;
-}
-
-function notebookContentMetrics(nb: Notebook) {
-  let chars = nb.title.length;
-  let pages = 0;
-  for (const sec of nb.sections) {
-    chars += sec.title.length;
-    for (const p of sec.pages) {
-      pages += 1;
-      chars += p.title.length + (p.content?.length ?? 0);
-    }
-  }
-  return {
-    chars,
-    pages,
-    sections: nb.sections.length,
-    images: countMarkdownImagesInNotebook(nb),
-  };
-}
-
-function spineSizeFromNotebook(nb: Notebook): { width: number; height: number } {
-  const { chars, pages, sections, images } = notebookContentMetrics(nb);
-  const approxMB = Math.min(52, chars / 18000);
-  let w = 12 + approxMB * 0.62 + sections * 1.15 + images * 1.35;
-  w = Math.min(72, Math.max(22, w));
-  const contentLift = Math.min(32, chars / 14000);
-  let h =
-    38 + pages * 0.07 + contentLift + Math.min(images * 2.4, 36) + sections * 0.35;
-  h = Math.min(188, Math.max(46, h));
-  const jitter = hashStringToInt(nb.id);
-  w = Math.min(72, Math.max(22, w + ((jitter % 11) - 5) * 0.45));
-  h = Math.min(188, Math.max(46, h + (((jitter >> 5) % 11) - 5) * 0.5));
-  return { width: Math.round(w), height: Math.round(h) };
-}
-
 /** Hospital mobile shelving rail — carriages shift to open one aisle. */
 function CompactMobileRail({
   railMotion,
   bookshelves,
+  globalOffset,
+  totalBays,
+  railPage,
+  railPageCount,
   selectedShelfId,
   onSelectCarriage,
+  onRailPageChange,
 }: {
   railMotion: boolean;
   bookshelves: Bookshelf[];
+  /** Absolute index of first bay in this window. */
+  globalOffset: number;
+  totalBays: number;
+  railPage: number;
+  railPageCount: number;
   selectedShelfId: string | null;
-  onSelectCarriage: (index: number) => void;
+  onSelectCarriage: (globalIndex: number) => void;
+  onRailPageChange: (page: number) => void;
 }) {
   const selectedIdx = bookshelves.findIndex((s) => s.id === selectedShelfId);
-  const activeSlot = selectedIdx >= 0 ? selectedIdx : null;
+  const activeLocal =
+    selectedIdx >= 0
+      ? selectedIdx
+      : null;
   const trackWidth = Math.max(
     bookshelves.length * (CARRIAGE_W + CARRIAGE_GAP) + AISLE_SHIFT_PX + 48,
     640
@@ -133,8 +86,7 @@ function CompactMobileRail({
   return (
     <div className="relative overflow-hidden rounded-3xl border border-slate-400/40 bg-gradient-to-b from-slate-300 via-slate-400 to-slate-500 p-1 shadow-[0_24px_60px_-20px_rgba(15,23,42,0.55)] dark:border-slate-600 dark:from-slate-700 dark:via-slate-800 dark:to-slate-900">
       <div className="rounded-[1.35rem] bg-[linear-gradient(180deg,#94a3b8_0%,#64748b_18%,#475569_100%)] p-4 dark:bg-[linear-gradient(180deg,#334155_0%,#1e293b_100%)]">
-        {/* Overhead gantry */}
-        <div className="mb-3 flex items-center justify-between gap-3 px-1">
+        <div className="mb-3 flex flex-wrap items-center justify-between gap-3 px-1">
           <div className="flex items-center gap-2">
             <span
               className={cn(
@@ -144,14 +96,40 @@ function CompactMobileRail({
               aria-hidden
             />
             <p className="font-mono text-[10px] uppercase tracking-[0.28em] text-slate-100/90">
-              {railMotion && activeSlot !== null
-                ? `Aisle open · Bay ${bayCode(activeSlot)}`
+              {railMotion && activeLocal !== null
+                ? `Aisle open · Bay ${bayCode(globalOffset + activeLocal)}`
                 : 'Select a carriage to deploy aisle'}
             </p>
           </div>
-          <p className="font-mono text-[10px] text-slate-200/70">
-            {bookshelves.length} unit{bookshelves.length === 1 ? '' : 's'} on rail
-          </p>
+          <div className="flex flex-wrap items-center gap-2">
+            <p className="font-mono text-[10px] text-slate-200/70">
+              Bays {globalOffset + 1}–
+              {Math.min(globalOffset + bookshelves.length, totalBays)} of {totalBays}
+            </p>
+            {railPageCount > 1 ? (
+              <div className="inline-flex items-center gap-1">
+                <button
+                  type="button"
+                  disabled={railPage <= 0}
+                  onClick={() => onRailPageChange(railPage - 1)}
+                  className="rounded-md border border-slate-200/40 bg-slate-900/20 px-2 py-0.5 font-mono text-[10px] text-white disabled:opacity-40"
+                >
+                  Prev
+                </button>
+                <span className="font-mono text-[10px] text-slate-100/80">
+                  {railPage + 1}/{railPageCount}
+                </span>
+                <button
+                  type="button"
+                  disabled={railPage >= railPageCount - 1}
+                  onClick={() => onRailPageChange(railPage + 1)}
+                  className="rounded-md border border-slate-200/40 bg-slate-900/20 px-2 py-0.5 font-mono text-[10px] text-white disabled:opacity-40"
+                >
+                  Next
+                </button>
+              </div>
+            ) : null}
+          </div>
         </div>
 
         <div className="overflow-x-auto pb-2 [-ms-overflow-style:none] [scrollbar-width:thin]">
@@ -159,7 +137,6 @@ function CompactMobileRail({
             className="relative mx-auto h-[240px] rounded-2xl bg-[radial-gradient(ellipse_at_top,#cbd5e1_0%,#94a3b8_45%,#64748b_100%)] shadow-[inset_0_8px_24px_rgba(15,23,42,0.35)] dark:bg-[radial-gradient(ellipse_at_top,#475569_0%,#1e293b_70%)] sm:h-[280px]"
             style={{ width: trackWidth, minWidth: '100%' }}
           >
-            {/* Floor rails */}
             <div
               className="pointer-events-none absolute inset-x-4 bottom-10 h-1.5 rounded-full bg-slate-700/50 shadow-[0_1px_0_rgba(255,255,255,0.2)]"
               aria-hidden
@@ -170,15 +147,16 @@ function CompactMobileRail({
             />
 
             {bookshelves.map((shelf, i) => {
+              const globalIndex = globalOffset + i;
               const selected = selectedShelfId === shelf.id;
               const shiftsRight = Boolean(
-                railMotion && activeSlot !== null && i > activeSlot
+                railMotion && activeLocal !== null && i > activeLocal
               );
               return (
                 <button
                   key={shelf.id}
                   type="button"
-                  onClick={() => onSelectCarriage(i)}
+                  onClick={() => onSelectCarriage(globalIndex)}
                   className={cn(
                     'group absolute top-3 z-10 flex h-[calc(100%-3.25rem)] flex-col overflow-hidden rounded-t-lg border border-slate-900/40 text-left shadow-[6px_0_18px_rgba(15,23,42,0.35),inset_0_1px_0_rgba(255,255,255,0.25)] transition-[transform,box-shadow,filter] duration-700 ease-[cubic-bezier(0.22,1,0.36,1)]',
                     'bg-[linear-gradient(135deg,#e2e8f0_0%,#94a3b8_42%,#64748b_100%)] hover:brightness-105',
@@ -194,9 +172,8 @@ function CompactMobileRail({
                       ? `translateX(${AISLE_SHIFT_PX}px)`
                       : 'translateX(0)',
                   }}
-                  title={`${bayCode(i)} · ${shelf.title}`}
+                  title={`${bayCode(globalIndex)} · ${shelf.title}`}
                 >
-                  {/* Handle + end panel rivets */}
                   <span
                     className="absolute inset-y-3 left-1 w-1.5 rounded-full bg-slate-500/80 shadow-inner"
                     aria-hidden
@@ -212,7 +189,7 @@ function CompactMobileRail({
 
                   <div className="flex flex-1 flex-col items-center justify-center px-3 pt-4 text-center">
                     <span className="font-mono text-[11px] font-semibold tracking-[0.2em] text-slate-700 dark:text-slate-200">
-                      {bayCode(i)}
+                      {bayCode(globalIndex)}
                     </span>
                     <span className="mt-2 line-clamp-3 text-[11px] font-bold leading-snug text-slate-900 dark:text-slate-50">
                       {shelf.title}
@@ -228,7 +205,6 @@ function CompactMobileRail({
               );
             })}
 
-            {/* Safety bar */}
             <div
               className={cn(
                 'absolute bottom-3 left-4 z-30 h-2 origin-left rounded-full border border-rose-900/50 transition-transform duration-500 ease-out',
@@ -242,16 +218,18 @@ function CompactMobileRail({
         </div>
 
         <p className="mt-3 text-center text-xs leading-relaxed text-slate-100/85">
-          {railMotion && activeSlot !== null ? (
+          {railMotion && activeLocal !== null ? (
             <>
               Safety bar deployed. Units to the right of{' '}
-              <span className="font-semibold text-cyan-100">{bayCode(activeSlot)}</span> shift as
-              one block — classic hospital high-density access.
+              <span className="font-semibold text-cyan-100">
+                {bayCode(globalOffset + activeLocal)}
+              </span>{' '}
+              on this rail page shift as one block.
             </>
           ) : (
             <>
-              Click a steel carriage to open a single aisle. Only one gap is open at a time, like
-              physical medical-records kompakt shelving.
+              Rail shows {RAIL_VISIBLE_BAYS} bays at a time (paginated). Click a carriage to open
+              one aisle — classic medical kompakt access.
             </>
           )}
         </p>
@@ -459,6 +437,10 @@ function ChartCabinetVisualization({
   shelfTitle,
   bayLabel,
   notebooks,
+  totalCharts,
+  cabinetPage,
+  cabinetPageCount,
+  onCabinetPageChange,
   tab,
   pageCount,
   sectionCount,
@@ -468,6 +450,10 @@ function ChartCabinetVisualization({
   shelfTitle: string;
   bayLabel: string;
   notebooks: Notebook[];
+  totalCharts: number;
+  cabinetPage: number;
+  cabinetPageCount: number;
+  onCabinetPageChange: (page: number) => void;
   tab: 'active' | 'archived';
   pageCount: (nb: Notebook) => number;
   sectionCount: (nb: Notebook) => number;
@@ -475,6 +461,13 @@ function ChartCabinetVisualization({
   onSpineClick: (nb: Notebook) => void;
 }) {
   const rows = chunkIntoRows(notebooks, BOOKS_PER_ROW);
+  const hint = densityHint(totalCharts);
+  const rangeStart =
+    totalCharts === 0 ? 0 : cabinetPage * CHARTS_PER_CABINET_PAGE + 1;
+  const rangeEnd = Math.min(
+    totalCharts,
+    (cabinetPage + 1) * CHARTS_PER_CABINET_PAGE
+  );
 
   return (
     <div className="mx-auto w-full max-w-[min(100%,1800px)]">
@@ -487,10 +480,43 @@ function ChartCabinetVisualization({
             {shelfTitle || 'Storage unit'}
           </h3>
         </div>
-        <p className="text-xs text-slate-500 dark:text-[var(--app-muted)]">
-          {notebooks.length} chart{notebooks.length === 1 ? '' : 's'} · click a spine to preview
-        </p>
+        <div className="flex flex-wrap items-center gap-2 text-xs text-slate-500 dark:text-[var(--app-muted)]">
+          <span>
+            {totalCharts === 0
+              ? '0 charts'
+              : `Charts ${rangeStart}–${rangeEnd} of ${totalCharts} · ${BOOKS_PER_ROW}/row`}
+          </span>
+          {cabinetPageCount > 1 ? (
+            <div className="inline-flex items-center gap-1">
+              <button
+                type="button"
+                disabled={cabinetPage <= 0}
+                onClick={() => onCabinetPageChange(cabinetPage - 1)}
+                className="rounded-md border border-slate-200 bg-white px-2 py-0.5 font-mono text-[10px] disabled:opacity-40 dark:border-[var(--app-border)] dark:bg-[var(--app-bg)]"
+              >
+                Prev
+              </button>
+              <span className="font-mono text-[10px]">
+                {cabinetPage + 1}/{cabinetPageCount}
+              </span>
+              <button
+                type="button"
+                disabled={cabinetPage >= cabinetPageCount - 1}
+                onClick={() => onCabinetPageChange(cabinetPage + 1)}
+                className="rounded-md border border-slate-200 bg-white px-2 py-0.5 font-mono text-[10px] disabled:opacity-40 dark:border-[var(--app-border)] dark:bg-[var(--app-bg)]"
+              >
+                Next
+              </button>
+            </div>
+          ) : null}
+        </div>
       </div>
+
+      {hint ? (
+        <p className="mb-3 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-900 dark:border-amber-900/50 dark:bg-amber-950/30 dark:text-amber-100">
+          {hint}
+        </p>
+      ) : null}
 
       <div className="relative overflow-hidden rounded-2xl border border-slate-500/30 bg-[linear-gradient(180deg,#cbd5e1_0%,#94a3b8_12%,#64748b_100%)] p-3 shadow-[inset_0_1px_0_rgba(255,255,255,0.35),0_18px_40px_-20px_rgba(15,23,42,0.5)] dark:border-slate-600 dark:bg-[linear-gradient(180deg,#475569_0%,#1e293b_100%)]">
         <div className="rounded-xl bg-[linear-gradient(180deg,#e2e8f0_0%,#cbd5e1_100%)] px-3 py-5 shadow-[inset_0_6px_18px_rgba(15,23,42,0.12)] dark:bg-[linear-gradient(180deg,#334155_0%,#1e293b_100%)]">
@@ -592,10 +618,13 @@ export default function BookshelfPage({
   const [busy, setBusy] = useState<string | null>(null);
   const [railMotion, setRailMotion] = useState(false);
   const [previewBook, setPreviewBook] = useState<Notebook | null>(null);
+  const [railPage, setRailPage] = useState(0);
+  const [cabinetPage, setCabinetPage] = useState(0);
   const importRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     setPreviewBook(null);
+    setCabinetPage(0);
   }, [manageShelfId, tab]);
 
   useEffect(() => {
@@ -640,6 +669,31 @@ export default function BookshelfPage({
   );
   const selectedShelf = selectedIndex >= 0 ? bookshelves[selectedIndex] : null;
   const selectedBay = selectedIndex >= 0 ? bayCode(selectedIndex) : '—';
+
+  const railWin = useMemo(
+    () => pageWindow(bookshelves.length, RAIL_VISIBLE_BAYS, railPage),
+    [bookshelves.length, railPage]
+  );
+  const railWindowShelves = useMemo(
+    () => railWin.slice(bookshelves),
+    [railWin, bookshelves]
+  );
+
+  useEffect(() => {
+    if (selectedIndex >= 0) {
+      setRailPage(railPageForIndex(selectedIndex));
+    }
+  }, [selectedIndex]);
+
+  const list = tab === 'active' ? activeList : archivedList;
+  const cabinetWin = useMemo(
+    () => pageWindow(list.length, CHARTS_PER_CABINET_PAGE, cabinetPage),
+    [list.length, cabinetPage]
+  );
+  const visibleCharts = useMemo(
+    () => cabinetWin.slice(list),
+    [cabinetWin, list]
+  );
 
   const createShelf = async () => {
     const name = newShelfName.trim() || 'New storage unit';
@@ -732,7 +786,6 @@ export default function BookshelfPage({
     }
   };
 
-  const list = tab === 'active' ? activeList : archivedList;
   const sectionCount = (nb: Notebook) => nb.sections.length;
   const pageCount = (nb: Notebook) =>
     nb.sections.reduce((n, s) => n + s.pages.length, 0);
@@ -949,14 +1002,20 @@ export default function BookshelfPage({
               {bookshelves.length > 0 ? (
                 <CompactMobileRail
                   railMotion={railMotion}
-                  bookshelves={bookshelves}
+                  bookshelves={railWindowShelves}
+                  globalOffset={railWin.start}
+                  totalBays={bookshelves.length}
+                  railPage={railWin.page}
+                  railPageCount={railWin.pageCount}
                   selectedShelfId={manageShelfId}
-                  onSelectCarriage={(i) => {
-                    const s = bookshelves[i];
+                  onSelectCarriage={(globalIndex) => {
+                    const s = bookshelves[globalIndex];
                     if (!s) return;
                     setManageShelfId(s.id);
                     setRailMotion(true);
+                    setRailPage(railPageForIndex(globalIndex));
                   }}
+                  onRailPageChange={setRailPage}
                 />
               ) : (
                 <div className="flex min-h-[240px] flex-col items-center justify-center rounded-3xl border border-dashed border-slate-300 bg-white/50 text-center dark:border-[var(--app-border)] dark:bg-[var(--app-surface)]/40">
@@ -1100,7 +1159,11 @@ export default function BookshelfPage({
                 <ChartCabinetVisualization
                   shelfTitle={selectedShelf?.title?.slice(0, 64) || ''}
                   bayLabel={selectedBay}
-                  notebooks={list}
+                  notebooks={visibleCharts}
+                  totalCharts={list.length}
+                  cabinetPage={cabinetWin.page}
+                  cabinetPageCount={cabinetWin.pageCount}
+                  onCabinetPageChange={setCabinetPage}
                   tab={tab}
                   pageCount={pageCount}
                   sectionCount={sectionCount}
