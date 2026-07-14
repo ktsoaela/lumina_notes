@@ -8,31 +8,27 @@ interface EditorProps {
 }
 
 const Editor: React.FC<EditorProps> = ({ value, onChange, className }) => {
+  const words = value.split(/\s+/).filter(Boolean).length;
+
   return (
-    <div
-      className={cn(
-        'flex flex-col h-full bg-[#dceaf4] dark:bg-[var(--app-bg)]/85',
-        className
-      )}
-    >
+    <div className={cn('flex h-full flex-col bg-transparent', className)}>
       <textarea
         className={cn(
-          'flex-1 resize-none rounded-md border border-brand-300 bg-transparent p-8',
-          'font-mono text-sm leading-relaxed text-gray-800 placeholder:text-gray-400',
-          'focus:outline-none focus-visible:border-brand-600 focus-visible:ring-2 focus-visible:ring-brand-600 focus-visible:ring-offset-2 focus-visible:ring-offset-[#dceaf4]',
-          'dark:border-[var(--app-border)] dark:text-[var(--app-fg)] dark:placeholder:text-[var(--app-muted)]',
-          'dark:focus-visible:border-brand-400 dark:focus-visible:ring-brand-400 dark:focus-visible:ring-offset-[var(--app-bg)]'
+          'min-h-0 flex-1 resize-none border-0 bg-transparent px-6 py-5 sm:px-8 sm:py-6',
+          'font-serif text-[15.5px] leading-[1.75] text-[var(--app-fg)]',
+          'placeholder:text-[var(--app-muted)]/45 focus:outline-none'
         )}
         value={value}
         onChange={(e) => onChange(e.target.value)}
-        placeholder="Start writing in Markdown..."
-        spellCheck={false}
+        placeholder="Write this page… Markdown welcome."
+        spellCheck
+        aria-label="Page content"
       />
-      <div className="flex items-center justify-between border-t border-gray-200 bg-white px-4 py-2 text-[10px] font-medium uppercase tracking-wider text-gray-400 dark:border-[var(--app-border)] dark:bg-[var(--app-surface)] dark:text-[var(--app-muted)]">
-        <span>Markdown Editor</span>
-        <div className="flex gap-4">
-          <span>{value.length} characters</span>
-          <span>{value.split(/\s+/).filter(Boolean).length} words</span>
+      <div className="flex items-center justify-between border-t border-[var(--app-border)]/70 px-4 py-2 text-[10px] font-medium uppercase tracking-[0.14em] text-[var(--app-muted)]">
+        <span>Writing desk</span>
+        <div className="flex gap-4 normal-case tracking-normal">
+          <span>{value.length} chars</span>
+          <span>{words} words</span>
         </div>
       </div>
     </div>

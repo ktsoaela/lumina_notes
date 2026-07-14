@@ -323,6 +323,22 @@ export default function App() {
     ? findPageInState(state, state.secondaryPageId)
     : undefined;
 
+  const activeNotebook = state.notebooks.find((n) => n.id === state.activeNotebookId);
+  const activeSection = activeNotebook?.sections.find(
+    (s) => s.id === state.activeSectionId
+  );
+  const notePath = {
+    bookTitle: activeNotebook?.title,
+    chapterTitle: activeSection?.title,
+  };
+  const secondarySection = activeNotebook?.sections.find((s) =>
+    s.pages.some((p) => p.id === state.secondaryPageId)
+  );
+  const secondaryPath = {
+    bookTitle: activeNotebook?.title,
+    chapterTitle: secondarySection?.title,
+  };
+
   const [pdfExportingPrimary, setPdfExportingPrimary] = useState(false);
   const [pdfExportingSecondary, setPdfExportingSecondary] = useState(false);
 
@@ -436,7 +452,7 @@ export default function App() {
   const handleAddNotebook = async () => {
     if (!activeBookshelfId) return;
     const id = `nb-${Date.now()}`;
-    const name = 'New Notebook';
+    const name = 'New book';
     try {
       await api.notebooks.create(id, name, activeBookshelfId);
       const newNotebook: Notebook = {
@@ -460,7 +476,7 @@ export default function App() {
 
   const handleAddSection = async (notebookId: string) => {
     const id = `sec-${Date.now()}`;
-    const name = 'New Section';
+    const name = 'New chapter';
     try {
       await api.sections.create(id, notebookId, name);
       const newSection: Section = { id, title: name, pages: [] };
@@ -482,7 +498,7 @@ export default function App() {
 
   const handleAddPage = async (sectionId: string) => {
     const id = `page-${Date.now()}`;
-    const title = 'Untitled Page';
+    const title = 'Untitled page';
     const content = '';
     try {
       await api.pages.create(id, sectionId, title, content);
@@ -768,7 +784,7 @@ export default function App() {
       : undefined;
 
   return (
-    <div className="flex flex-col h-screen bg-[var(--app-bg)] text-[var(--app-fg)] font-sans overflow-hidden">
+    <div className="flex h-screen flex-col overflow-hidden bg-[var(--app-bg)] font-sans text-[var(--app-fg)] notes-atelier">
       <header className="h-12 bg-brand-700 text-white flex items-center px-3 sm:px-4 justify-between shrink-0 select-none gap-2">
         <div className="flex items-center gap-2 sm:gap-4 min-w-0">
           {mainView === 'notes' && (
@@ -814,7 +830,7 @@ export default function App() {
               )}
             >
               <Library className="w-4 h-4" />
-              Bookshelves
+              Library
             </button>
           </nav>
         </div>
@@ -1071,7 +1087,7 @@ export default function App() {
                     onRenamePage={handleRenamePage}
                   />
                 </Panel>
-                <PanelResizeHandle className="w-1 shrink-0 cursor-col-resize bg-gray-100 transition-colors hover:bg-brand-100 dark:bg-[var(--app-bg)] dark:hover:bg-[var(--app-border)]" />
+                <PanelResizeHandle className="w-1.5 shrink-0 cursor-col-resize bg-[var(--gutter)] transition-colors hover:bg-brand-200 dark:hover:bg-brand-800" />
               </>
             )}
 
@@ -1086,6 +1102,7 @@ export default function App() {
                     <Panel defaultSize="50%" minSize="22%" className="min-w-0">
                       <NotePanel
                         page={activePage}
+                        path={notePath}
                         paneLabel="Left"
                         viewMode={viewMode}
                         onTitleChange={(t) => updatePageTitleById(state.activePageId!, t)}
@@ -1100,11 +1117,12 @@ export default function App() {
                         pdfExporting={pdfExportingPrimary}
                       />
                     </Panel>
-                    <PanelResizeHandle className="w-1 shrink-0 cursor-col-resize bg-gray-100 transition-colors hover:bg-brand-100 dark:bg-[var(--app-bg)] dark:hover:bg-[var(--app-border)]" />
+                    <PanelResizeHandle className="w-1.5 shrink-0 cursor-col-resize bg-[var(--gutter)] transition-colors hover:bg-brand-200 dark:hover:bg-brand-800" />
                     <Panel defaultSize="50%" minSize="22%" className="min-w-0">
                       {secondaryPage && state.secondaryPageId ? (
                         <NotePanel
                           page={secondaryPage}
+                          path={secondaryPath}
                           paneLabel="Right"
                           viewMode={viewMode}
                           onTitleChange={(t) =>
@@ -1144,6 +1162,7 @@ export default function App() {
                 ) : (
                   <NotePanel
                     page={activePage}
+                    path={notePath}
                     viewMode={viewMode}
                     onTitleChange={(t) => updatePageTitleById(state.activePageId!, t)}
                     onContentChange={(c) =>
@@ -1158,32 +1177,16 @@ export default function App() {
                   />
                 )
               ) : (
-                <div className="flex h-full flex-col items-center justify-center bg-[var(--app-bg)] text-gray-400 dark:text-[var(--app-muted)]">
-                  <div className="flex max-w-md flex-col items-center rounded-2xl border border-gray-100 bg-white p-8 text-center shadow-sm dark:border-[var(--app-border)] dark:bg-[var(--app-surface)]">
-                    <div className="mb-6 flex h-16 w-16 items-center justify-center rounded-full bg-brand-50 dark:bg-[var(--app-bg)]">
-                      <FileText className="h-8 w-8 text-brand-600 dark:text-brand-400" />
-                    </div>
-                    <h2 className="mb-2 text-xl font-semibold text-gray-800 dark:text-[var(--app-fg)]">
-                      No Page Selected
+                <div className="flex h-full flex-col items-center justify-center px-6 text-[var(--app-muted)]">
+                  <div className="paper-page flex max-w-md flex-col items-center rounded-2xl border border-[var(--app-border)] p-10 text-center">
+                    <BookOpen className="mb-4 h-10 w-10 text-[var(--spine)]" />
+                    <h2 className="font-display text-2xl text-[var(--app-fg)]">
+                      Open a page
                     </h2>
-                    <p className="mb-6 text-sm leading-relaxed text-gray-600 dark:text-[var(--app-fg)]/85">
-                      Select a page from the sidebar or create a new one to start taking notes.
-                      Lumina supports Markdown, Mermaid diagrams, and Plotly charts.
+                    <p className="mt-2 text-sm leading-relaxed">
+                      Choose a book in the table of contents, open a chapter, then
+                      pick a page — or create a new book to begin writing.
                     </p>
-                    <div className="flex flex-col gap-2 w-full">
-                      <div className="flex items-center justify-center gap-2 text-xs font-medium text-gray-500 dark:text-[var(--app-muted)]">
-                        <ChevronRight className="w-3 h-3" />
-                        <span>Markdown Editor</span>
-                      </div>
-                      <div className="flex items-center justify-center gap-2 text-xs font-medium text-gray-500 dark:text-[var(--app-muted)]">
-                        <ChevronRight className="w-3 h-3" />
-                        <span>Mermaid Diagrams</span>
-                      </div>
-                      <div className="flex items-center justify-center gap-2 text-xs font-medium text-gray-500 dark:text-[var(--app-muted)]">
-                        <ChevronRight className="w-3 h-3" />
-                        <span>Plotly Charts</span>
-                      </div>
-                    </div>
                   </div>
                 </div>
               )}
@@ -1193,17 +1196,18 @@ export default function App() {
       </main>
 
       {/* Footer / Status Bar */}
-      <footer className="h-6 shrink-0 select-none flex items-center justify-between border-t border-gray-200 bg-[#f3f2f1] px-4 text-[10px] font-semibold uppercase tracking-widest text-gray-500 dark:border-[var(--app-border)] dark:bg-[var(--app-surface)] dark:text-[var(--app-muted)]">
+      <footer className="flex h-6 shrink-0 select-none items-center justify-between border-t border-[var(--app-border)] bg-[var(--app-surface)] px-4 text-[10px] font-semibold uppercase tracking-widest text-[var(--app-muted)]">
         <div className="flex items-center gap-4">
           <span>Ready</span>
-          <span>Cloud Connected</span>
+          {activeNotebook ? (
+            <span className="normal-case tracking-normal font-medium">
+              {activeNotebook.title}
+              {activeSection ? ` · ${activeSection.title}` : ''}
+            </span>
+          ) : null}
         </div>
         <div className="flex items-center gap-4">
-          <div className="flex items-center gap-1">
-            <HelpCircle className="w-3 h-3" />
-            <span>Help</span>
-          </div>
-          <span>v2.0.0 (SaaS)</span>
+          <span>Book studio</span>
         </div>
       </footer>
 
