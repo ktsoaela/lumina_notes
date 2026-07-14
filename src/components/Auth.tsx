@@ -84,7 +84,7 @@ export default function Auth({ onAuthSuccess, onBack, prefillDemo }: AuthProps) 
   };
 
   return (
-    <div className="flex min-h-screen flex-col items-center justify-center bg-[var(--app-bg)] p-4 selection:bg-brand-100 dark:selection:bg-brand-900/40">
+    <div className="studio-shell flex min-h-screen flex-col items-center justify-center p-4 selection:bg-brand-100 dark:selection:bg-brand-900/40">
       <motion.div 
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
@@ -143,7 +143,7 @@ export default function Auth({ onAuthSuccess, onBack, prefillDemo }: AuthProps) 
                     required
                     value={formData.name}
                     onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                    className="w-full bg-gray-50 dark:bg-[var(--app-surface)] border border-gray-200 dark:border-[var(--app-border)] rounded-xl py-3 pl-10 pr-4 text-sm text-gray-900 dark:text-[var(--app-fg)] placeholder:text-gray-400 dark:placeholder:text-[var(--app-muted)] focus:outline-none focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500 transition-all"
+                    className="studio-input !py-3 !pl-10 !pr-4 transition-all"
                     placeholder="John Doe"
                   />
                 </div>
@@ -162,7 +162,7 @@ export default function Auth({ onAuthSuccess, onBack, prefillDemo }: AuthProps) 
                     required
                     value={formData.identifier}
                     onChange={(e) => setFormData({ ...formData, identifier: e.target.value })}
-                    className="w-full bg-gray-50 dark:bg-[var(--app-surface)] border border-gray-200 dark:border-[var(--app-border)] rounded-xl py-3 pl-10 pr-4 text-sm text-gray-900 dark:text-[var(--app-fg)] placeholder:text-gray-400 dark:placeholder:text-[var(--app-muted)] focus:outline-none focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500 transition-all"
+                    className="studio-input !py-3 !pl-10 !pr-4 transition-all"
                     placeholder="you@example.com or your_username"
                   />
                 </div>
@@ -179,7 +179,7 @@ export default function Auth({ onAuthSuccess, onBack, prefillDemo }: AuthProps) 
                       required
                       value={formData.email}
                       onChange={(e) => setFormData({ ...formData, email: e.target.value })}
-                      className="w-full bg-gray-50 dark:bg-[var(--app-surface)] border border-gray-200 dark:border-[var(--app-border)] rounded-xl py-3 pl-10 pr-4 text-sm text-gray-900 dark:text-[var(--app-fg)] placeholder:text-gray-400 dark:placeholder:text-[var(--app-muted)] focus:outline-none focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500 transition-all"
+                      className="studio-input !py-3 !pl-10 !pr-4 transition-all"
                       placeholder="name@example.com"
                     />
                   </div>
@@ -194,7 +194,7 @@ export default function Auth({ onAuthSuccess, onBack, prefillDemo }: AuthProps) 
                       autoComplete="off"
                       value={formData.username}
                       onChange={(e) => setFormData({ ...formData, username: e.target.value })}
-                      className="w-full bg-gray-50 dark:bg-[var(--app-surface)] border border-gray-200 dark:border-[var(--app-border)] rounded-xl py-3 pl-10 pr-4 text-sm text-gray-900 dark:text-[var(--app-fg)] placeholder:text-gray-400 dark:placeholder:text-[var(--app-muted)] focus:outline-none focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500 transition-all"
+                      className="studio-input !py-3 !pl-10 !pr-4 transition-all"
                       placeholder="letters, numbers, underscore (3–32)"
                     />
                   </div>
@@ -212,7 +212,7 @@ export default function Auth({ onAuthSuccess, onBack, prefillDemo }: AuthProps) 
                   required
                   value={formData.password}
                   onChange={(e) => setFormData({ ...formData, password: e.target.value })}
-                  className="w-full bg-gray-50 dark:bg-[var(--app-surface)] border border-gray-200 dark:border-[var(--app-border)] rounded-xl py-3 pl-10 pr-4 text-sm text-gray-900 dark:text-[var(--app-fg)] placeholder:text-gray-400 dark:placeholder:text-[var(--app-muted)] focus:outline-none focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500 transition-all"
+                  className="studio-input !py-3 !pl-10 !pr-4 transition-all"
                   placeholder="••••••••"
                 />
               </div>

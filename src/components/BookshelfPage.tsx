@@ -43,13 +43,13 @@ import { coerceEntityTitle, validateEntityTitle } from '../lib/validation';
 
 const CHART_SPINE_COLORS = [
   '#0e7490',
+  '#0369a1',
+  '#0f766e',
   '#b45309',
-  '#047857',
   '#be123c',
   '#4338ca',
-  '#0369a1',
-  '#a16207',
-  '#6d28d9',
+  '#475569',
+  '#047857',
 ] as const;
 
 /** Hospital mobile shelving rail — carriages shift to open one aisle. */
@@ -86,8 +86,8 @@ function CompactMobileRail({
   );
 
   return (
-    <div className="relative overflow-hidden rounded-3xl border border-slate-400/40 bg-gradient-to-b from-slate-300 via-slate-400 to-slate-500 p-1 shadow-[0_24px_60px_-20px_rgba(15,23,42,0.55)] dark:border-slate-600 dark:from-slate-700 dark:via-slate-800 dark:to-slate-900">
-      <div className="rounded-[1.35rem] bg-[linear-gradient(180deg,#94a3b8_0%,#64748b_18%,#475569_100%)] p-4 dark:bg-[linear-gradient(180deg,#334155_0%,#1e293b_100%)]">
+    <div className="vault-rail">
+      <div className="vault-rail-inner">
         <div className="mb-3 flex flex-wrap items-center justify-between gap-3 px-1">
           <div className="flex items-center gap-2">
             <span
@@ -136,7 +136,7 @@ function CompactMobileRail({
 
         <div className="overflow-x-auto pb-2 [-ms-overflow-style:none] [scrollbar-width:thin]">
           <div
-            className="relative mx-auto h-[240px] rounded-2xl bg-[radial-gradient(ellipse_at_top,#cbd5e1_0%,#94a3b8_45%,#64748b_100%)] shadow-[inset_0_8px_24px_rgba(15,23,42,0.35)] dark:bg-[radial-gradient(ellipse_at_top,#475569_0%,#1e293b_70%)] sm:h-[280px]"
+            className="vault-track relative mx-auto h-[240px] sm:h-[280px]"
             style={{ width: trackWidth, minWidth: '100%' }}
           >
             <div
@@ -159,13 +159,10 @@ function CompactMobileRail({
                   key={shelf.id}
                   type="button"
                   onClick={() => onSelectCarriage(globalIndex)}
+                  data-selected={selected ? 'true' : 'false'}
                   className={cn(
-                    'group absolute top-3 z-10 flex h-[calc(100%-3.25rem)] flex-col overflow-hidden rounded-t-lg border border-slate-900/40 text-left shadow-[6px_0_18px_rgba(15,23,42,0.35),inset_0_1px_0_rgba(255,255,255,0.25)] transition-[transform,box-shadow,filter] duration-700 ease-[cubic-bezier(0.22,1,0.36,1)]',
-                    'bg-[linear-gradient(135deg,#e2e8f0_0%,#94a3b8_42%,#64748b_100%)] hover:brightness-105',
-                    'dark:bg-[linear-gradient(135deg,#64748b_0%,#334155_55%,#1e293b_100%)]',
-                    shiftsRight && 'z-20',
-                    selected &&
-                      'ring-2 ring-cyan-300 ring-offset-2 ring-offset-slate-500/40'
+                    'vault-carriage group absolute top-3 z-10 flex h-[calc(100%-3.25rem)] flex-col overflow-hidden text-left',
+                    shiftsRight && 'z-20'
                   )}
                   style={{
                     left: `${24 + i * (CARRIAGE_W + CARRIAGE_GAP)}px`,
@@ -230,8 +227,8 @@ function CompactMobileRail({
             </>
           ) : (
             <>
-              Rail shows {RAIL_VISIBLE_BAYS} bays at a time (paginated). Click a carriage to open
-              one aisle — classic medical kompakt access.
+              Rail shows {RAIL_VISIBLE_BAYS} bays at a time. Click a carriage to open one aisle —
+              classic hospital high-density document storage.
             </>
           )}
         </p>
@@ -276,25 +273,25 @@ function BookDetailView({
   const busy = busyNotebookId === notebook.id;
 
   return (
-    <div className="w-full overflow-hidden rounded-2xl border border-slate-200/80 bg-white/90 shadow-[0_20px_50px_-24px_rgba(15,23,42,0.45)] backdrop-blur-md dark:border-[var(--app-border)] dark:bg-[var(--app-surface)]/95">
-      <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-200/80 bg-slate-50/80 px-4 py-3 dark:border-[var(--app-border)] dark:bg-[var(--app-bg)]/60">
+    <div className="studio-panel w-full overflow-hidden bg-[var(--paper)]/95 shadow-[0_20px_50px_-24px_rgba(26,21,16,0.35)] backdrop-blur-md">
+      <div className="flex flex-wrap items-center justify-between gap-3 border-b border-[var(--app-border)] bg-[var(--gutter)]/80 px-4 py-3">
         <div className="flex items-center gap-2">
           <button
             type="button"
             onClick={onClose}
-            className="inline-flex items-center gap-2 rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs font-medium text-slate-700 hover:bg-slate-50 dark:border-[var(--app-border)] dark:bg-[var(--app-surface)] dark:text-[var(--app-fg)] dark:hover:bg-[var(--app-bg)]"
+            className="studio-btn"
           >
             <X className="h-3.5 w-3.5" />
-            Close chart
+            Close book
           </button>
-          <span className="font-mono text-[10px] uppercase tracking-[0.2em] text-slate-500 dark:text-[var(--app-muted)]">
-            {bayLabel} · chart preview
+          <span className="font-mono text-[10px] uppercase tracking-[0.2em] text-[var(--app-muted)]">
+            {bayLabel} · book preview
           </span>
         </div>
         <button
           type="button"
           onClick={onOpenInNotes}
-          className="inline-flex items-center gap-2 rounded-lg bg-cyan-700 px-4 py-2 text-sm font-semibold text-white shadow-sm hover:bg-cyan-800"
+          className="studio-btn-primary"
         >
           <BookOpen className="h-4 w-4" />
           Open in Notes
@@ -310,7 +307,7 @@ function BookDetailView({
             }}
           >
             <span className="text-[10px] font-semibold uppercase tracking-[0.35em] text-white/70">
-              Medical chart binder
+              Markdown notebook
             </span>
             <div>
               <h2 className="text-balance text-2xl font-bold leading-tight drop-shadow-md">
@@ -389,8 +386,8 @@ function BookDetailView({
 
         <div className="md:col-span-7">
           <div className="mb-3 flex items-center gap-2 text-sm font-semibold text-slate-800 dark:text-[var(--app-fg)]">
-            <List className="h-4 w-4 text-cyan-700 dark:text-cyan-400" />
-            Chart contents
+            <List className="h-4 w-4 text-[var(--spine)] dark:text-[var(--spine)]" />
+            Book contents
           </div>
           <div className="max-h-[min(55vh,480px)] space-y-3 overflow-y-auto pr-1">
             {notebook.sections.length === 0 ? (
@@ -475,7 +472,7 @@ function ChartCabinetVisualization({
     <div className="mx-auto w-full max-w-[min(100%,1800px)]">
       <div className="mb-4 flex flex-wrap items-end justify-between gap-2">
         <div>
-          <p className="font-mono text-[10px] uppercase tracking-[0.28em] text-cyan-800/80 dark:text-cyan-300/80">
+          <p className="font-mono text-[10px] uppercase tracking-[0.28em] text-[var(--spine)]/80 dark:text-[var(--spine)]/80">
             Open bay {bayLabel}
           </p>
           <h3 className="text-lg font-semibold tracking-tight text-slate-900 dark:text-[var(--app-fg)]">
@@ -520,7 +517,7 @@ function ChartCabinetVisualization({
         </p>
       ) : null}
 
-      <div className="relative overflow-hidden rounded-2xl border border-slate-500/30 bg-[linear-gradient(180deg,#cbd5e1_0%,#94a3b8_12%,#64748b_100%)] p-3 shadow-[inset_0_1px_0_rgba(255,255,255,0.35),0_18px_40px_-20px_rgba(15,23,42,0.5)] dark:border-slate-600 dark:bg-[linear-gradient(180deg,#475569_0%,#1e293b_100%)]">
+      <div className="vault-cabinet">
         <div className="rounded-xl bg-[linear-gradient(180deg,#e2e8f0_0%,#cbd5e1_100%)] px-3 py-5 shadow-[inset_0_6px_18px_rgba(15,23,42,0.12)] dark:bg-[linear-gradient(180deg,#334155_0%,#1e293b_100%)]">
           {notebooks.length === 0 ? (
             <div className="flex flex-col items-center justify-center gap-2 py-16 text-center">
@@ -537,7 +534,7 @@ function ChartCabinetVisualization({
               {rows.map((row, ri) => (
                 <div
                   key={ri}
-                  className="relative flex min-h-[9rem] flex-nowrap content-end items-end justify-start gap-x-2 overflow-x-auto border-b-[5px] border-slate-500/70 pb-4 pt-2 dark:border-slate-600 after:pointer-events-none after:absolute after:inset-x-0 after:-bottom-1.5 after:h-1.5 after:bg-black/15"
+                  className="vault-shelf-row relative flex min-h-[9rem] flex-nowrap content-end items-end justify-start gap-x-2 overflow-x-auto pb-4 pt-2 after:pointer-events-none after:absolute after:inset-x-0 after:-bottom-1.5 after:h-1.5 after:bg-black/15"
                 >
                   {row.map((nb, bi) => {
                     const pages = pageCount(nb);
@@ -558,10 +555,10 @@ function ChartCabinetVisualization({
                         title={`${title} · ${pages} pages · ${sections} sections`}
                         onClick={() => onSpineClick(nb)}
                         className={cn(
-                          'relative flex shrink-0 flex-col items-center justify-between overflow-hidden rounded-md border border-black/25 px-1 py-2 shadow-md transition-transform hover:-translate-y-1 focus:outline-none focus-visible:ring-2 focus-visible:ring-cyan-400',
+                          'relative flex shrink-0 flex-col items-center justify-between overflow-hidden rounded-md border border-black/25 px-1 py-2 shadow-md transition-transform hover:-translate-y-1 focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--spine)]',
                           tab === 'archived' && 'opacity-65 saturate-75',
                           previewBookId === nb.id &&
-                            'ring-2 ring-cyan-300 ring-offset-2 ring-offset-slate-300'
+                            'ring-2 ring-[var(--spine)] ring-offset-2 ring-offset-[#c4b090]'
                         )}
                         style={{
                           width: `${w}px`,
@@ -701,9 +698,9 @@ export default function BookshelfPage({
 
   const createShelf = async () => {
     const checked = validateEntityTitle(
-      newShelfName || 'New storage unit',
+      newShelfName || 'New bookshelf',
       'bookshelf',
-      { allowEmptyFallback: 'New storage unit' }
+      { allowEmptyFallback: 'New bookshelf' }
     );
     if (!checked.ok) return;
     const name = checked.value;
@@ -717,7 +714,7 @@ export default function BookshelfPage({
       setRailMotion(true);
     } catch (e) {
       console.error(e);
-      toast.error('Could not create storage unit');
+      toast.error('Could not create bookshelf');
     } finally {
       setBusy(null);
     }
@@ -725,10 +722,10 @@ export default function BookshelfPage({
 
   const renameShelf = async (id: string, currentTitle: string) => {
     const name = await promptText({
-      title: 'Rename storage unit',
+      title: 'Rename bookshelf',
       label: 'Unit name',
       defaultValue: currentTitle,
-      placeholder: 'e.g. Ward 3 · Outpatients',
+      placeholder: 'e.g. Work · Journal · Projects',
       confirmLabel: 'Save',
     });
     if (name === null) return;
@@ -745,8 +742,8 @@ export default function BookshelfPage({
   const deleteShelf = async (id: string) => {
     const shelf = bookshelves.find((b) => b.id === id);
     const ok = await confirm({
-      title: 'Decommission storage unit?',
-      message: `“${shelf?.title?.trim() || 'Unit'}” will be removed. It must be empty (no chart binders). This cannot be undone.`,
+      title: 'Remove bookshelf?',
+      message: `“${shelf?.title?.trim() || 'Bookshelf'}” will be removed. It must be empty (no notebooks). This cannot be undone.`,
       confirmLabel: 'Delete unit',
       variant: 'danger',
     });
@@ -772,13 +769,13 @@ export default function BookshelfPage({
   const createNotebook = async () => {
     if (!manageShelfId) return;
     const name = await promptText({
-      title: 'New chart binder',
+      title: 'New chart',
       label: 'Notebook title',
       placeholder: 'e.g. Intake notes',
       confirmLabel: 'Create',
     });
     if (name === null) return;
-    const title = coerceEntityTitle(name, 'chart');
+    const title = coerceEntityTitle(name, 'notebook');
     setBusy('new-notebook');
     try {
       const nbId = `nb-${Date.now()}`;
@@ -805,7 +802,7 @@ export default function BookshelfPage({
   const archive = async (id: string) => {
     const nb = [...activeList, ...archivedList].find((n) => n.id === id);
     const ok = await confirm({
-      title: 'Archive chart binder?',
+      title: 'Archive notebook?',
       message: `“${nb?.title?.trim() || 'Notebook'}” will move to Archived. You can restore it later.`,
       confirmLabel: 'Archive',
       variant: 'default',
@@ -825,7 +822,7 @@ export default function BookshelfPage({
   const removeForever = async (id: string) => {
     const nb = archivedList.find((n) => n.id === id);
     const ok = await confirm({
-      title: 'Delete chart forever?',
+      title: 'Delete notebook forever?',
       message: `“${nb?.title?.trim() || 'Notebook'}” and all sections/pages will be permanently removed.`,
       confirmLabel: 'Delete forever',
       variant: 'danger',
@@ -893,21 +890,21 @@ export default function BookshelfPage({
   };
 
   return (
-    <div className="flex h-full min-h-0 flex-col bg-[radial-gradient(ellipse_at_top,#e8eef5_0%,#f8fafc_42%,#eef2f7_100%)] text-slate-900 dark:bg-[radial-gradient(ellipse_at_top,#132238_0%,#0a1628_55%,#07101c_100%)] dark:text-[var(--app-fg)]">
-      <header className="shrink-0 border-b border-slate-200/80 bg-white/80 px-5 py-4 backdrop-blur-xl dark:border-[var(--app-border)] dark:bg-[var(--app-surface)]/80">
+    <div className="flex h-full min-h-0 flex-col vault-shell text-[var(--app-fg)]">
+      <header className="app-topbar shrink-0 px-5 py-4">
         <div className="mx-auto flex w-full max-w-7xl flex-wrap items-center justify-between gap-4">
           <div className="flex flex-wrap items-center gap-4">
             <button
               type="button"
               onClick={onBack}
-              className="inline-flex items-center gap-2 text-sm font-medium text-cyan-800 hover:underline dark:text-cyan-300"
+              className="inline-flex items-center gap-2 text-sm font-medium text-[var(--spine)] hover:underline dark:text-[var(--spine)]"
             >
               <ArrowLeft className="h-4 w-4" />
               Back to notes
             </button>
-            <div className="h-8 w-px bg-slate-200 dark:bg-[var(--app-border)]" />
+            <div className="h-8 w-px bg-[var(--app-border)]" />
             <div>
-              <p className="font-mono text-[10px] uppercase tracking-[0.3em] text-cyan-800/70 dark:text-cyan-300/70">
+              <p className="font-mono text-[10px] uppercase tracking-[0.3em] text-cyan-700/80 dark:text-cyan-300/80">
                 Records vault
               </p>
               <h1 className="text-lg font-semibold tracking-tight">
@@ -915,7 +912,7 @@ export default function BookshelfPage({
               </h1>
             </div>
           </div>
-          <div className="flex items-center gap-2 rounded-full border border-slate-200 bg-slate-50 px-3 py-1.5 text-[11px] text-slate-600 dark:border-[var(--app-border)] dark:bg-[var(--app-bg)] dark:text-[var(--app-muted)]">
+          <div className="flex items-center gap-2 rounded-full border border-[var(--app-border)] bg-[var(--gutter)] px-3 py-1.5 text-[11px] text-[var(--app-muted)]">
             <ShieldAlert className="h-3.5 w-3.5 text-amber-600" />
             One aisle open at a time
           </div>
@@ -927,14 +924,13 @@ export default function BookshelfPage({
           {/* Unit CRUD + rail */}
           <section className="grid grid-cols-1 gap-6 lg:grid-cols-12">
             <div className="lg:col-span-4">
-              <div className="rounded-2xl border border-slate-200/90 bg-white/90 p-4 shadow-sm backdrop-blur dark:border-[var(--app-border)] dark:bg-[var(--app-surface)]/90">
+              <div className="studio-panel bg-[var(--paper)]/95 p-4 shadow-sm backdrop-blur">
                 <div className="mb-4 flex items-center gap-2">
-                  <BookMarked className="h-4 w-4 text-cyan-700 dark:text-cyan-400" />
+                  <BookMarked className="h-4 w-4 text-[var(--spine)] dark:text-[var(--spine)]" />
                   <h2 className="text-sm font-semibold">Unit registry</h2>
                 </div>
                 <p className="mb-4 text-xs leading-relaxed text-slate-500 dark:text-[var(--app-muted)]">
-                  Create and manage physical-style storage carriages. Select a bay on the rail to
-                  open the aisle and work charts inside.
+                  Create and manage mobile shelving carriages — like hospital chart rooms. Select a bay on the rail to open one aisle and work binders inside.
                 </p>
 
                 <form
@@ -951,13 +947,13 @@ export default function BookshelfPage({
                     type="text"
                     value={newShelfName}
                     onChange={(e) => setNewShelfName(e.target.value)}
-                    placeholder="e.g. Ward 4 · Clinic A"
-                    className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm text-slate-900 placeholder:text-slate-400 dark:border-[var(--app-border)] dark:bg-[var(--app-bg)] dark:text-[var(--app-fg)]"
+                    placeholder="e.g. Ward 4 · Clinic A · Projects"
+                    className="studio-input"
                   />
                   <button
                     type="submit"
                     disabled={busy === 'new-shelf'}
-                    className="inline-flex items-center justify-center gap-1.5 rounded-xl bg-cyan-700 px-4 py-2.5 text-sm font-semibold text-white hover:bg-cyan-800 disabled:opacity-50"
+                    className="studio-btn-primary disabled:opacity-50"
                   >
                     {busy === 'new-shelf' ? (
                       <Loader2 className="h-4 w-4 animate-spin" />
@@ -987,11 +983,11 @@ export default function BookshelfPage({
                             className={cn(
                               'flex w-full items-center gap-3 rounded-xl border px-3 py-2.5 text-left transition-colors',
                               active
-                                ? 'border-cyan-300 bg-cyan-50 shadow-sm dark:border-cyan-800 dark:bg-cyan-950/30'
+                                ? 'border-[var(--spine)] bg-[color-mix(in_srgb,var(--spine)_12%,var(--paper))] shadow-sm dark:border-[var(--spine)] dark:bg-[color-mix(in_srgb,var(--spine)_20%,transparent)]'
                                 : 'border-transparent hover:border-slate-200 hover:bg-slate-50 dark:hover:border-[var(--app-border)] dark:hover:bg-[var(--app-bg)]'
                             )}
                           >
-                            <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-slate-800 font-mono text-[11px] font-bold text-cyan-200">
+                            <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-[var(--spine)] font-mono text-[11px] font-bold text-white">
                               {bayCode(i)}
                             </span>
                             <span className="min-w-0 flex-1">
@@ -1043,7 +1039,7 @@ export default function BookshelfPage({
               )}
 
               {selectedShelf ? (
-                <div className="flex flex-wrap items-center gap-2 rounded-2xl border border-slate-200/90 bg-white/90 p-3 shadow-sm dark:border-[var(--app-border)] dark:bg-[var(--app-surface)]/90">
+                <div className="flex flex-wrap items-center gap-2 studio-panel bg-[var(--paper)]/95 p-3 shadow-sm">
                   <div className="mr-auto min-w-0 px-1">
                     <p className="font-mono text-[10px] uppercase tracking-[0.22em] text-slate-500 dark:text-[var(--app-muted)]">
                       Active bay {selectedBay}
@@ -1053,7 +1049,7 @@ export default function BookshelfPage({
                   <button
                     type="button"
                     onClick={() => onOpenShelfForNotes(selectedShelf.id)}
-                    className="inline-flex items-center gap-1.5 rounded-lg bg-slate-900 px-3 py-2 text-xs font-semibold text-white hover:bg-slate-800 dark:bg-cyan-700 dark:hover:bg-cyan-800"
+                    className="studio-btn-primary !text-xs !px-3 !py-2"
                   >
                     <BookOpen className="h-3.5 w-3.5" />
                     Open in Notes
@@ -1086,14 +1082,14 @@ export default function BookshelfPage({
           </section>
 
           {/* Charts in open bay */}
-          <section className="rounded-3xl border border-slate-200/90 bg-white/70 p-5 shadow-sm backdrop-blur dark:border-[var(--app-border)] dark:bg-[var(--app-surface)]/70 sm:p-6">
+          <section className="studio-panel bg-[var(--paper)]/80 p-5 shadow-sm backdrop-blur sm:p-6">
             <div className="mb-5 flex flex-wrap items-center justify-between gap-3">
               <div>
                 <h2 className="text-sm font-semibold tracking-tight">
                   Charts in open bay
                 </h2>
                 <p className="mt-0.5 text-xs text-slate-500 dark:text-[var(--app-muted)]">
-                  Binders on the steel shelves — create, import, archive, or open.
+                  Chart binders on the steel shelves — create, import Markdown, archive, or open.
                 </p>
               </div>
               <div className="flex flex-wrap items-center gap-2">
@@ -1108,7 +1104,7 @@ export default function BookshelfPage({
                   type="button"
                   disabled={!manageShelfId || busy === 'new-notebook'}
                   onClick={() => void createNotebook()}
-                  className="inline-flex items-center gap-1.5 rounded-lg bg-cyan-700 px-3 py-2 text-xs font-semibold text-white hover:bg-cyan-800 disabled:opacity-50"
+                  className="inline-flex items-center gap-1.5 rounded-lg bg-[var(--spine)] px-3 py-2 text-xs font-semibold text-white hover:brightness-110 disabled:opacity-50"
                 >
                   {busy === 'new-notebook' ? (
                     <Loader2 className="h-3.5 w-3.5 animate-spin" />
@@ -1161,11 +1157,11 @@ export default function BookshelfPage({
 
             {loading ? (
               <div className="flex justify-center py-20">
-                <Loader2 className="h-8 w-8 animate-spin text-cyan-700" />
+                <Loader2 className="h-8 w-8 animate-spin text-[var(--spine)]" />
               </div>
             ) : !manageShelfId ? (
               <p className="py-16 text-center text-sm text-slate-500 dark:text-[var(--app-muted)]">
-                Commission a storage unit to stock charts.
+                Commission a storage unit to stock chart binders.
               </p>
             ) : (
               <div className="space-y-6">

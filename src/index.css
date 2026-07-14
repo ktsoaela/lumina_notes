@@ -1,52 +1,361 @@
-@import url('https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,600;9..144,700&family=Source+Serif+4:opsz,wght@8..60,400;8..60,600&family=Figtree:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,450;9..144,560;9..144,650&family=Source+Serif+4:opsz,wght@8..60,400;8..60,600&family=Sora:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap');
 @import "tailwindcss";
 
+/* Quiet 2026 — peace, not war: mist, soft teal, generous calm */
 @theme {
-  --font-sans: "Figtree", ui-sans-serif, system-ui, sans-serif;
+  --font-sans: "Sora", ui-sans-serif, system-ui, sans-serif;
   --font-display: "Fraunces", ui-serif, Georgia, serif;
   --font-serif: "Source Serif 4", ui-serif, Georgia, serif;
   --font-mono: "JetBrains Mono", ui-monospace, SFMono-Regular, monospace;
-  --color-brand-50: #f0f6fb;
-  --color-brand-100: #dceaf4;
-  --color-brand-200: #b8d4e8;
-  --color-brand-300: #8ab8d4;
-  --color-brand-400: #3d7aaa;
-  --color-brand-500: #2a6fa8;
-  --color-brand-600: #1e5a8a;
-  --color-brand-700: #174a73;
-  --color-brand-800: #143c5e;
-  --color-brand-900: #0f2840;
-  --color-ink-50: #f7f4ef;
-  --color-ink-100: #efe8dc;
-  --color-ink-200: #e2d6c4;
-  --color-ink-800: #2c2419;
-  --color-ink-900: #1a1510;
+  --color-brand-50: #eef5f6;
+  --color-brand-100: #d9e9ec;
+  --color-brand-200: #b5d2d8;
+  --color-brand-300: #86b3be;
+  --color-brand-400: #5a91a0;
+  --color-brand-500: #3d7486;
+  --color-brand-600: #345f6e;
+  --color-brand-700: #2d4f5c;
+  --color-brand-800: #27424d;
+  --color-brand-900: #1c3038;
+  --color-ink-50: #f4f6f8;
+  --color-ink-100: #e8ecf0;
+  --color-ink-200: #d5dde5;
+  --color-ink-800: #243040;
+  --color-ink-900: #151c26;
 }
 
 :root {
   color-scheme: light;
-  --app-bg: #f3efe7;
-  --app-fg: #1a1510;
-  --app-fg-accent: #174a73;
-  --app-muted: #6b645a;
-  --app-surface: #fbf8f2;
-  --app-border: #ddd2c0;
-  --paper: #fffdf8;
-  --spine: #174a73;
-  --gutter: #ebe4d6;
+  --app-bg: #f0f3f5;
+  --app-fg: #1a2430;
+  --app-fg-accent: #2d4f5c;
+  --app-muted: #5c6b7a;
+  --app-surface: #fafbfc;
+  --app-border: #d8e0e6;
+  --paper: #ffffff;
+  --spine: #3d7486;
+  --gutter: #e8eef1;
+  --focus: #3d7486;
+  --radius-ui: 0.75rem;
+  --shadow-soft: 0 12px 40px -28px rgba(26, 36, 48, 0.28);
 }
 
 .dark {
   color-scheme: dark;
-  --app-bg: #0c121c;
-  --app-fg: #f1f5f9;
-  --app-fg-accent: #c5d7ea;
-  --app-muted: #94a3b8;
-  --app-surface: #132238;
-  --app-border: #1e3a5c;
-  --paper: #101a28;
-  --spine: #3d7aaa;
-  --gutter: #0a1220;
+  --app-bg: #0c1116;
+  --app-fg: #e8eef2;
+  --app-fg-accent: #a8c8d2;
+  --app-muted: #93a4b0;
+  --app-surface: #121920;
+  --app-border: #243240;
+  --paper: #0f161c;
+  --spine: #7aafbe;
+  --gutter: #0a0f14;
+  --focus: #7aafbe;
+  --shadow-soft: 0 16px 48px -28px rgba(0, 0, 0, 0.65);
+}
+
+/* High contrast — maximum separation for vision needs */
+.contrast {
+  color-scheme: dark;
+  --app-bg: #000000;
+  --app-fg: #ffffff;
+  --app-fg-accent: #ffffff;
+  --app-muted: #e8e8e8;
+  --app-surface: #0a0a0a;
+  --app-border: #ffffff;
+  --paper: #000000;
+  --spine: #9ed4e4;
+  --gutter: #111111;
+  --focus: #ffffff;
+  --shadow-soft: none;
+}
+
+@media (prefers-contrast: more) {
+  :root:not(.dark):not(.contrast) {
+    --app-fg: #000000;
+    --app-muted: #2a2a2a;
+    --app-border: #1a1a1a;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  :root:not(.reduce-motion) {
+    /* OS preference alone still softens — class reinforces */
+  }
+}
+
+/* Shared quiet shell — Notes / Library chrome / Profile */
+.studio-shell {
+  background:
+    radial-gradient(ellipse 70% 45% at 0% -5%, rgba(61, 116, 134, 0.07), transparent 55%),
+    radial-gradient(ellipse 50% 35% at 100% 0%, rgba(107, 144, 128, 0.06), transparent 50%),
+    var(--app-bg);
+  color: var(--app-fg);
+}
+
+.dark .studio-shell,
+.contrast .studio-shell {
+  background:
+    radial-gradient(ellipse 60% 40% at 0% 0%, rgba(122, 175, 190, 0.1), transparent 55%),
+    var(--app-bg);
+}
+
+.studio-panel {
+  border: 1px solid var(--app-border);
+  background: var(--app-surface);
+  border-radius: var(--radius-ui);
+  box-shadow: var(--shadow-soft);
+}
+
+.studio-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.375rem;
+  border-radius: 9999px;
+  border: 1px solid var(--app-border);
+  background: var(--paper);
+  padding: 0.4rem 0.85rem;
+  font-size: 0.75rem;
+  font-weight: 500;
+  color: var(--app-fg);
+  transition: border-color 0.15s ease, color 0.15s ease, background 0.15s ease;
+}
+
+.studio-btn:hover {
+  border-color: var(--spine);
+  color: var(--spine);
+}
+
+.studio-btn-primary {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.375rem;
+  border-radius: 9999px;
+  background: var(--spine);
+  padding: 0.5rem 1.05rem;
+  font-size: 0.8125rem;
+  font-weight: 600;
+  color: #fff;
+  transition: filter 0.15s ease, opacity 0.15s ease;
+}
+
+.studio-btn-primary:hover {
+  filter: brightness(1.06);
+}
+
+.studio-btn-primary:disabled {
+  opacity: 0.45;
+}
+
+.studio-input {
+  width: 100%;
+  border-radius: var(--radius-ui);
+  border: 1px solid var(--app-border);
+  background: var(--paper);
+  padding: 0.65rem 0.9rem;
+  font-size: 0.875rem;
+  color: var(--app-fg);
+}
+
+.studio-input::placeholder {
+  color: color-mix(in srgb, var(--app-muted) 72%, transparent);
+}
+
+.studio-input:focus {
+  outline: 2px solid color-mix(in srgb, var(--focus) 50%, transparent);
+  outline-offset: 1px;
+}
+
+/* Frosted app top bar — quiet chrome */
+.app-topbar {
+  border-bottom: 1px solid var(--app-border);
+  background: color-mix(in srgb, var(--app-surface) 88%, transparent);
+  backdrop-filter: blur(14px);
+  color: var(--app-fg);
+}
+
+.app-topbar-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.375rem;
+  border-radius: 0.5rem;
+  padding: 0.4rem 0.65rem;
+  font-size: 0.75rem;
+  font-weight: 500;
+  color: var(--app-muted);
+  transition: background 0.15s ease, color 0.15s ease;
+}
+
+.app-topbar-btn:hover {
+  background: var(--gutter);
+  color: var(--app-fg);
+}
+
+.app-topbar-btn[data-active='true'] {
+  background: color-mix(in srgb, var(--spine) 12%, var(--paper));
+  color: var(--spine);
+}
+
+/* Paper writing surface */
+.paper-page {
+  background-color: var(--paper);
+  background-image:
+    linear-gradient(90deg, color-mix(in srgb, var(--spine) 6%, transparent) 0, transparent 42px),
+    linear-gradient(180deg, transparent 0, transparent calc(100% - 1px), color-mix(in srgb, var(--spine) 5%, transparent) 100%);
+  box-shadow: var(--shadow-soft);
+}
+
+.dark .paper-page {
+  background-image: linear-gradient(90deg, color-mix(in srgb, var(--spine) 10%, transparent) 0, transparent 42px);
+}
+
+.contrast .paper-page {
+  background-image: none;
+  box-shadow: none;
+  border-width: 2px;
+}
+
+.contrast .studio-btn,
+.contrast .studio-panel {
+  border-width: 2px;
+}
+
+.contrast a:focus-visible,
+.contrast button:focus-visible,
+.contrast input:focus-visible,
+.contrast textarea:focus-visible,
+.contrast [role='button']:focus-visible {
+  outline: 3px solid #fff;
+  outline-offset: 2px;
+}
+
+/* —— Hospital records vault (Library only) —— */
+.vault-shell {
+  --vault-steel-1: #cbd5e1;
+  --vault-steel-2: #94a3b8;
+  --vault-steel-3: #64748b;
+  --vault-ink: #0f172a;
+  --vault-accent: #0891b2;
+  --vault-accent-soft: #67e8f9;
+  background:
+    radial-gradient(ellipse 80% 40% at 50% 0%, rgba(8, 145, 178, 0.08), transparent 50%),
+    var(--app-bg);
+}
+
+.dark .vault-shell,
+.contrast .vault-shell {
+  --vault-steel-1: #475569;
+  --vault-steel-2: #334155;
+  --vault-steel-3: #1e293b;
+  --vault-ink: #f1f5f9;
+  --vault-accent: #22d3ee;
+  --vault-accent-soft: #a5f3fc;
+}
+
+.vault-rail {
+  border-radius: 1.5rem;
+  border: 1px solid color-mix(in srgb, var(--vault-steel-3) 55%, transparent);
+  background: linear-gradient(180deg, var(--vault-steel-1) 0%, var(--vault-steel-2) 40%, var(--vault-steel-3) 100%);
+  padding: 0.25rem;
+  box-shadow: 0 24px 60px -24px rgba(15, 23, 42, 0.45);
+}
+
+.vault-rail-inner {
+  border-radius: 1.35rem;
+  background: linear-gradient(180deg, #94a3b8 0%, #64748b 18%, #475569 100%);
+  padding: 1rem;
+}
+
+.dark .vault-rail-inner,
+.contrast .vault-rail-inner {
+  background: linear-gradient(180deg, #334155 0%, #1e293b 100%);
+}
+
+.vault-track {
+  border-radius: 1rem;
+  background: radial-gradient(ellipse at top, #cbd5e1 0%, #94a3b8 45%, #64748b 100%);
+  box-shadow: inset 0 8px 24px rgba(15, 23, 42, 0.35);
+}
+
+.dark .vault-track,
+.contrast .vault-track {
+  background: radial-gradient(ellipse at top, #475569 0%, #1e293b 70%);
+}
+
+.vault-carriage {
+  border-radius: 0.5rem 0.5rem 0 0;
+  border: 1px solid rgba(15, 23, 42, 0.4);
+  background: linear-gradient(135deg, #e2e8f0 0%, #94a3b8 42%, #64748b 100%);
+  box-shadow:
+    6px 0 18px rgba(15, 23, 42, 0.35),
+    inset 0 1px 0 rgba(255, 255, 255, 0.25);
+  transition: transform 0.7s cubic-bezier(0.22, 1, 0.36, 1), box-shadow 0.3s ease, filter 0.2s ease;
+}
+
+.dark .vault-carriage,
+.contrast .vault-carriage {
+  background: linear-gradient(135deg, #64748b 0%, #334155 55%, #1e293b 100%);
+}
+
+.vault-carriage:hover {
+  filter: brightness(1.05);
+}
+
+.vault-carriage[data-selected='true'] {
+  outline: 2px solid var(--vault-accent-soft);
+  outline-offset: 2px;
+}
+
+.vault-cabinet {
+  border-radius: 1rem;
+  border: 1px solid color-mix(in srgb, var(--vault-steel-3) 40%, transparent);
+  background: linear-gradient(180deg, #cbd5e1 0%, #94a3b8 12%, #64748b 100%);
+  padding: 0.75rem;
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.35),
+    0 18px 40px -20px rgba(15, 23, 42, 0.5);
+}
+
+.dark .vault-cabinet,
+.contrast .vault-cabinet {
+  background: linear-gradient(180deg, #475569 0%, #1e293b 100%);
+}
+
+.vault-shelf-row {
+  border-bottom: 5px solid color-mix(in srgb, #64748b 80%, transparent);
+}
+
+.dark .vault-shelf-row,
+.contrast .vault-shelf-row {
+  border-bottom-color: #475569;
+}
+
+/* Accessibility helpers */
+.a11y-lg {
+  font-size: 112.5%;
+}
+
+.a11y-lg .font-display,
+.a11y-lg input.font-display {
+  letter-spacing: -0.01em;
+}
+
+.reduce-motion *,
+.reduce-motion *::before,
+.reduce-motion *::after {
+  animation-duration: 0.01ms !important;
+  animation-iteration-count: 1 !important;
+  transition-duration: 0.01ms !important;
+  scroll-behavior: auto !important;
+}
+
+.underline-links a {
+  text-decoration: underline;
+  text-underline-offset: 0.18em;
 }
 
 @layer base {
@@ -88,6 +397,11 @@
   a[aria-disabled='true'] {
     cursor: not-allowed;
   }
+
+  :focus-visible {
+    outline: 2px solid var(--focus);
+    outline-offset: 2px;
+  }
 }
 
 .font-display {
@@ -98,34 +412,8 @@
   font-family: var(--font-serif);
 }
 
-/* Notes studio atmosphere */
 .notes-atelier {
-  background:
-    radial-gradient(ellipse 80% 50% at 10% -10%, rgba(23, 74, 115, 0.12), transparent 55%),
-    radial-gradient(ellipse 60% 40% at 100% 0%, rgba(226, 214, 196, 0.55), transparent 50%),
-    var(--app-bg);
-}
-
-.dark .notes-atelier {
-  background:
-    radial-gradient(ellipse 70% 45% at 0% 0%, rgba(61, 122, 170, 0.18), transparent 55%),
-    radial-gradient(ellipse 50% 40% at 100% 100%, rgba(15, 40, 64, 0.8), transparent 50%),
-    var(--app-bg);
-}
-
-.paper-page {
-  background-color: var(--paper);
-  background-image:
-    linear-gradient(90deg, rgba(23, 74, 115, 0.04) 0, transparent 48px),
-    linear-gradient(180deg, transparent 0, transparent calc(100% - 1px), rgba(23, 74, 115, 0.04) 100%);
-  box-shadow:
-    0 1px 0 rgba(255, 255, 255, 0.7) inset,
-    0 18px 40px -24px rgba(26, 21, 16, 0.35);
-}
-
-.dark .paper-page {
-  background-image: linear-gradient(90deg, rgba(61, 122, 170, 0.08) 0, transparent 48px);
-  box-shadow: 0 18px 40px -20px rgba(0, 0, 0, 0.55);
+  /* alias kept for App className compatibility */
 }
 
 ::-webkit-scrollbar {
@@ -138,18 +426,14 @@
 }
 
 ::-webkit-scrollbar-thumb {
-  background: #c9bba6;
+  background: color-mix(in srgb, var(--app-muted) 35%, transparent);
   border-radius: 4px;
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  background: #a89880;
+  background: color-mix(in srgb, var(--app-muted) 55%, transparent);
 }
 
-.dark ::-webkit-scrollbar-thumb {
-  background: #3b4f6b;
-}
-
-.dark ::-webkit-scrollbar-thumb:hover {
-  background: #5a6d8a;
+.contrast ::-webkit-scrollbar-thumb {
+  background: #ffffff;
 }
