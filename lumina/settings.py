@@ -6,12 +6,34 @@ from pathlib import Path
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 
-SECRET_KEY = os.environ.get(
-    "DJANGO_SECRET_KEY",
-    "lumina-django-dev-key-change-for-production",
-)
+LUMINA_ENV = os.environ.get("LUMINA_ENV", "development").strip().lower()
+IS_PRODUCTION = LUMINA_ENV in ("production", "prod")
 
-DEBUG = os.environ.get("DJANGO_DEBUG", "1") not in ("0", "false", "False")
+_PLACEHOLDER_DJANGO_KEYS = {
+    "",
+    "lumina-django-dev-key-change-for-production",
+    "change-me-in-production",
+    "REPLACE_WITH_STRONG_DJANGO_SECRET",
+}
+
+_raw_secret = (os.environ.get("DJANGO_SECRET_KEY") or "").strip()
+if IS_PRODUCTION:
+    if _raw_secret in _PLACEHOLDER_DJANGO_KEYS:
+        raise RuntimeError(
+            "DJANGO_SECRET_KEY must be set to a strong non-placeholder value "
+            "when LUMINA_ENV=production"
+        )
+    SECRET_KEY = _raw_secret
+else:
+    SECRET_KEY = _raw_secret or "lumina-django-dev-key-change-for-production"
+
+DEBUG = os.environ.get("DJANGO_DEBUG", "0" if IS_PRODUCTION else "1") not in (
+    "0",
+    "false",
+    "False",
+)
+if IS_PRODUCTION and DEBUG:
+    raise RuntimeError("DJANGO_DEBUG must be disabled when LUMINA_ENV=production")
 
 ALLOWED_HOSTS = [
     h.strip()
@@ -71,10 +93,13 @@ TEMPLATES = [
 
 WSGI_APPLICATION = "lumina.wsgi.application"
 
+_db_path = os.environ.get("DATABASE_PATH")
 DATABASES = {
     "default": {
         "ENGINE": "django.db.backends.sqlite3",
-        "NAME": BASE_DIR / "database.sqlite",
+        "NAME": Path(_db_path).expanduser().resolve()
+        if _db_path
+        else BASE_DIR / "database.sqlite",
     }
 }
 

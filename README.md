@@ -49,8 +49,8 @@ A Markdown note-taking app with a OneNote-inspired hierarchy (bookshelves → no
 
 3. Copy `.env.example` to `.env.local` (or `.env`) and set at least:
 
-   - `GEMINI_API_KEY` — Gemini API key (if using AI features)
-   - `JWT_SECRET` — secret used to sign auth tokens
+   - `JWT_SECRET` — secret used to sign auth tokens (required in production)
+   - `LUMINA_ENV=production` — enables strict secret checks, disables demo seed & Swagger by default
 
 4. Start the app:
 
@@ -103,10 +103,14 @@ Then restart the API / uvicorn so it reloads `app.py`.
 
 ```bash
 docker build -t lumina-notes .
-docker run --rm -p 58888:58888 -e JWT_SECRET=change-me lumina-notes
+docker run --rm -p 58888:58888 \
+  -e JWT_SECRET="$(openssl rand -hex 32)" \
+  -e LUMINA_ENV=production \
+  -e CORS_ORIGINS=http://127.0.0.1:58888 \
+  lumina-notes
 ```
 
-Open http://127.0.0.1:58888
+Open http://127.0.0.1:58888 (health: `/health`).
 
 ## Kubernetes
 

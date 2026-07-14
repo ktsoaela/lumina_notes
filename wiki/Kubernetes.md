@@ -16,7 +16,11 @@ kubectl apply -f k8s/deployment.yaml
 
 ## Secrets
 
-Edit `k8s/config.yaml` and set a strong `JWT_SECRET` before production use. Prefer sealed secrets or an external secret manager in real environments.
+Edit `k8s/config.yaml` and set a strong `JWT_SECRET` (and `DJANGO_SECRET_KEY` if needed) before production use. Prefer sealed secrets or an external secret manager in real environments.
+
+Set `CORS_ORIGINS` to your real HTTPS origin(s). Do not use `*`.
+
+Probes use `/health` (DB-ready). Swagger is disabled in production (`ENABLE_DOCS=0`).
 
 ## Ingress
 

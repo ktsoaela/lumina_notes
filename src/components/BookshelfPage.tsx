@@ -23,6 +23,7 @@ import { notebookToMarkdown, downloadText, parseImportedMarkdown } from '../lib/
 import { sanitizeFilename } from '../lib/filename';
 import { cn } from '../lib/utils';
 import { useAppDialogs } from '../context/AppDialogsContext';
+import { useToast } from '../context/ToastContext';
 import {
   AISLE_SHIFT_PX,
   BOOKS_PER_ROW,
@@ -38,6 +39,7 @@ import {
   railPageForIndex,
   spineSizeFromNotebook,
 } from '../lib/shelfLayout';
+import { coerceEntityTitle, validateEntityTitle } from '../lib/validation';
 
 const CHART_SPINE_COLORS = [
   '#0e7490',
@@ -609,6 +611,7 @@ export default function BookshelfPage({
   onRefreshBookshelves,
 }: BookshelfPageProps) {
   const { confirm, promptText } = useAppDialogs();
+  const toast = useToast();
   const [newShelfName, setNewShelfName] = useState('');
   const [tab, setTab] = useState<'active' | 'archived'>('active');
   const [manageShelfId, setManageShelfId] = useState<string | null>(null);
@@ -654,10 +657,11 @@ export default function BookshelfPage({
       setArchivedList(ar);
     } catch (e) {
       console.error(e);
+      toast.error('Could not load charts');
     } finally {
       setLoading(false);
     }
-  }, [manageShelfId]);
+  }, [manageShelfId, toast]);
 
   useEffect(() => {
     loadNotebooks();
@@ -696,7 +700,13 @@ export default function BookshelfPage({
   );
 
   const createShelf = async () => {
-    const name = newShelfName.trim() || 'New storage unit';
+    const checked = validateEntityTitle(
+      newShelfName || 'New storage unit',
+      'bookshelf',
+      { allowEmptyFallback: 'New storage unit' }
+    );
+    if (!checked.ok) return;
+    const name = checked.value;
     const id = `bs-${Date.now()}`;
     setBusy('new-shelf');
     try {
@@ -707,6 +717,7 @@ export default function BookshelfPage({
       setRailMotion(true);
     } catch (e) {
       console.error(e);
+      toast.error('Could not create storage unit');
     } finally {
       setBusy(null);
     }
@@ -767,7 +778,7 @@ export default function BookshelfPage({
       confirmLabel: 'Create',
     });
     if (name === null) return;
-    const title = name.trim() || 'Untitled chart';
+    const title = coerceEntityTitle(name, 'chart');
     setBusy('new-notebook');
     try {
       const nbId = `nb-${Date.now()}`;
@@ -781,6 +792,7 @@ export default function BookshelfPage({
       setTab('active');
     } catch (e) {
       console.error(e);
+      toast.error('Could not create chart binder');
     } finally {
       setBusy(null);
     }
@@ -862,6 +874,7 @@ export default function BookshelfPage({
       onOpenNotebook(nbId, manageShelfId);
     } catch (err) {
       console.error(err);
+      toast.error('Import failed');
     } finally {
       setBusy(null);
     }

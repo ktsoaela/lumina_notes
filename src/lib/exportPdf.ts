@@ -70,7 +70,8 @@ export async function exportPageToPdf(
         },
         jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' },
         pagebreak: { mode: ['css', 'legacy'] },
-      })
+        // html2pdf.js supports pagebreak; typings omit it
+      } as never)
       .from(el)
       .save();
   } finally {
