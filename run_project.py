@@ -185,7 +185,7 @@ def main() -> None:
     print(
         f"FastAPI API http://127.0.0.1:{API_PORT}  (uvicorn reload: {reload_note})\n"
         f"{admin_line}"
-        f"Vite UI     http://127.0.0.1:{VITE_PORT}  (proxies /api → FastAPI)\n"
+        f"Vite UI     http://127.0.0.1:{VITE_PORT}  (proxies /api -> FastAPI)\n"
         "Ctrl+C stops all.\n"
     )
 

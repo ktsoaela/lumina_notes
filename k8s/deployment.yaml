@@ -1,0 +1,60 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: lumina-notes
+  namespace: lumina-notes
+  labels:
+    app.kubernetes.io/name: lumina-notes
+    app.kubernetes.io/component: api
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: lumina-notes
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: lumina-notes
+        app.kubernetes.io/component: api
+    spec:
+      containers:
+        - name: api
+          image: lumina-notes:latest
+          imagePullPolicy: IfNotPresent
+          ports:
+            - name: http
+              containerPort: 58888
+          env:
+            - name: DATABASE_PATH
+              value: /data/database.sqlite
+          envFrom:
+            - configMapRef:
+                name: lumina-notes-config
+            - secretRef:
+                name: lumina-notes-secrets
+          readinessProbe:
+            httpGet:
+              path: /swagger
+              port: http
+            initialDelaySeconds: 5
+            periodSeconds: 10
+          livenessProbe:
+            httpGet:
+              path: /swagger
+              port: http
+            initialDelaySeconds: 15
+            periodSeconds: 20
+          resources:
+            requests:
+              cpu: 100m
+              memory: 256Mi
+            limits:
+              cpu: "1"
+              memory: 1Gi
+          volumeMounts:
+            - name: data
+              mountPath: /data
+      volumes:
+        - name: data
+          persistentVolumeClaim:
+            claimName: lumina-notes-data

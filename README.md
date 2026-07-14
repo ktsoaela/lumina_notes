@@ -1,66 +1,132 @@
 <div align="center">
-<img width="1200" height="475" alt="GHBanner" src="https://github.com/user-attachments/assets/0aa67016-6eaf-458a-adb2-6e31a0763ed6" />
+  <img src="src/assets/book_black_and_white.png" alt="Lumina Notes logo" width="128" style="background:#ffffff;padding:16px;border-radius:12px" />
 </div>
 
-# Run and deploy your AI Studio app
+# Lumina Notes
 
-This contains everything you need to run your app locally.
+**simple_markdown_notebook_application**
 
-View your app in AI Studio: https://ai.studio/apps/17f0082a-e037-4d23-ab45-af434558cf61
+A Markdown note-taking app with a OneNote-inspired hierarchy (bookshelves → notebooks → sections → pages), Mermaid diagrams, Plotly charts, print/PDF export, and a Windows Electron desktop shell.
 
-## Run Locally
+**Author:** [Khotso Tsoaela](https://github.com/ktsoaela) (`@ktsoaela`)
 
-**Prerequisites:**  Node.js
+## Features
 
+- Hierarchical notebooks with Markdown editing and live preview
+- Mermaid diagrams and Plotly charts in notes
+- Print and A4 PDF export from the rendered preview
+- JWT authentication and shared SQLite storage
+- Optional Django admin over the same database
+- Windows installer via Electron (Start menu — no terminal required day to day)
 
-1. Install dependencies:
-   `npm install`
-2. Set the `GEMINI_API_KEY` in [.env.local](.env.local) to your Gemini API key
-3. Run the app:
-   `npm run dev`
+## Stack
+
+| Layer | Technology |
+|--------|------------|
+| Frontend | React 19, TypeScript, Vite, Tailwind CSS |
+| API | FastAPI, Uvicorn, SQLite |
+| Admin (optional) | Django 5 |
+| Desktop | Electron + electron-builder (NSIS) |
+
+## Prerequisites
+
+- [Node.js](https://nodejs.org/) (LTS recommended)
+- [Python](https://www.python.org/) 3.11+
+
+## Run locally
+
+1. Install JavaScript dependencies:
+
+   ```bash
+   npm install
+   ```
+
+2. Install Python dependencies:
+
+   ```bash
+   pip install -r requirements.txt
+   ```
+
+3. Copy `.env.example` to `.env.local` (or `.env`) and set at least:
+
+   - `GEMINI_API_KEY` — Gemini API key (if using AI features)
+   - `JWT_SECRET` — secret used to sign auth tokens
+
+4. Start the app:
+
+   | Goal | Command |
+   |------|---------|
+   | Frontend only (Vite) | `npm run dev` |
+   | Full stack (API + Django + Vite) | `npm start` |
+   | Electron + Vite + API | `npm run dev:electron` |
+
+Dev ports (defaults): Vite `5173`, API `58888`, Django admin `8001`.
 
 ## Print & PDF
 
-On an open note, use **Print** (browser print dialog — choose a printer or **Microsoft Print to PDF**) or **PDF** to download an A4 PDF generated from the **rendered Markdown** preview. Very large pages or some embedded charts may not rasterize perfectly in PDF.
+On an open note, use **Print** (browser print dialog — printer or **Microsoft Print to PDF**) or **PDF** to download an A4 PDF from the rendered Markdown preview. Very large pages or some embedded charts may not rasterize perfectly in PDF.
 
-## Windows app (Start menu — no terminal to *use* it)
+## Windows desktop app
 
-The desktop shell is **Electron**. The API and static UI are still **FastAPI + the built Vite `dist`** (bundled next to `LuminaApi.exe`).
+The desktop shell is **Electron**. The API and UI are **FastAPI + the built Vite `dist`** (bundled next to `LuminaApi.exe`).
 
-After you install once, you open Lumina like any other program: **Start → Lumina Notes** (and optionally a desktop shortcut). You do **not** need Command Prompt or Cursor to run it day to day.
+### Using a prebuilt installer
 
-### If someone gave you the installer
+1. Run the NSIS installer from `release/electron/` (e.g. `Lumina Notes Setup 1.0.0.exe`).
+2. Launch **Lumina Notes** from the Start menu.
 
-1. Run the NSIS installer from **`release\electron\`** (name like **`Lumina Notes Setup 1.0.0.exe`** after you build it).
-2. Finish the wizard. The app appears under **Settings → Apps** and in the **Start** menu.
-3. Launch **Lumina Notes** from there anytime.
+### Build the installer
 
-### Build the installer yourself (one-time, on your dev PC)
+Requires Node.js and Python (PyInstaller is installed by the build script if needed).
 
-Requires: **Node.js**, **Python** (for PyInstaller; the script installs PyInstaller if needed).
+```bash
+npm run build:installer
+```
 
-1. In the project folder, run **`npm run build:installer`**  
-   - or double-click **`scripts\build_installer.bat`** in File Explorer (same thing).
-2. Install from **`release\electron\`** (the **`Lumina Notes Setup … .exe`** file).
-3. From then on, use **Start → Lumina Notes** only.
+Or double-click `scripts/build_installer.bat`. The installer appears under `release/electron/`.
 
-Default data file: **`database.sqlite`** next to **`LuminaApi.exe`** inside the app’s **`resources\backend`** folder (per-user install).
+Default data file: `database.sqlite` next to `LuminaApi.exe` in the app’s `resources/backend` folder.
 
-### Portable / dev
-
-- **Dev (Electron + Vite + API):** `npm run dev:electron` (starts FastAPI, Vite, and Electron together).
-- **Backend-only test (no Electron):** `npm run build:desktop` → run **`release\LuminaApi\LuminaApi.exe`** (API serves the built SPA from `dist` in the bundle).
-
-Optional: [Inno Setup 6](https://jrsoftware.org/isdl.php) can wrap **`release\electron\win-unpacked`** using **`installer\LuminaNotes.iss`** if you want a second packaging path; the primary Windows installer is **electron-builder** (NSIS).
+Optional: [Inno Setup 6](https://jrsoftware.org/isdl.php) can wrap `release/electron/win-unpacked` using `installer/LuminaNotes.iss`. The primary Windows installer is **electron-builder** (NSIS).
 
 ### Login errors / `passlib` + bcrypt
 
-The API uses the **`bcrypt`** package only. If you still see **`passlib`** in tracebacks or `(trapped) error reading bcrypt version`, remove the old dependency and restart the API:
+The API uses the `bcrypt` package only. If you see `passlib` in tracebacks or `(trapped) error reading bcrypt version`:
 
 ```bash
 pip uninstall passlib -y
 ```
 
-Then stop and start **uvicorn** (or your `run_project` terminal) so it reloads `app.py`.
+Then restart the API / uvicorn so it reloads `app.py`.
 
-Notebook icon attribution: https://www.flaticon.com/free-icon/book_2015630
+## Docker
+
+```bash
+docker build -t lumina-notes .
+docker run --rm -p 58888:58888 -e JWT_SECRET=change-me lumina-notes
+```
+
+Open http://127.0.0.1:58888
+
+## Kubernetes
+
+Manifests live in `k8s/`. See [CONTRIBUTING.md](CONTRIBUTING.md) and the [Wiki](https://github.com/fullyoperational/lumina_notes/wiki) for cluster notes.
+
+```bash
+kubectl apply -f k8s/
+```
+
+## Documentation
+
+| Doc | Purpose |
+|-----|---------|
+| [CHANGELOG.md](CHANGELOG.md) | Release history |
+| [CONTRIBUTING.md](CONTRIBUTING.md) | How to contribute |
+| [LICENSE](LICENSE) | MIT License |
+| [GitHub Wiki](https://github.com/fullyoperational/lumina_notes/wiki) | Extended guides |
+
+## License
+
+MIT © Khotso Tsoaela
+
+Notebook icon: [Flaticon](https://www.flaticon.com/free-icon/book_2015630)

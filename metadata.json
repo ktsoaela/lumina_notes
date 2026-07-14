@@ -1,5 +1,5 @@
 {
   "name": "Lumina Notes",
-  "description": "A powerful Markdown note-taking tool with support for Mermaid diagrams, Plotly charts, and a OneNote-inspired hierarchical organization.",
+  "description": "simple_markdown_notebook_application — Markdown notebooks by Khotso Tsoaela (@ktsoaela), with Mermaid, Plotly, and a OneNote-inspired hierarchy.",
   "requestFramePermissions": []
 }
