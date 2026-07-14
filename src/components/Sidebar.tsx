@@ -148,14 +148,14 @@ const Sidebar: React.FC<SidebarProps> = ({
       <div className="shrink-0 border-b border-[var(--app-border)] px-4 pb-4 pt-5">
         <div className="flex items-start justify-between gap-2">
           <div className="min-w-0">
-            <p className="text-[10px] font-medium uppercase tracking-[0.22em] text-[var(--app-muted)]">
-              Table of contents
+            <p className="text-[10px] font-medium uppercase tracking-[0.26em] text-[var(--app-muted)]">
+              Quiet spine
             </p>
             <h2 className="mt-1 font-display text-xl font-medium tracking-tight text-[var(--app-fg)]">
-              Your book
+              Structure of thought
             </h2>
             <p className="mt-1 text-xs leading-relaxed text-[var(--app-muted)]">
-              Book → chapter → page. Open anywhere, write in Markdown.
+              Book → chapter → page — open anywhere, write freely.
             </p>
           </div>
           <button

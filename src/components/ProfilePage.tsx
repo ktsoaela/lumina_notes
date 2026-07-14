@@ -358,45 +358,94 @@ export default function ProfilePage({
   const storageBtn =
     'studio-btn shrink-0 text-sm text-[var(--spine)]';
 
+  const hour = new Date().getHours();
+  const auraWarm = hour >= 16 || hour < 6 ? '#f0e6d8' : '#f5efe6';
+  const auraCool = hour >= 10 && hour < 16 ? '#d9ebe4' : '#e2ece9';
+  const deepest =
+    stats && stats.pagesActive > 0
+      ? `${stats.pagesActive} pages in reflection`
+      : 'Begin a reflection stream';
+  const fluid =
+    stats && stats.sectionsActive > 0
+      ? `${stats.sectionsActive} chapters in synthesis`
+      : 'Awaiting fluid synthesis';
+  const focusHours =
+    stats && stats.notebooksActive > 0
+      ? `${stats.notebooksActive} open notebooks`
+      : 'Space for harmonic focus';
+
   return (
     <div className="flex h-full min-h-0 flex-col studio-shell text-[var(--app-fg)]">
-      <div className="flex shrink-0 items-center gap-4 border-b border-[var(--app-border)] bg-[var(--app-surface)]/90 px-6 py-4 backdrop-blur-xl">
-        <button
-          type="button"
-          onClick={onBack}
-          className="inline-flex items-center gap-2 text-sm font-medium text-[var(--spine)] hover:underline"
-        >
+      <div className="app-topbar flex shrink-0 items-center gap-4 px-6 py-4">
+        <button type="button" onClick={onBack} className="studio-btn">
           <ArrowLeft className="w-4 h-4" />
-          Back to notes
+          Notes
         </button>
         <div>
-          <p className="font-mono text-[10px] uppercase tracking-[0.28em] text-[var(--spine)]/70">
-            Account
+          <p className="text-[10px] font-medium uppercase tracking-[0.28em] text-[var(--app-muted)]">
+            Inner resonance
           </p>
-          <h1 className="font-display text-lg font-semibold text-[var(--app-fg)]">
-            Profile & settings
+          <h1 className="font-display text-lg font-medium text-[var(--app-fg)]">
+            Profile
           </h1>
         </div>
       </div>
 
       <div className="min-h-0 flex-1 overflow-y-auto">
-        <div className="mx-auto w-full max-w-6xl p-4 sm:p-6">
+        <div className="mx-auto w-full max-w-6xl space-y-8 p-4 sm:p-8">
+          <section className="studio-panel flex flex-col items-center gap-6 px-6 py-10 text-center">
+            <div
+              className="resonance-aura"
+              style={
+                {
+                  ['--aura-warm' as string]: auraWarm,
+                  ['--aura-cool' as string]: auraCool,
+                } as React.CSSProperties
+              }
+              aria-hidden
+            />
+            <div>
+              <p className="font-display text-2xl font-medium tracking-tight">{user.name}</p>
+              <p className="mt-1 text-sm text-[var(--app-muted)]">
+                {user.username ? `@${user.username}` : user.email}
+              </p>
+            </div>
+            <div className="grid w-full max-w-2xl gap-3 sm:grid-cols-3">
+              <div className="footprint-card text-left">
+                <p className="text-[10px] font-medium uppercase tracking-[0.18em] text-[var(--app-muted)]">
+                  Deepest reflection
+                </p>
+                <p className="mt-2 text-sm font-medium">{deepest}</p>
+              </div>
+              <div className="footprint-card text-left">
+                <p className="text-[10px] font-medium uppercase tracking-[0.18em] text-[var(--app-muted)]">
+                  Fluid synthesis
+                </p>
+                <p className="mt-2 text-sm font-medium">{fluid}</p>
+              </div>
+              <div className="footprint-card text-left">
+                <p className="text-[10px] font-medium uppercase tracking-[0.18em] text-[var(--app-muted)]">
+                  Harmonic focus
+                </p>
+                <p className="mt-2 text-sm font-medium">{focusHours}</p>
+              </div>
+            </div>
+            <div className="w-full max-w-md">
+              <p className="mb-2 text-[10px] font-medium uppercase tracking-[0.2em] text-[var(--app-muted)]">
+                Mindprint key
+              </p>
+              <div
+                className="mindprint-wave"
+                title="Session identity wave — unique to your account rhythm"
+              />
+            </div>
+          </section>
+
           <div className="grid grid-cols-1 gap-6 lg:grid-cols-12">
-            {/* col-4 sidebar */}
             <aside className="lg:col-span-4">
-              <div className="studio-panel bg-[var(--paper)] p-3 shadow-sm lg:sticky lg:top-4">
-                <div className="mb-3 flex items-center gap-3 border-b border-[var(--app-border)] px-2 pb-3">
-                  <div className="flex h-10 w-10 items-center justify-center rounded-full bg-[color-mix(in_srgb,var(--spine)_15%,var(--paper))] text-sm font-bold text-[var(--spine)]">
-                    {(user.name || user.email || '?').charAt(0).toUpperCase()}
-                  </div>
-                  <div className="min-w-0">
-                    <p className="truncate text-sm font-semibold text-[var(--app-fg)]">
-                      {user.name}
-                    </p>
-                    <p className="truncate text-xs text-[var(--app-muted)]">
-                      {user.username ? `@${user.username}` : user.email}
-                    </p>
-                  </div>
+              <div className="studio-panel p-3 lg:sticky lg:top-4">
+                <div className="mb-3 border-b border-[var(--app-border)] px-2 pb-3">
+                  <p className="text-xs font-medium text-[var(--app-muted)]">Settings</p>
                 </div>
                 <nav className="flex flex-row gap-1 overflow-x-auto lg:flex-col" aria-label="Settings">
                   {NAV.map((item) => {
