@@ -5,6 +5,7 @@ import os
 import re
 import sqlite3
 import sys
+import time
 from pathlib import Path
 from typing import Annotated, Any
 
@@ -497,14 +498,12 @@ CurrentUser = Annotated[dict[str, Any], Depends(get_current_user)]
 
 def _row_to_user(row: sqlite3.Row) -> dict[str, Any]:
     d = {k: row[k] for k in row.keys()}
-    out: dict[str, Any] = {
+    return {
         "id": int(d["id"]),
         "email": d["email"],
         "name": d["name"],
+        "username": d.get("username"),
     }
-    if "username" in d and d["username"] is not None:
-        out["username"] = d["username"]
-    return out
 
 
 class SignupBody(BaseModel):
@@ -573,6 +572,7 @@ class NotebookArchiveBody(BaseModel):
 class ProfileUpdate(BaseModel):
     name: str | None = None
     email: str | None = None
+    username: str | None = None
 
 
 class SectionUpdate(BaseModel):
@@ -751,9 +751,26 @@ def auth_profile_update(user: CurrentUser, body: ProfileUpdate, db: Db):
             raise HTTPException(
                 status.HTTP_400_BAD_REQUEST, detail="Email already in use"
             )
+    username = row["username"]
+    if "username" in body.model_fields_set:
+        username = _normalize_username(body.username)
+        if username is not None:
+            clash = db.execute(
+                """
+                SELECT id FROM users
+                WHERE username IS NOT NULL
+                  AND lower(trim(username)) = lower(trim(?))
+                  AND id != ?
+                """,
+                (username, user["id"]),
+            ).fetchone()
+            if clash is not None:
+                raise HTTPException(
+                    status.HTTP_400_BAD_REQUEST, detail="Username already in use"
+                )
     db.execute(
-        "UPDATE users SET name = ?, email = ? WHERE id = ?",
-        (name, email, user["id"]),
+        "UPDATE users SET name = ?, email = ?, username = ? WHERE id = ?",
+        (name, email, username, user["id"]),
     )
     row2 = db.execute("SELECT * FROM users WHERE id = ?", (user["id"],)).fetchone()
     assert row2 is not None
@@ -814,6 +831,225 @@ def user_stats(user: CurrentUser, db: Db):
         "pagesActive": pages_active,
         "pagesArchived": int(archived_pages or 0),
     }
+
+
+def _export_user_library(db: sqlite3.Connection, user_id: int) -> dict[str, Any]:
+    shelves = db.execute(
+        "SELECT id, name, createdAt FROM bookshelves WHERE userId = ? ORDER BY createdAt ASC, id ASC",
+        (user_id,),
+    ).fetchall()
+    shelf_payload: list[dict[str, Any]] = []
+    for sh in shelves:
+        notebooks = db.execute(
+            """
+            SELECT id, name, archived, createdAt
+            FROM notebooks
+            WHERE userId = ? AND bookshelfId = ?
+            ORDER BY createdAt ASC, id ASC
+            """,
+            (user_id, sh["id"]),
+        ).fetchall()
+        nb_payload: list[dict[str, Any]] = []
+        for nb in notebooks:
+            sections = db.execute(
+                "SELECT id, name, createdAt FROM sections WHERE notebookId = ? ORDER BY createdAt ASC, id ASC",
+                (nb["id"],),
+            ).fetchall()
+            sec_payload: list[dict[str, Any]] = []
+            for sec in sections:
+                pages = db.execute(
+                    """
+                    SELECT id, title, content, updatedAt
+                    FROM pages WHERE sectionId = ?
+                    ORDER BY updatedAt ASC, id ASC
+                    """,
+                    (sec["id"],),
+                ).fetchall()
+                sec_payload.append(
+                    {
+                        "id": sec["id"],
+                        "name": sec["name"],
+                        "createdAt": sec["createdAt"],
+                        "pages": [
+                            {
+                                "id": p["id"],
+                                "title": p["title"],
+                                "content": p["content"] or "",
+                                "updatedAt": p["updatedAt"],
+                            }
+                            for p in pages
+                        ],
+                    }
+                )
+            nb_payload.append(
+                {
+                    "id": nb["id"],
+                    "name": nb["name"],
+                    "archived": bool(nb["archived"]),
+                    "createdAt": nb["createdAt"],
+                    "sections": sec_payload,
+                }
+            )
+        shelf_payload.append(
+            {
+                "id": sh["id"],
+                "name": sh["name"],
+                "createdAt": sh["createdAt"],
+                "notebooks": nb_payload,
+            }
+        )
+    return {"bookshelves": shelf_payload}
+
+
+def _delete_user_library(db: sqlite3.Connection, user_id: int) -> None:
+    notebooks = db.execute(
+        "SELECT id FROM notebooks WHERE userId = ?", (user_id,)
+    ).fetchall()
+    for nb in notebooks:
+        sections = db.execute(
+            "SELECT id FROM sections WHERE notebookId = ?", (nb["id"],)
+        ).fetchall()
+        for sec in sections:
+            db.execute("DELETE FROM pages WHERE sectionId = ?", (sec["id"],))
+        db.execute("DELETE FROM sections WHERE notebookId = ?", (nb["id"],))
+    db.execute("DELETE FROM notebooks WHERE userId = ?", (user_id,))
+    db.execute("DELETE FROM bookshelves WHERE userId = ?", (user_id,))
+
+
+def _import_user_library(db: sqlite3.Connection, user_id: int, payload: dict[str, Any]) -> None:
+    shelves = payload.get("bookshelves")
+    if not isinstance(shelves, list):
+        raise HTTPException(
+            status.HTTP_400_BAD_REQUEST, detail="Invalid backup: bookshelves required"
+        )
+    _delete_user_library(db, user_id)
+    if not shelves:
+        _insert_default_bookshelf(db, user_id)
+        return
+    for sh in shelves:
+        if not isinstance(sh, dict) or not sh.get("id") or not sh.get("name"):
+            continue
+        try:
+            db.execute(
+                "INSERT INTO bookshelves (id, userId, name) VALUES (?, ?, ?)",
+                (str(sh["id"]), user_id, str(sh["name"])),
+            )
+        except sqlite3.IntegrityError:
+            sid = f"bs-{user_id}-{int(time.time() * 1000)}"
+            db.execute(
+                "INSERT INTO bookshelves (id, userId, name) VALUES (?, ?, ?)",
+                (sid, user_id, str(sh["name"])),
+            )
+            sh = {**sh, "id": sid}
+        for nb in sh.get("notebooks") or []:
+            if not isinstance(nb, dict) or not nb.get("id") or not nb.get("name"):
+                continue
+            nb_id = str(nb["id"])
+            try:
+                db.execute(
+                    """
+                    INSERT INTO notebooks (id, userId, bookshelfId, name, archived)
+                    VALUES (?, ?, ?, ?, ?)
+                    """,
+                    (
+                        nb_id,
+                        user_id,
+                        str(sh["id"]),
+                        str(nb["name"]),
+                        1 if nb.get("archived") else 0,
+                    ),
+                )
+            except sqlite3.IntegrityError:
+                nb_id = f"nb-{user_id}-{int(time.time() * 1000)}"
+                db.execute(
+                    """
+                    INSERT INTO notebooks (id, userId, bookshelfId, name, archived)
+                    VALUES (?, ?, ?, ?, ?)
+                    """,
+                    (
+                        nb_id,
+                        user_id,
+                        str(sh["id"]),
+                        str(nb["name"]),
+                        1 if nb.get("archived") else 0,
+                    ),
+                )
+            for sec in nb.get("sections") or []:
+                if not isinstance(sec, dict) or not sec.get("id") or not sec.get("name"):
+                    continue
+                sec_id = str(sec["id"])
+                try:
+                    db.execute(
+                        "INSERT INTO sections (id, notebookId, name) VALUES (?, ?, ?)",
+                        (sec_id, nb_id, str(sec["name"])),
+                    )
+                except sqlite3.IntegrityError:
+                    sec_id = f"sec-{user_id}-{int(time.time() * 1000)}"
+                    db.execute(
+                        "INSERT INTO sections (id, notebookId, name) VALUES (?, ?, ?)",
+                        (sec_id, nb_id, str(sec["name"])),
+                    )
+                for page in sec.get("pages") or []:
+                    if not isinstance(page, dict) or not page.get("id"):
+                        continue
+                    page_id = str(page["id"])
+                    title = str(page.get("title") or "Untitled")
+                    content = str(page.get("content") or "")
+                    try:
+                        db.execute(
+                            """
+                            INSERT INTO pages (id, sectionId, title, content)
+                            VALUES (?, ?, ?, ?)
+                            """,
+                            (page_id, sec_id, title, content),
+                        )
+                    except sqlite3.IntegrityError:
+                        page_id = f"page-{user_id}-{int(time.time() * 1000)}"
+                        db.execute(
+                            """
+                            INSERT INTO pages (id, sectionId, title, content)
+                            VALUES (?, ?, ?, ?)
+                            """,
+                            (page_id, sec_id, title, content),
+                        )
+
+
+@app.get("/api/user/backup")
+def user_backup(user: CurrentUser, db: Db):
+    row = db.execute(
+        "SELECT id, email, name, username FROM users WHERE id = ?",
+        (user["id"],),
+    ).fetchone()
+    library = _export_user_library(db, user["id"])
+    return {
+        "format": "lumina-notes-backup",
+        "version": 1,
+        "exportedAt": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
+        "user": _row_to_user(row) if row is not None else user,
+        **library,
+    }
+
+
+@app.post("/api/user/backup/import")
+def user_backup_import(user: CurrentUser, body: dict[str, Any], db: Db):
+    if body.get("format") not in (None, "lumina-notes-backup") and "bookshelves" not in body:
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, detail="Unrecognized backup file")
+    _import_user_library(db, user["id"], body)
+    return {"ok": True, "stats": user_stats(user, db)}
+
+
+@app.delete("/api/user/data")
+def user_delete_data(user: CurrentUser, db: Db):
+    _delete_user_library(db, user["id"])
+    _insert_default_bookshelf(db, user["id"])
+    return {"ok": True}
+
+
+@app.delete("/api/auth/account")
+def auth_close_account(user: CurrentUser, db: Db):
+    _delete_user_library(db, user["id"])
+    db.execute("DELETE FROM users WHERE id = ?", (user["id"],))
+    return {"ok": True}
 
 
 @app.get("/api/bookshelves")

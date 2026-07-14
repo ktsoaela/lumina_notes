@@ -58,6 +58,26 @@
     background-color: var(--app-surface);
     color: var(--app-fg);
   }
+
+  a,
+  button,
+  [role='button'],
+  summary,
+  label[for],
+  input[type='checkbox'],
+  input[type='radio'],
+  input[type='file'],
+  select {
+    cursor: pointer;
+  }
+
+  button:disabled,
+  [role='button'][aria-disabled='true'],
+  input:disabled,
+  select:disabled,
+  a[aria-disabled='true'] {
+    cursor: not-allowed;
+  }
 }
 
 /* Custom scrollbar for a more OneNote-like feel */
