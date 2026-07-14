@@ -152,10 +152,10 @@ const Sidebar: React.FC<SidebarProps> = ({
               Quiet spine
             </p>
             <h2 className="mt-1 font-display text-xl font-medium tracking-tight text-[var(--app-fg)]">
-              Structure of thought
+              Book · chapter · page
             </h2>
             <p className="mt-1 text-xs leading-relaxed text-[var(--app-muted)]">
-              Book → chapter → page — open anywhere, write freely.
+              In the garden: plant → leaf cluster → leaf. Here you write the leaves.
             </p>
           </div>
           <button

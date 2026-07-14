@@ -623,7 +623,9 @@ export default function App() {
 
   const handleOpenNotebookFromShelf = async (
     notebookId: string,
-    bookshelfId: string
+    bookshelfId: string,
+    sectionId?: string,
+    pageId?: string
   ) => {
     setMainView('notes');
     setIsAppLoading(true);
@@ -638,12 +640,18 @@ export default function App() {
       ]);
       const notebooks = [...active, ...archived];
       const nb = notebooks.find((n) => n.id === notebookId);
+      const section =
+        (sectionId && nb?.sections.find((s) => s.id === sectionId)) ||
+        nb?.sections[0];
+      const page =
+        (pageId && section?.pages.find((p) => p.id === pageId)) ||
+        section?.pages[0];
       setState((prev) => ({
         ...prev,
         notebooks,
         activeNotebookId: notebookId,
-        activeSectionId: nb?.sections[0]?.id ?? null,
-        activePageId: nb?.sections[0]?.pages[0]?.id ?? null,
+        activeSectionId: section?.id ?? null,
+        activePageId: page?.id ?? null,
         secondaryPageId: null,
       }));
     } catch (err) {
@@ -1026,6 +1034,7 @@ export default function App() {
               onBack={() => setMainView('notes')}
               onOpenShelfForNotes={handleOpenShelfForNotes}
               onOpenNotebook={handleOpenNotebookFromShelf}
+              onOpenPage={handleOpenNotebookFromShelf}
               onLibraryChanged={fetchData}
               onRefreshBookshelves={refreshBookshelves}
             />
@@ -1034,12 +1043,12 @@ export default function App() {
           <div className="flex h-full flex-col items-center justify-center px-6 text-[var(--app-muted)]">
             <Library className="mb-4 h-12 w-12 text-[var(--spine)]" />
             <p className="mb-4 max-w-md text-center font-display text-lg text-[var(--app-fg)]">
-              Enter a room
+              Open a garden bed
             </p>
             <p className="mb-6 max-w-md text-center text-sm">
               {bookshelves.length === 0
-                ? 'In Library, create a room in your mind, place memory books inside, then open a page to write.'
-                : 'Choose a room in Library — its memory books become the notebooks you write in Notes.'}
+                ? 'In Mind, prepare a garden bed, plant books, then open a leaf (page) to write Markdown.'
+                : 'Choose a garden bed in Mind — its plants become the notebooks you write in Notes.'}
             </p>
             <button
               type="button"
@@ -1215,7 +1224,7 @@ export default function App() {
             {mainView === 'notes'
               ? 'Acoustic pillar'
               : mainView === 'bookshelf'
-                ? 'Rooms of memory'
+                ? 'Mind garden'
                 : 'Inner resonance'}
           </span>
         </div>
