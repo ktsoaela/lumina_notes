@@ -18,7 +18,7 @@ import {
   ShieldAlert,
 } from 'lucide-react';
 import { api } from '../lib/api';
-import type { Bookshelf, Notebook } from '../types';
+import type { Bookshelf, Notebook, Page, Section } from '../types';
 import { notebookToMarkdown, downloadText, parseImportedMarkdown } from '../lib/markdownIO';
 import { sanitizeFilename } from '../lib/filename';
 import { cn } from '../lib/utils';
@@ -40,7 +40,7 @@ import {
   spineSizeFromNotebook,
 } from '../lib/shelfLayout';
 import { coerceEntityTitle, validateEntityTitle } from '../lib/validation';
-import SemanticHorizon from './SemanticHorizon';
+import EarthGarden from './EarthGarden';
 
 const CHART_SPINE_COLORS = [
   '#0e7490',
@@ -595,6 +595,12 @@ interface BookshelfPageProps {
   onBack: () => void;
   onOpenShelfForNotes: (shelfId: string) => void;
   onOpenNotebook: (notebookId: string, bookshelfId: string) => void;
+  onOpenPage?: (
+    notebookId: string,
+    bookshelfId: string,
+    sectionId: string,
+    pageId: string
+  ) => void;
   onLibraryChanged: () => void;
   onRefreshBookshelves: () => Promise<void>;
 }
@@ -605,6 +611,7 @@ export default function BookshelfPage({
   onBack,
   onOpenShelfForNotes,
   onOpenNotebook,
+  onOpenPage,
   onLibraryChanged,
   onRefreshBookshelves,
 }: BookshelfPageProps) {
@@ -700,9 +707,9 @@ export default function BookshelfPage({
 
   const createShelf = async () => {
     const checked = validateEntityTitle(
-      newShelfName || 'New room',
+      newShelfName || 'New garden bed',
       'bookshelf',
-      { allowEmptyFallback: 'New room' }
+      { allowEmptyFallback: 'New garden bed' }
     );
     if (!checked.ok) return;
     const name = checked.value;
@@ -716,7 +723,7 @@ export default function BookshelfPage({
       setRailMotion(true);
     } catch (e) {
       console.error(e);
-      toast.error('Could not create room');
+      toast.error('Could not create garden bed');
     } finally {
       setBusy(null);
     }
@@ -724,8 +731,8 @@ export default function BookshelfPage({
 
   const renameShelf = async (id: string, currentTitle: string) => {
     const name = await promptText({
-      title: 'Rename room',
-      label: 'Room name',
+      title: 'Rename garden bed',
+      label: 'Bed name',
       defaultValue: currentTitle,
       placeholder: 'e.g. Work · Journal · Projects',
       confirmLabel: 'Save',
@@ -744,8 +751,8 @@ export default function BookshelfPage({
   const deleteShelf = async (id: string) => {
     const shelf = bookshelves.find((b) => b.id === id);
     const ok = await confirm({
-      title: 'Close this room?',
-      message: `“${shelf?.title?.trim() || 'Room'}” will be removed. It must be empty (no memory books). This cannot be undone.`,
+      title: 'Remove this garden bed?',
+      message: `“${shelf?.title?.trim() || 'Bed'}” will be removed. It must be empty (no plants/books). This cannot be undone.`,
       confirmLabel: 'Delete unit',
       variant: 'danger',
     });
@@ -771,7 +778,7 @@ export default function BookshelfPage({
   const createNotebook = async () => {
     if (!manageShelfId) return;
     const name = await promptText({
-      title: 'New memory book',
+      title: 'New plant (book)',
       label: 'Notebook title',
       placeholder: 'e.g. Intake notes',
       confirmLabel: 'Create',
@@ -897,11 +904,9 @@ export default function BookshelfPage({
         <div className="mx-auto flex w-full max-w-6xl flex-wrap items-center justify-between gap-4">
           <div>
             <p className="text-[10px] font-medium uppercase tracking-[0.28em] text-[var(--app-muted)]">
-              Inside the mind
+              Lumina
             </p>
-            <h1 className="font-display text-xl font-medium tracking-tight">
-              Rooms &amp; memories
-            </h1>
+            <h1 className="font-display text-xl font-medium tracking-tight">Mind</h1>
           </div>
           <button type="button" onClick={onBack} className="studio-btn">
             <ArrowLeft className="h-4 w-4" />
@@ -912,18 +917,25 @@ export default function BookshelfPage({
 
       <div className="flex-1 overflow-y-auto">
         <div className="mx-auto w-full max-w-6xl space-y-8 p-5 sm:p-8">
-          <SemanticHorizon
-            bookshelves={bookshelves}
-            selectedShelfId={manageShelfId}
-            notebooks={list}
-            chrono={chrono}
-            onChronoChange={setChrono}
-            onSelectShelf={(id) => {
+          <EarthGarden
+            beds={bookshelves}
+            selectedBedId={manageShelfId}
+            plants={list}
+            season={chrono}
+            onSeasonChange={setChrono}
+            onSelectBed={(id) => {
               setManageShelfId(id);
               setRailMotion(true);
             }}
-            onOpenNotebook={(nb) => {
+            onOpenPlant={(nb) => {
               setPreviewBook(nb);
+            }}
+            onOpenLeaf={(nb, sec, pg) => {
+              if (manageShelfId && onOpenPage) {
+                onOpenPage(nb.id, manageShelfId, sec.id, pg.id);
+              } else if (manageShelfId) {
+                onOpenNotebook(nb.id, manageShelfId);
+              }
             }}
           />
 
@@ -932,11 +944,11 @@ export default function BookshelfPage({
               <div className="studio-panel p-4">
                 <div className="mb-3 flex items-center gap-2">
                   <BookMarked className="h-4 w-4 text-[var(--spine)]" />
-                  <h2 className="text-sm font-medium tracking-wide">Rooms</h2>
+                  <h2 className="text-sm font-medium tracking-wide">Garden beds</h2>
                 </div>
                 <p className="mb-4 text-xs leading-relaxed text-[var(--app-muted)]">
-                  Wings of your mind — work, journaling, projects. Open a room to shelve
-                  memory books inside.
+                  Each bed is a storage unit of your mind. Plant books inside, then open leaves to
+                  write.
                 </p>
                 <form
                   className="mb-4 flex flex-col gap-2"
@@ -949,9 +961,9 @@ export default function BookshelfPage({
                     type="text"
                     value={newShelfName}
                     onChange={(e) => setNewShelfName(e.target.value)}
-                    placeholder="e.g. Work · Journal · Night thoughts"
+                    placeholder="e.g. Work · Journal · Night garden"
                     className="studio-input"
-                    aria-label="New room name"
+                    aria-label="New garden bed name"
                   />
                   <button
                     type="submit"
@@ -963,7 +975,7 @@ export default function BookshelfPage({
                     ) : (
                       <Plus className="h-4 w-4" />
                     )}
-                    Add room
+                    Add garden bed
                   </button>
                 </form>
                 <ul className="max-h-[240px] space-y-1 overflow-y-auto">
@@ -992,7 +1004,7 @@ export default function BookshelfPage({
                 <div className="studio-panel flex flex-wrap items-center gap-2 p-3">
                   <div className="mr-auto min-w-0 px-1">
                     <p className="text-[10px] font-medium uppercase tracking-[0.22em] text-[var(--app-muted)]">
-                      Room open
+                      Garden bed open
                     </p>
                     <p className="truncate text-sm font-medium">{selectedShelf.title}</p>
                   </div>
@@ -1028,9 +1040,9 @@ export default function BookshelfPage({
               <div className="studio-panel p-5 sm:p-6">
                 <div className="mb-5 flex flex-wrap items-center justify-between gap-3">
                   <div>
-                    <h2 className="text-sm font-medium tracking-wide">Memory books</h2>
+                    <h2 className="text-sm font-medium tracking-wide">Plants &amp; books</h2>
                     <p className="mt-0.5 text-xs text-[var(--app-muted)]">
-                      Each memory is a book — import Markdown, archive, or open it to write.
+                      Each plant is a book. Import Markdown, archive, or open to write on its leaves.
                     </p>
                   </div>
                   <div className="flex flex-wrap items-center gap-2">
@@ -1052,7 +1064,7 @@ export default function BookshelfPage({
                       ) : (
                         <Plus className="h-3.5 w-3.5" />
                       )}
-                      New memory
+                      Plant a book
                     </button>
                     <button
                       type="button"
@@ -1102,11 +1114,11 @@ export default function BookshelfPage({
                   </div>
                 ) : !manageShelfId ? (
                   <p className="py-12 text-center text-sm text-[var(--app-muted)]">
-                    Add a room to start collecting memory books.
+                    Add a garden bed to start planting books.
                   </p>
                 ) : list.length === 0 ? (
                   <p className="py-12 text-center text-sm text-[var(--app-muted)]">
-                    This room is empty — create a memory book or import Markdown.
+                    This bed is fallow — plant a book or import Markdown.
                   </p>
                 ) : (
                   <ul className="grid gap-2 sm:grid-cols-2">
@@ -1117,9 +1129,9 @@ export default function BookshelfPage({
                           onClick={() => setPreviewBook(nb)}
                           className="studio-panel flex w-full flex-col items-start gap-1 p-4 text-left transition hover:bg-[var(--sage)]/40"
                         >
-                          <span className="font-medium tracking-tight">{nb.title || 'Untitled memory'}</span>
+                          <span className="font-medium tracking-tight">{nb.title || 'Untitled plant'}</span>
                           <span className="text-[11px] text-[var(--app-muted)]">
-                            Book · {sectionCount(nb)} chapters · {pageCount(nb)} pages
+                            Book · {sectionCount(nb)} chapters · {pageCount(nb)} pages (leaves)
                           </span>
                         </button>
                       </li>

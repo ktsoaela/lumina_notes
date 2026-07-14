@@ -770,6 +770,84 @@
 .notes-atelier {
 }
 
+/* —— Earth garden (Mind) — minimal botanical, matches studio —— */
+.earth-plot-stage {
+  background:
+    linear-gradient(
+      180deg,
+      color-mix(in srgb, var(--sage) 35%, var(--paper)) 0%,
+      var(--paper) 42%,
+      color-mix(in srgb, #d5ddd0 55%, var(--paper)) 100%
+    );
+}
+
+.earth-horizon {
+  pointer-events: none;
+  position: absolute;
+  left: 8%;
+  right: 8%;
+  bottom: 2.75rem;
+  height: 1px;
+  background: linear-gradient(
+    90deg,
+    transparent,
+    color-mix(in srgb, var(--stone) 85%, transparent),
+    transparent
+  );
+}
+
+.earth-season-slider {
+  appearance: none;
+  height: 2px;
+  border-radius: 9999px;
+  background: linear-gradient(
+    90deg,
+    color-mix(in srgb, var(--stone) 80%, transparent),
+    var(--spine)
+  );
+}
+
+.earth-season-slider::-webkit-slider-thumb {
+  appearance: none;
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background: var(--paper);
+  border: 2px solid var(--spine);
+  box-shadow: var(--shadow-micro);
+  cursor: pointer;
+}
+
+.earth-season-slider::-moz-range-thumb {
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background: var(--paper);
+  border: 2px solid var(--spine);
+  box-shadow: var(--shadow-micro);
+  cursor: pointer;
+}
+
+.earth-sway {
+  display: inline-block;
+  transform-origin: 50% 100%;
+  animation: earth-sway 5.5s ease-in-out infinite;
+}
+
+@keyframes earth-sway {
+  0%,
+  100% {
+    transform: rotate(-1.2deg);
+  }
+  50% {
+    transform: rotate(1.4deg);
+  }
+}
+
+.reduce-motion .earth-sway {
+  animation: none;
+}
+
 ::-webkit-scrollbar {
   width: 7px;
   height: 7px;
