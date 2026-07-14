@@ -1,0 +1,7 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: lumina-notes
+  labels:
+    app.kubernetes.io/name: lumina-notes
+    app.kubernetes.io/part-of: simple_markdown_notebook_application
