@@ -4,7 +4,7 @@ import {
   Panel,
   Separator as PanelResizeHandle,
 } from 'react-resizable-panels';
-import { Clock, Download, FileDown, Loader2, Printer, Save } from 'lucide-react';
+import { Clock, Download, FileDown, Loader2, Printer } from 'lucide-react';
 import { format } from 'date-fns';
 import { Page } from '../types';
 import { cn } from '../lib/utils';
@@ -13,8 +13,14 @@ import Preview from './Preview';
 
 export type EditorViewMode = 'split' | 'edit' | 'preview';
 
+export type NotePath = {
+  bookTitle?: string;
+  chapterTitle?: string;
+};
+
 interface NotePanelProps {
   page: Page;
+  path?: NotePath;
   /** Shown as a small badge above the title; omit in single-note mode */
   paneLabel?: string;
   viewMode: EditorViewMode;
@@ -29,6 +35,7 @@ interface NotePanelProps {
 
 const NotePanel: React.FC<NotePanelProps> = ({
   page,
+  path,
   paneLabel,
   viewMode,
   onTitleChange,
@@ -40,66 +47,84 @@ const NotePanel: React.FC<NotePanelProps> = ({
   className,
 }) => {
   return (
-    <div className={cn('flex flex-col h-full min-w-0', className)}>
-      <div className="px-4 sm:px-6 lg:px-8 py-4 border-b border-gray-100 dark:border-[var(--app-border)] bg-white dark:bg-[var(--app-surface)] shrink-0">
-        {paneLabel ? (
-          <div className="flex items-center gap-2 mb-2">
-            <span className="rounded bg-brand-50 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-brand-700 dark:bg-[var(--app-bg)] dark:text-brand-300">
-              {paneLabel}
+    <div className={cn('flex h-full min-w-0 flex-col', className)}>
+      <div className="shrink-0 border-b border-[var(--app-border)] bg-[var(--app-surface)]/90 px-4 py-4 backdrop-blur-sm sm:px-6 lg:px-10">
+        {(path?.bookTitle || path?.chapterTitle || paneLabel) && (
+          <nav
+            className="mb-3 flex flex-wrap items-center gap-x-2 gap-y-1 text-[11px] font-medium uppercase tracking-[0.14em] text-[var(--app-muted)]"
+            aria-label="Location in book"
+          >
+            {paneLabel ? (
+              <span className="rounded-full bg-brand-100 px-2 py-0.5 text-[10px] text-[var(--spine)] dark:bg-brand-900/50 dark:text-brand-200">
+                {paneLabel}
+              </span>
+            ) : null}
+            {path?.bookTitle ? (
+              <span className="truncate text-[var(--spine)]">{path.bookTitle}</span>
+            ) : null}
+            {path?.bookTitle && path?.chapterTitle ? (
+              <span aria-hidden className="opacity-40">
+                /
+              </span>
+            ) : null}
+            {path?.chapterTitle ? (
+              <span className="truncate">{path.chapterTitle}</span>
+            ) : null}
+            <span aria-hidden className="opacity-40">
+              /
             </span>
-          </div>
-        ) : null}
+            <span className="truncate text-[var(--app-fg)]">Page</span>
+          </nav>
+        )}
+
         <input
           type="text"
           value={page.title}
           onChange={(e) => onTitleChange(e.target.value)}
-          className="w-full border-none bg-transparent text-2xl font-bold text-gray-900 placeholder:text-gray-300 focus:outline-none dark:text-[var(--app-fg)] dark:placeholder:text-[var(--app-muted)] sm:text-3xl lg:text-4xl"
-          placeholder="Page Title"
+          className="font-display w-full border-none bg-transparent text-3xl font-semibold tracking-tight text-[var(--app-fg)] placeholder:text-[var(--app-muted)]/50 focus:outline-none sm:text-4xl"
+          placeholder="Page title"
+          aria-label="Page title"
         />
-        <div className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-2 text-xs font-medium uppercase tracking-wider text-gray-400 dark:text-[var(--app-muted)]">
-          <div className="flex items-center gap-1">
-            <Clock className="w-3 h-3" />
+
+        <div className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-2 text-xs text-[var(--app-muted)]">
+          <div className="flex items-center gap-1.5">
+            <Clock className="h-3.5 w-3.5" />
             <span>
-              Last updated:{' '}
               {typeof page.updatedAt === 'number'
-                ? format(page.updatedAt, 'MMM d, yyyy HH:mm')
+                ? format(page.updatedAt, 'MMM d, yyyy · HH:mm')
                 : page.updatedAt}
             </span>
           </div>
-          <div className="flex items-center gap-1">
-            <Save className="w-3 h-3" />
-            <span>Synced to Cloud</span>
-          </div>
-          <div className="ml-auto flex flex-wrap items-center gap-2 normal-case">
+          <div className="ml-auto flex flex-wrap items-center gap-2">
             <button
               type="button"
               onClick={() => onPrint()}
-              className="inline-flex items-center gap-1.5 rounded-lg border border-gray-200 bg-white px-2.5 py-1.5 text-[11px] font-semibold text-gray-700 transition-colors hover:border-brand-300 hover:bg-gray-50 dark:border-[var(--app-border)] dark:bg-[var(--app-surface)] dark:text-[var(--app-fg)] dark:hover:border-brand-600 dark:hover:bg-[var(--app-bg)]"
-              title="Print this page (rendered Markdown)"
+              className="inline-flex items-center gap-1.5 rounded-full border border-[var(--app-border)] bg-[var(--paper)] px-3 py-1.5 text-[11px] font-semibold text-[var(--app-fg)] transition hover:border-[var(--spine)] hover:text-[var(--spine)]"
+              title="Print this page"
             >
-              <Printer className="w-3.5 h-3.5" />
+              <Printer className="h-3.5 w-3.5" />
               Print
             </button>
             <button
               type="button"
               onClick={onExportMarkdown}
-              className="inline-flex items-center gap-1.5 rounded-lg border border-gray-200 bg-white px-2.5 py-1.5 text-[11px] font-semibold text-gray-700 transition-colors hover:border-brand-300 hover:bg-gray-50 dark:border-[var(--app-border)] dark:bg-[var(--app-surface)] dark:text-[var(--app-fg)] dark:hover:border-brand-600 dark:hover:bg-[var(--app-bg)]"
-              title="Download this page as a Markdown (.md) file"
+              className="inline-flex items-center gap-1.5 rounded-full border border-[var(--app-border)] bg-[var(--paper)] px-3 py-1.5 text-[11px] font-semibold text-[var(--app-fg)] transition hover:border-[var(--spine)] hover:text-[var(--spine)]"
+              title="Download Markdown"
             >
-              <Download className="w-3.5 h-3.5" />
-              Download
+              <Download className="h-3.5 w-3.5" />
+              Markdown
             </button>
             <button
               type="button"
               onClick={onExportPdf}
               disabled={pdfExporting}
-              className="inline-flex items-center gap-1.5 rounded-lg border border-gray-200 bg-white px-2.5 py-1.5 text-[11px] font-semibold text-gray-700 transition-colors hover:border-brand-300 hover:bg-gray-50 disabled:opacity-50 dark:border-[var(--app-border)] dark:bg-[var(--app-surface)] dark:text-[var(--app-fg)] dark:hover:bg-[var(--app-bg)]"
-              title="Save as PDF (from preview rendering)"
+              className="inline-flex items-center gap-1.5 rounded-full border border-[var(--app-border)] bg-[var(--paper)] px-3 py-1.5 text-[11px] font-semibold text-[var(--app-fg)] transition hover:border-[var(--spine)] hover:text-[var(--spine)] disabled:opacity-50"
+              title="Save as PDF"
             >
               {pdfExporting ? (
-                <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                <Loader2 className="h-3.5 w-3.5 animate-spin" />
               ) : (
-                <FileDown className="w-3.5 h-3.5" />
+                <FileDown className="h-3.5 w-3.5" />
               )}
               PDF
             </button>
@@ -107,24 +132,30 @@ const NotePanel: React.FC<NotePanelProps> = ({
         </div>
       </div>
 
-      <div className="flex-1 overflow-hidden min-h-0">
-        <PanelGroup orientation="horizontal" className="h-full">
-          {(viewMode === 'edit' || viewMode === 'split') && (
-            <>
-              <Panel defaultSize={viewMode === 'edit' ? '100%' : '50%'}>
-                <Editor value={page.content} onChange={onContentChange} />
+      <div className="min-h-0 flex-1 overflow-hidden p-3 sm:p-4 lg:p-5">
+        <div className="paper-page h-full min-h-0 overflow-hidden rounded-2xl border border-[var(--app-border)]">
+          <PanelGroup orientation="horizontal" className="h-full">
+            {(viewMode === 'edit' || viewMode === 'split') && (
+              <>
+                <Panel defaultSize={viewMode === 'edit' ? '100%' : '50%'}>
+                  <div className="h-full font-serif text-[15px] leading-relaxed">
+                    <Editor value={page.content} onChange={onContentChange} />
+                  </div>
+                </Panel>
+                {viewMode === 'split' && (
+                  <PanelResizeHandle className="w-1.5 shrink-0 cursor-col-resize bg-[var(--gutter)] transition hover:bg-brand-200 dark:hover:bg-brand-800" />
+                )}
+              </>
+            )}
+            {(viewMode === 'preview' || viewMode === 'split') && (
+              <Panel defaultSize={viewMode === 'preview' ? '100%' : '50%'}>
+                <div className="h-full font-serif">
+                  <Preview content={page.content} />
+                </div>
               </Panel>
-              {viewMode === 'split' && (
-                <PanelResizeHandle className="w-1 shrink-0 cursor-col-resize bg-gray-50 transition-colors hover:bg-brand-100 dark:bg-[var(--app-bg)] dark:hover:bg-[var(--app-border)]" />
-              )}
-            </>
-          )}
-          {(viewMode === 'preview' || viewMode === 'split') && (
-            <Panel defaultSize={viewMode === 'preview' ? '100%' : '50%'}>
-              <Preview content={page.content} />
-            </Panel>
-          )}
-        </PanelGroup>
+            )}
+          </PanelGroup>
+        </div>
       </div>
     </div>
   );
