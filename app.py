@@ -6,6 +6,7 @@ import re
 import sqlite3
 import sys
 import time
+import logging
 from collections import defaultdict, deque
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
@@ -36,6 +37,23 @@ if os.environ.get("DATABASE_PATH"):
 
 LUMINA_ENV = os.environ.get("LUMINA_ENV", "development").strip().lower()
 IS_PRODUCTION = LUMINA_ENV in ("production", "prod")
+
+logging.basicConfig(
+    level=logging.INFO if IS_PRODUCTION else logging.DEBUG,
+    format="%(asctime)s %(levelname)s %(name)s %(message)s",
+)
+logger = logging.getLogger("lumina")
+
+# ponytail: Sentry only when DSN set; skip OpenTelemetry until traces matter
+_sentry_dsn = (os.environ.get("SENTRY_DSN") or "").strip()
+if _sentry_dsn:
+    try:
+        import sentry_sdk
+
+        sentry_sdk.init(dsn=_sentry_dsn, environment=LUMINA_ENV, traces_sample_rate=0.0)
+        logger.info("Sentry enabled")
+    except ImportError:
+        logger.warning("SENTRY_DSN set but sentry-sdk not installed")
 
 # Same SQLite file for FastAPI + Django; these are the dev URLs that talk to that DB over HTTP.
 _DEFAULT_CORS = (
@@ -79,10 +97,11 @@ JWT_SECRET = _resolve_jwt_secret()
 JWT_EXPIRE_HOURS = int(os.environ.get("JWT_EXPIRE_HOURS", "24"))
 ALGORITHM = "HS256"
 
-SEED_DEMO_USER = os.environ.get(
-    "SEED_DEMO_USER",
-    "0" if IS_PRODUCTION else "1",
-).strip().lower() not in ("0", "false", "no", "")
+# Never seed demo accounts in production, even if SEED_DEMO_USER=1 is misconfigured.
+SEED_DEMO_USER = False if IS_PRODUCTION else (
+    os.environ.get("SEED_DEMO_USER", "1").strip().lower()
+    not in ("0", "false", "no", "")
+)
 
 ENABLE_DOCS = os.environ.get(
     "ENABLE_DOCS",
@@ -869,9 +888,42 @@ app.add_middleware(
 )
 
 
+@app.middleware("http")
+async def security_headers(request: Request, call_next):
+    response = await call_next(request)
+    response.headers.setdefault("X-Content-Type-Options", "nosniff")
+    response.headers.setdefault("X-Frame-Options", "DENY")
+    response.headers.setdefault("Referrer-Policy", "strict-origin-when-cross-origin")
+    response.headers.setdefault(
+        "Permissions-Policy", "camera=(), microphone=(), geolocation=()"
+    )
+    # ponytail: unsafe-inline/eval needed for Vite + Mermaid/Plotly; hash nonces later if CDN-free
+    if "Content-Security-Policy" not in response.headers:
+        response.headers["Content-Security-Policy"] = (
+            "default-src 'self'; "
+            "script-src 'self' 'unsafe-inline' 'unsafe-eval'; "
+            "style-src 'self' 'unsafe-inline'; "
+            "img-src 'self' data: blob: https:; "
+            "font-src 'self' data:; "
+            "connect-src 'self' https:; "
+            "frame-ancestors 'none'; "
+            "base-uri 'self'; "
+            "form-action 'self'"
+        )
+    return response
+
+
 @app.on_event("startup")
 def _startup() -> None:
     init_db()
+    log = logging.getLogger("lumina")
+    log.info(
+        "startup env=%s docs=%s seed_demo=%s db=%s",
+        LUMINA_ENV,
+        ENABLE_DOCS,
+        SEED_DEMO_USER,
+        DB_PATH,
+    )
 
 
 @app.get("/health", response_model=None)

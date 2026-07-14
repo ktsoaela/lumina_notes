@@ -16,11 +16,8 @@ import {
 import Sidebar from './components/Sidebar';
 import { SearchPanel, useSearchHotkey } from './components/SearchPanel';
 import NotePanel, { type EditorViewMode } from './components/NotePanel';
-import LandingPage from './components/LandingPage';
 import Auth from './components/Auth';
-import ProfilePage from './components/ProfilePage';
-import BookshelfPage from './components/BookshelfPage';
-import { 
+import {
   Columns, 
   Eye, 
   Edit3, 
@@ -67,6 +64,10 @@ import { isElectronApp } from './lib/platform';
 import { coerceEntityTitle, validatePageContent } from './lib/validation';
 import { useAppDialogs } from './context/AppDialogsContext';
 import { useToast } from './context/ToastContext';
+
+const LandingPage = React.lazy(() => import('./components/LandingPage'));
+const ProfilePage = React.lazy(() => import('./components/ProfilePage'));
+const BookshelfPage = React.lazy(() => import('./components/BookshelfPage'));
 
 function findPageInState(state: AppState, pageId: string): Page | undefined {
   for (const nb of state.notebooks) {
@@ -742,14 +743,22 @@ export default function App() {
       );
     }
     return (
-      <LandingPage
-        onGetStarted={() => {
-          setDemoPrefill(false);
-          setShowAuth(true);
-        }}
-        onViewDemo={handleViewDemo}
-        viewDemoLoading={demoLoginLoading}
-      />
+      <React.Suspense
+        fallback={
+          <div className="flex h-screen items-center justify-center bg-[var(--app-bg)]">
+            <Loader2 className="w-8 h-8 text-brand-600 animate-spin" />
+          </div>
+        }
+      >
+        <LandingPage
+          onGetStarted={() => {
+            setDemoPrefill(false);
+            setShowAuth(true);
+          }}
+          onViewDemo={handleViewDemo}
+          viewDemoLoading={demoLoginLoading}
+        />
+      </React.Suspense>
     );
   }
 
@@ -963,31 +972,47 @@ export default function App() {
           </div>
         )}
         {mainView === 'profile' && auth.user ? (
-          <ProfilePage
-            user={auth.user}
-            theme={theme}
-            onThemeChange={setTheme}
-            onBack={() => setMainView('notes')}
-            onUserUpdated={handleUserUpdated}
-            onLibraryChanged={() => {
-              void fetchData();
-              void refreshBookshelves();
-            }}
-            onAccountClosed={() => {
-              setMainView('notes');
-              handleLogout();
-            }}
-          />
+          <React.Suspense
+            fallback={
+              <div className="flex h-full items-center justify-center">
+                <Loader2 className="w-8 h-8 text-brand-600 animate-spin" />
+              </div>
+            }
+          >
+            <ProfilePage
+              user={auth.user}
+              theme={theme}
+              onThemeChange={setTheme}
+              onBack={() => setMainView('notes')}
+              onUserUpdated={handleUserUpdated}
+              onLibraryChanged={() => {
+                void fetchData();
+                void refreshBookshelves();
+              }}
+              onAccountClosed={() => {
+                setMainView('notes');
+                handleLogout();
+              }}
+            />
+          </React.Suspense>
         ) : mainView === 'bookshelf' ? (
-          <BookshelfPage
-            bookshelves={bookshelves}
-            activeBookshelfId={activeBookshelfId}
-            onBack={() => setMainView('notes')}
-            onOpenShelfForNotes={handleOpenShelfForNotes}
-            onOpenNotebook={handleOpenNotebookFromShelf}
-            onLibraryChanged={fetchData}
-            onRefreshBookshelves={refreshBookshelves}
-          />
+          <React.Suspense
+            fallback={
+              <div className="flex h-full items-center justify-center">
+                <Loader2 className="w-8 h-8 text-brand-600 animate-spin" />
+              </div>
+            }
+          >
+            <BookshelfPage
+              bookshelves={bookshelves}
+              activeBookshelfId={activeBookshelfId}
+              onBack={() => setMainView('notes')}
+              onOpenShelfForNotes={handleOpenShelfForNotes}
+              onOpenNotebook={handleOpenNotebookFromShelf}
+              onLibraryChanged={fetchData}
+              onRefreshBookshelves={refreshBookshelves}
+            />
+          </React.Suspense>
         ) : !activeBookshelfId ? (
           <div className="flex h-full flex-col items-center justify-center bg-[var(--app-bg)] px-6 text-gray-500 dark:text-[var(--app-muted)]">
             <Library className="w-12 h-12 mb-4 text-brand-400" />
