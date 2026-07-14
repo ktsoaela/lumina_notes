@@ -28,6 +28,8 @@ def _paths() -> tuple[Path, Path]:
 
 
 DB_PATH, DIST_DIR = _paths()
+if os.environ.get("DATABASE_PATH"):
+    DB_PATH = Path(os.environ["DATABASE_PATH"]).expanduser().resolve()
 
 # Same SQLite file for FastAPI + Django; these are the dev URLs that talk to that DB over HTTP.
 _DEFAULT_CORS = (
