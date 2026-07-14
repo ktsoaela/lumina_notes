@@ -42,7 +42,7 @@
     "marked": "^17.0.6",
     "mermaid": "^11.14.0",
     "motion": "^12.23.24",
-    "plotly.js": "^3.5.0",
+    "plotly.js": "^3.7.0",
     "react": "^19.0.0",
     "react-dom": "^19.0.0",
     "react-markdown": "^10.1.0",
