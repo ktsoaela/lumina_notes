@@ -29,3 +29,5 @@ The sample Ingress uses host `lumina-notes.local` and class `nginx`. Change host
 ## Persistence
 
 SQLite is stored on a PVC (`lumina-notes-data`). For multi-replica setups, switch to a networked database; SQLite is single-writer.
+
+See also [Ops-Runbooks.md](Ops-Runbooks.md) for backup, secret rotation, and incident checks.

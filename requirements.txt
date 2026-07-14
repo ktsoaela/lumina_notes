@@ -5,3 +5,4 @@ bcrypt>=4.0.0
 python-multipart>=0.0.9
 django>=5.0,<6
 httpx>=0.27.0
+# Optional: pip install sentry-sdk when SENTRY_DSN is set

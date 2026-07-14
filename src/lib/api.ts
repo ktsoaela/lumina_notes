@@ -200,10 +200,12 @@ export const api = {
       const res = await fetch(`/api/sections/${notebookId}`, { headers: getHeaders() });
       const sections = await res.json();
       // Fetch pages for each section
-      return Promise.all(sections.map(async (sec: any) => {
-        const pages = await api.pages.list(sec.id);
-        return { ...sec, title: sec.name, pages };
-      }));
+      return Promise.all(
+        sections.map(async (sec: { id: string; name: string }) => {
+          const pages = await api.pages.list(sec.id);
+          return { ...sec, title: sec.name, pages };
+        })
+      );
     },
     create: async (id: string, notebookId: string, name: string) => {
       const res = await fetch('/api/sections', {

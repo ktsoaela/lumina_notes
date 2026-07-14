@@ -13,6 +13,9 @@ import {
 import { Notebook, Section, Page } from '../types';
 import { cn } from '../lib/utils';
 import { Logo } from './Logo';
+import { virtualWindow } from '../lib/virtualWindow';
+
+const NOTEBOOK_ROW_H = 36;
 
 type EditTarget =
   | { kind: 'notebook'; id: string }
@@ -96,6 +99,27 @@ const Sidebar: React.FC<SidebarProps> = ({
     setEditTarget(null);
   }, []);
 
+  const listRef = React.useRef<HTMLDivElement>(null);
+  const [scrollTop, setScrollTop] = React.useState(0);
+  const [viewportH, setViewportH] = React.useState(480);
+
+  React.useEffect(() => {
+    const el = listRef.current;
+    if (!el) return;
+    const measure = () => setViewportH(el.clientHeight || 480);
+    measure();
+    const ro = new ResizeObserver(measure);
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, []);
+
+  // ponytail: virtualize only when sidebar has many binders (bookshelf already pages charts)
+  const useVirt = notebooks.length > 40;
+  const win = useVirt
+    ? virtualWindow(notebooks.length, NOTEBOOK_ROW_H, scrollTop, viewportH)
+    : { start: 0, end: notebooks.length, offsetY: 0, totalH: 0 };
+  const visibleNotebooks = notebooks.slice(win.start, win.end);
+
   return (
     <div className="flex h-full min-w-0 w-full flex-col select-none border-r border-gray-200 bg-gray-50 text-gray-900 dark:border-[var(--app-border)] dark:bg-[var(--app-bg)] dark:text-[var(--app-fg)]">
       <div className="shrink-0 border-b border-gray-200 bg-gray-50 p-4 dark:border-[var(--app-border)] dark:bg-[var(--app-surface)]">
@@ -109,6 +133,7 @@ const Sidebar: React.FC<SidebarProps> = ({
             onClick={onAddNotebook}
             className="rounded-md p-2 text-gray-600 transition-colors hover:bg-gray-100 hover:text-gray-900 dark:text-[var(--app-muted)] dark:hover:bg-[var(--app-bg)] dark:hover:text-[var(--app-fg)]"
             title="New Notebook"
+            aria-label="New notebook"
           >
             <Plus className="h-4 w-4" />
           </button>
@@ -126,46 +151,100 @@ const Sidebar: React.FC<SidebarProps> = ({
         </div>
       )}
 
-      <div className="min-h-0 flex-1 overflow-y-auto p-2">
-        {notebooks.map((notebook) => (
-          <NotebookItem
-            key={notebook.id}
-            notebook={notebook}
-            isActive={activeNotebookId === notebook.id}
-            isExpanded={expandedNotebookIds.has(notebook.id)}
-            onToggleNotebookExpand={() => {
-              setExpandedNotebookIds((prev) => {
-                const next = new Set(prev);
-                if (next.has(notebook.id)) next.delete(notebook.id);
-                else next.add(notebook.id);
-                return next;
-              });
-            }}
-            onNotebookRowClick={() => {
-              onSelectNotebook(notebook.id);
-              setExpandedNotebookIds((prev) => new Set(prev).add(notebook.id));
-            }}
-            activeSectionId={activeSectionId}
-            activePageId={activePageId}
-            secondaryPageId={secondaryPageId}
-            dualPageOpen={dualPageOpen}
-            expandedSectionIds={expandedSectionIds}
-            setExpandedSectionIds={setExpandedSectionIds}
-            onSelectSection={onSelectSection}
-            onSelectPage={onSelectPage}
-            onAddSection={onAddSection}
-            onAddPage={onAddPage}
-            onArchiveNotebook={onArchiveNotebook}
-            onDeleteSection={onDeleteSection}
-            onDeletePage={onDeletePage}
-            editTarget={editTarget}
-            editDraft={editDraft}
-            setEditDraft={setEditDraft}
-            setEditTarget={setEditTarget}
-            commitRename={commitRename}
-            cancelRename={cancelRename}
-          />
-        ))}
+      <div
+        ref={listRef}
+        className="min-h-0 flex-1 overflow-y-auto p-2"
+        role="navigation"
+        aria-label="Notebooks"
+        onScroll={(e) => {
+          if (useVirt) setScrollTop(e.currentTarget.scrollTop);
+        }}
+      >
+        {useVirt ? (
+          <div style={{ height: win.totalH, position: 'relative' }}>
+            <div style={{ transform: `translateY(${win.offsetY}px)` }}>
+              {visibleNotebooks.map((notebook) => (
+                <NotebookItem
+                  key={notebook.id}
+                  notebook={notebook}
+                  isActive={activeNotebookId === notebook.id}
+                  isExpanded={expandedNotebookIds.has(notebook.id)}
+                  onToggleNotebookExpand={() => {
+                    setExpandedNotebookIds((prev) => {
+                      const next = new Set(prev);
+                      if (next.has(notebook.id)) next.delete(notebook.id);
+                      else next.add(notebook.id);
+                      return next;
+                    });
+                  }}
+                  onNotebookRowClick={() => {
+                    onSelectNotebook(notebook.id);
+                    setExpandedNotebookIds((prev) => new Set(prev).add(notebook.id));
+                  }}
+                  activeSectionId={activeSectionId}
+                  activePageId={activePageId}
+                  secondaryPageId={secondaryPageId}
+                  dualPageOpen={dualPageOpen}
+                  expandedSectionIds={expandedSectionIds}
+                  setExpandedSectionIds={setExpandedSectionIds}
+                  onSelectSection={onSelectSection}
+                  onSelectPage={onSelectPage}
+                  onAddSection={onAddSection}
+                  onAddPage={onAddPage}
+                  onArchiveNotebook={onArchiveNotebook}
+                  onDeleteSection={onDeleteSection}
+                  onDeletePage={onDeletePage}
+                  editTarget={editTarget}
+                  editDraft={editDraft}
+                  setEditDraft={setEditDraft}
+                  setEditTarget={setEditTarget}
+                  commitRename={commitRename}
+                  cancelRename={cancelRename}
+                />
+              ))}
+            </div>
+          </div>
+        ) : (
+          notebooks.map((notebook) => (
+            <NotebookItem
+              key={notebook.id}
+              notebook={notebook}
+              isActive={activeNotebookId === notebook.id}
+              isExpanded={expandedNotebookIds.has(notebook.id)}
+              onToggleNotebookExpand={() => {
+                setExpandedNotebookIds((prev) => {
+                  const next = new Set(prev);
+                  if (next.has(notebook.id)) next.delete(notebook.id);
+                  else next.add(notebook.id);
+                  return next;
+                });
+              }}
+              onNotebookRowClick={() => {
+                onSelectNotebook(notebook.id);
+                setExpandedNotebookIds((prev) => new Set(prev).add(notebook.id));
+              }}
+              activeSectionId={activeSectionId}
+              activePageId={activePageId}
+              secondaryPageId={secondaryPageId}
+              dualPageOpen={dualPageOpen}
+              expandedSectionIds={expandedSectionIds}
+              setExpandedSectionIds={setExpandedSectionIds}
+              onSelectSection={onSelectSection}
+              onSelectPage={onSelectPage}
+              onAddSection={onAddSection}
+              onAddPage={onAddPage}
+              onArchiveNotebook={onArchiveNotebook}
+              onDeleteSection={onDeleteSection}
+              onDeletePage={onDeletePage}
+              editTarget={editTarget}
+              editDraft={editDraft}
+              setEditDraft={setEditDraft}
+              setEditTarget={setEditTarget}
+              commitRename={commitRename}
+              cancelRename={cancelRename}
+            />
+          ))
+        )}
       </div>
     </div>
   );

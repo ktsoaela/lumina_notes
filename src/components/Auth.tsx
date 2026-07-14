@@ -1,12 +1,13 @@
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { Mail, Lock, User, ArrowLeft, Loader2, AlertCircle } from 'lucide-react';
+import { Mail, Lock, User as UserIcon, ArrowLeft, Loader2, AlertCircle } from 'lucide-react';
 import { Logo } from './Logo';
 import { api } from '../lib/api';
 import { validateLoginInput, validateSignupInput } from '../lib/validation';
+import type { User } from '../types';
 
 interface AuthProps {
-  onAuthSuccess: (user: any, token: string) => void;
+  onAuthSuccess: (user: User, token: string) => void;
   /** Omit in Electron so Sign In has no back-to-website control. */
   onBack?: () => void;
   /** Pre-fill demo credentials (after View Demo failed or manual sign-in help) */
@@ -75,8 +76,8 @@ export default function Auth({ onAuthSuccess, onBack, prefillDemo }: AuthProps) 
         });
         onAuthSuccess(user, token);
       }
-    } catch (err: any) {
-      setError(err.message || 'Authentication failed');
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : 'Authentication failed');
     } finally {
       setIsLoading(false);
     }
@@ -133,10 +134,11 @@ export default function Auth({ onAuthSuccess, onBack, prefillDemo }: AuthProps) 
 
             {!isLogin && (
               <div className="space-y-1.5">
-                <label className="text-xs font-bold text-gray-500 dark:text-[var(--app-muted)] uppercase tracking-wider ml-1">Full Name</label>
+                <label htmlFor="auth-name" className="text-xs font-bold text-gray-500 dark:text-[var(--app-muted)] uppercase tracking-wider ml-1">Full Name</label>
                 <div className="relative group">
-                  <User className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 group-focus-within:text-brand-600 transition-colors" />
-                  <input 
+                  <UserIcon className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 group-focus-within:text-brand-600 transition-colors" aria-hidden />
+                  <input
+                    id="auth-name"
                     type="text"
                     required
                     value={formData.name}
@@ -150,10 +152,11 @@ export default function Auth({ onAuthSuccess, onBack, prefillDemo }: AuthProps) 
 
             {isLogin ? (
               <div className="space-y-1.5">
-                <label className="text-xs font-bold text-gray-500 dark:text-[var(--app-muted)] uppercase tracking-wider ml-1">Email or username</label>
+                <label htmlFor="auth-identifier" className="text-xs font-bold text-gray-500 dark:text-[var(--app-muted)] uppercase tracking-wider ml-1">Email or username</label>
                 <div className="relative group">
-                  <Mail className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 group-focus-within:text-brand-600 transition-colors" />
+                  <Mail className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 group-focus-within:text-brand-600 transition-colors" aria-hidden />
                   <input
+                    id="auth-identifier"
                     type="text"
                     autoComplete="username"
                     required
@@ -167,10 +170,11 @@ export default function Auth({ onAuthSuccess, onBack, prefillDemo }: AuthProps) 
             ) : (
               <>
                 <div className="space-y-1.5">
-                  <label className="text-xs font-bold text-gray-500 dark:text-[var(--app-muted)] uppercase tracking-wider ml-1">Email address</label>
+                  <label htmlFor="auth-email" className="text-xs font-bold text-gray-500 dark:text-[var(--app-muted)] uppercase tracking-wider ml-1">Email address</label>
                   <div className="relative group">
-                    <Mail className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 group-focus-within:text-brand-600 transition-colors" />
+                    <Mail className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 group-focus-within:text-brand-600 transition-colors" aria-hidden />
                     <input
+                      id="auth-email"
                       type="email"
                       required
                       value={formData.email}
@@ -181,10 +185,11 @@ export default function Auth({ onAuthSuccess, onBack, prefillDemo }: AuthProps) 
                   </div>
                 </div>
                 <div className="space-y-1.5">
-                  <label className="text-xs font-bold text-gray-500 dark:text-[var(--app-muted)] uppercase tracking-wider ml-1">Username <span className="font-normal normal-case text-gray-400">(optional)</span></label>
+                  <label htmlFor="auth-username" className="text-xs font-bold text-gray-500 dark:text-[var(--app-muted)] uppercase tracking-wider ml-1">Username <span className="font-normal normal-case text-gray-400">(optional)</span></label>
                   <div className="relative group">
-                    <User className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 group-focus-within:text-brand-600 transition-colors" />
+                    <UserIcon className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 group-focus-within:text-brand-600 transition-colors" aria-hidden />
                     <input
+                      id="auth-username"
                       type="text"
                       autoComplete="off"
                       value={formData.username}
@@ -198,10 +203,11 @@ export default function Auth({ onAuthSuccess, onBack, prefillDemo }: AuthProps) 
             )}
 
             <div className="space-y-1.5">
-              <label className="text-xs font-bold text-gray-500 dark:text-[var(--app-muted)] uppercase tracking-wider ml-1">Password</label>
+              <label htmlFor="auth-password" className="text-xs font-bold text-gray-500 dark:text-[var(--app-muted)] uppercase tracking-wider ml-1">Password</label>
               <div className="relative group">
-                <Lock className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 group-focus-within:text-brand-600 transition-colors" />
-                <input 
+                <Lock className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 group-focus-within:text-brand-600 transition-colors" aria-hidden />
+                <input
+                  id="auth-password"
                   type="password"
                   required
                   value={formData.password}
@@ -211,7 +217,6 @@ export default function Auth({ onAuthSuccess, onBack, prefillDemo }: AuthProps) 
                 />
               </div>
             </div>
-
             <button 
               type="submit"
               disabled={isLoading}

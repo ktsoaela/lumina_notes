@@ -126,6 +126,7 @@ kubectl apply -f k8s/
 |-----|---------|
 | [CHANGELOG.md](CHANGELOG.md) | Release history |
 | [CONTRIBUTING.md](CONTRIBUTING.md) | How to contribute |
+| [wiki/Ops-Runbooks.md](wiki/Ops-Runbooks.md) | Backup, secrets, incidents |
 | [LICENSE](LICENSE) | MIT License |
 | [GitHub Wiki](https://github.com/fullyoperational/lumina_notes/wiki) | Extended guides |
 

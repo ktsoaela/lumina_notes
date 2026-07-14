@@ -9,3 +9,11 @@ coverage/
 *.log
 .env*
 !.env.example
+
+# Local app data — never commit (contains accounts / notes)
+*.sqlite
+*.sqlite3
+*.sqlite-journal
+*.sqlite-wal
+*.sqlite-shm
+database.sqlite

@@ -9,6 +9,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ### Added
 
+- Playwright e2e + axe a11y gate; ops runbooks; tag-based GitHub Releases workflow
+- Security headers / CSP; optional `SENTRY_DSN`; Electron sandbox + backend start dialogs
+- Sidebar virtual window + lazy-loaded Landing/Profile/Bookshelf routes
+- Project skill: `.cursor/skills/ponytail` ([ponytail](https://github.com/DietrichGebert/ponytail))
 - `/health` (+ `/ready`) DB-ready probes; Swagger/OpenAPI gated by `ENABLE_DOCS`
 - Auth rate limiting; Pydantic size/password limits aligned with the client
 - Toast notifications + React error boundary for save/UI failures

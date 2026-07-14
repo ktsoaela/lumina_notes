@@ -21,7 +21,11 @@ const Preview: React.FC<PreviewProps> = ({ content, className }) => {
       <Markdown
         remarkPlugins={[remarkGfm]}
         components={{
-          code({ node, inline, className, children, ...props }: any) {
+          code({ inline, className, children, ...props }: {
+            inline?: boolean;
+            className?: string;
+            children?: React.ReactNode;
+          }) {
             const match = /language-(\w+)/.exec(className || '');
             const lang = match ? match[1] : '';
             const codeContent = String(children).replace(/\n$/, '');
