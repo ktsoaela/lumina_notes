@@ -6,16 +6,18 @@ import re
 import sqlite3
 import sys
 import time
+from collections import defaultdict, deque
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Annotated, Any
 
-from fastapi import Depends, FastAPI, HTTPException, Query, status
-from fastapi.responses import FileResponse
+from fastapi import Depends, FastAPI, HTTPException, Query, Request, status
+from fastapi.responses import FileResponse, JSONResponse
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from starlette.middleware.cors import CORSMiddleware
 import bcrypt
 from jose import JWTError, jwt
-from pydantic import BaseModel, model_validator
+from pydantic import BaseModel, Field, field_validator, model_validator
 
 
 def _paths() -> tuple[Path, Path]:
@@ -32,22 +34,93 @@ DB_PATH, DIST_DIR = _paths()
 if os.environ.get("DATABASE_PATH"):
     DB_PATH = Path(os.environ["DATABASE_PATH"]).expanduser().resolve()
 
+LUMINA_ENV = os.environ.get("LUMINA_ENV", "development").strip().lower()
+IS_PRODUCTION = LUMINA_ENV in ("production", "prod")
+
 # Same SQLite file for FastAPI + Django; these are the dev URLs that talk to that DB over HTTP.
 _DEFAULT_CORS = (
     "http://127.0.0.1:5173,"
     "http://127.0.0.1:8001,"
     "http://127.0.0.1:58888"
 )
-CORS_ORIGINS = [
-    o.strip()
-    for o in os.environ.get("CORS_ORIGINS", _DEFAULT_CORS).split(",")
-    if o.strip()
-]
+_raw_cors = os.environ.get("CORS_ORIGINS", _DEFAULT_CORS).strip()
+if _raw_cors == "*":
+    if IS_PRODUCTION:
+        raise RuntimeError(
+            "CORS_ORIGINS='*' is not allowed in production with credentials. "
+            "Set explicit origins, e.g. https://app.example.com"
+        )
+    CORS_ORIGINS = ["*"]
+else:
+    CORS_ORIGINS = [o.strip() for o in _raw_cors.split(",") if o.strip()]
 
-JWT_SECRET = os.environ.get("JWT_SECRET", "lumina-notes-secret-key")
+_PLACEHOLDER_SECRETS = {
+    "",
+    "change-me-in-production",
+    "lumina-notes-secret-key",
+    "your_super_secret_key_here",
+}
+
+
+def _resolve_jwt_secret() -> str:
+    secret = (os.environ.get("JWT_SECRET") or "").strip()
+    if IS_PRODUCTION:
+        if secret in _PLACEHOLDER_SECRETS:
+            raise RuntimeError(
+                "JWT_SECRET must be set to a strong non-placeholder value when LUMINA_ENV=production"
+            )
+        return secret
+    if secret in _PLACEHOLDER_SECRETS or not secret:
+        return "lumina-notes-dev-only-secret"
+    return secret
+
+
+JWT_SECRET = _resolve_jwt_secret()
+JWT_EXPIRE_HOURS = int(os.environ.get("JWT_EXPIRE_HOURS", "24"))
 ALGORITHM = "HS256"
 
+SEED_DEMO_USER = os.environ.get(
+    "SEED_DEMO_USER",
+    "0" if IS_PRODUCTION else "1",
+).strip().lower() not in ("0", "false", "no", "")
+
+ENABLE_DOCS = os.environ.get(
+    "ENABLE_DOCS",
+    "0" if IS_PRODUCTION else "1",
+).strip().lower() not in ("0", "false", "no", "")
+
+AUTH_RATE_LIMIT = int(os.environ.get("AUTH_RATE_LIMIT", "20"))
+AUTH_RATE_WINDOW_SEC = int(os.environ.get("AUTH_RATE_WINDOW_SEC", "60"))
+
+SCHEMA_VERSION = "2"
+
 security = HTTPBearer(auto_error=False)
+
+_auth_hits: dict[str, deque[float]] = defaultdict(deque)
+
+
+def _client_ip(request: Request) -> str:
+    forwarded = request.headers.get("x-forwarded-for", "").split(",")[0].strip()
+    if forwarded:
+        return forwarded
+    if request.client:
+        return request.client.host
+    return "unknown"
+
+
+def _rate_limit_auth(request: Request) -> None:
+    key = f"auth:{_client_ip(request)}"
+    now = time.monotonic()
+    bucket = _auth_hits[key]
+    while bucket and now - bucket[0] > AUTH_RATE_WINDOW_SEC:
+        bucket.popleft()
+    if len(bucket) >= AUTH_RATE_LIMIT:
+        raise HTTPException(
+            status.HTTP_429_TOO_MANY_REQUESTS,
+            detail="Too many auth attempts. Try again shortly.",
+        )
+    bucket.append(now)
+
 
 # bcrypt enforces a 72-byte limit; match that for hashing and checks.
 def _pwd_bytes(plain: str) -> bytes:
@@ -67,6 +140,11 @@ def verify_password(plain: str, hashed: str) -> bool:
         return False
 
 SCHEMA = """
+CREATE TABLE IF NOT EXISTS schema_meta (
+  key TEXT PRIMARY KEY,
+  value TEXT NOT NULL
+);
+
 CREATE TABLE IF NOT EXISTS users (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   email TEXT UNIQUE,
@@ -365,7 +443,20 @@ def init_db() -> None:
         except sqlite3.OperationalError:
             pass
         _migrate_bookshelves(conn)
-        _seed_demo_user(conn)
+        conn.execute(
+            """
+            CREATE TABLE IF NOT EXISTS schema_meta (
+              key TEXT PRIMARY KEY,
+              value TEXT NOT NULL
+            )
+            """
+        )
+        conn.execute(
+            "INSERT OR REPLACE INTO schema_meta (key, value) VALUES ('version', ?)",
+            (SCHEMA_VERSION,),
+        )
+        if SEED_DEMO_USER:
+            _seed_demo_user(conn)
         conn.commit()
     finally:
         conn.close()
@@ -390,11 +481,15 @@ Db = Annotated[sqlite3.Connection, Depends(get_db)]
 
 
 def create_token(user_id: int, email: str, name: str) -> str:
-    return jwt.encode(
-        {"id": user_id, "email": email, "name": name},
-        JWT_SECRET,
-        algorithm=ALGORITHM,
-    )
+    now = datetime.now(timezone.utc)
+    payload = {
+        "id": user_id,
+        "email": email,
+        "name": name,
+        "iat": now,
+        "exp": now + timedelta(hours=JWT_EXPIRE_HOURS),
+    }
+    return jwt.encode(payload, JWT_SECRET, algorithm=ALGORITHM)
 
 
 def _django_check_password(plain: str, encoded: str) -> bool:
@@ -506,17 +601,41 @@ def _row_to_user(row: sqlite3.Row) -> dict[str, Any]:
     }
 
 
+_EMAIL_RE = re.compile(r"^[^\s@]+@[^\s@]+\.[^\s@]+$")
+_ENTITY_ID_RE = re.compile(r"^[A-Za-z0-9._:-]+$")
+
+
+def _collapse_ws(value: str) -> str:
+    return " ".join(value.split()).strip()
+
+
 class SignupBody(BaseModel):
-    email: str
-    password: str
-    name: str
-    username: str | None = None
+    email: str = Field(..., min_length=1, max_length=254)
+    password: str = Field(..., min_length=6, max_length=128)
+    name: str = Field(..., min_length=1, max_length=80)
+    username: str | None = Field(None, max_length=32)
+
+    @field_validator("email")
+    @classmethod
+    def _valid_email(cls, v: str) -> str:
+        email = v.strip().lower()
+        if not _EMAIL_RE.match(email):
+            raise ValueError("Enter a valid email address")
+        return email
+
+    @field_validator("name")
+    @classmethod
+    def _valid_name(cls, v: str) -> str:
+        name = _collapse_ws(v)
+        if not name:
+            raise ValueError("Name is required")
+        return name
 
 
 class LoginBody(BaseModel):
-    password: str
-    identifier: str | None = None
-    email: str | None = None  # legacy: same as identifier
+    password: str = Field(..., min_length=1, max_length=128)
+    identifier: str | None = Field(None, max_length=254)
+    email: str | None = Field(None, max_length=254)  # legacy: same as identifier
 
     @model_validator(mode="after")
     def _require_login_identifier(self) -> "LoginBody":
@@ -529,40 +648,124 @@ class LoginBody(BaseModel):
 
 
 class BookshelfCreate(BaseModel):
-    id: str
-    name: str
+    id: str = Field(..., min_length=1, max_length=64)
+    name: str = Field(..., min_length=1, max_length=120)
+
+    @field_validator("id")
+    @classmethod
+    def _valid_id(cls, v: str) -> str:
+        vid = v.strip()
+        if not _ENTITY_ID_RE.match(vid):
+            raise ValueError("Id contains invalid characters")
+        return vid
+
+    @field_validator("name")
+    @classmethod
+    def _valid_name(cls, v: str) -> str:
+        name = _collapse_ws(v)
+        if not name:
+            raise ValueError("Name is required")
+        return name
 
 
 class BookshelfUpdate(BaseModel):
-    name: str
+    name: str = Field(..., min_length=1, max_length=120)
+
+    @field_validator("name")
+    @classmethod
+    def _valid_name(cls, v: str) -> str:
+        name = _collapse_ws(v)
+        if not name:
+            raise ValueError("Name is required")
+        return name
 
 
 class NotebookCreate(BaseModel):
-    id: str
-    name: str
-    bookshelfId: str
+    id: str = Field(..., min_length=1, max_length=64)
+    name: str = Field(..., min_length=1, max_length=120)
+    bookshelfId: str = Field(..., min_length=1, max_length=64)
+
+    @field_validator("id", "bookshelfId")
+    @classmethod
+    def _valid_ids(cls, v: str) -> str:
+        vid = v.strip()
+        if not _ENTITY_ID_RE.match(vid):
+            raise ValueError("Id contains invalid characters")
+        return vid
+
+    @field_validator("name")
+    @classmethod
+    def _valid_name(cls, v: str) -> str:
+        name = _collapse_ws(v)
+        if not name:
+            raise ValueError("Name is required")
+        return name
 
 
 class SectionCreate(BaseModel):
-    id: str
-    notebookId: str
-    name: str
+    id: str = Field(..., min_length=1, max_length=64)
+    notebookId: str = Field(..., min_length=1, max_length=64)
+    name: str = Field(..., min_length=1, max_length=120)
+
+    @field_validator("id", "notebookId")
+    @classmethod
+    def _valid_ids(cls, v: str) -> str:
+        vid = v.strip()
+        if not _ENTITY_ID_RE.match(vid):
+            raise ValueError("Id contains invalid characters")
+        return vid
+
+    @field_validator("name")
+    @classmethod
+    def _valid_name(cls, v: str) -> str:
+        name = _collapse_ws(v)
+        if not name:
+            raise ValueError("Name is required")
+        return name
 
 
 class PageCreate(BaseModel):
-    id: str
-    sectionId: str
-    title: str
-    content: str
+    id: str = Field(..., min_length=1, max_length=64)
+    sectionId: str = Field(..., min_length=1, max_length=64)
+    title: str = Field(..., min_length=1, max_length=120)
+    content: str = Field(..., max_length=2_000_000)
+
+    @field_validator("id", "sectionId")
+    @classmethod
+    def _valid_ids(cls, v: str) -> str:
+        vid = v.strip()
+        if not _ENTITY_ID_RE.match(vid):
+            raise ValueError("Id contains invalid characters")
+        return vid
+
+    @field_validator("title")
+    @classmethod
+    def _valid_title(cls, v: str) -> str:
+        title = _collapse_ws(v) or "Untitled"
+        return title[:120]
 
 
 class PageUpdate(BaseModel):
-    title: str
-    content: str
+    title: str = Field(..., min_length=1, max_length=120)
+    content: str = Field(..., max_length=2_000_000)
+
+    @field_validator("title")
+    @classmethod
+    def _valid_title(cls, v: str) -> str:
+        title = _collapse_ws(v) or "Untitled"
+        return title[:120]
 
 
 class NotebookUpdate(BaseModel):
-    name: str
+    name: str = Field(..., min_length=1, max_length=120)
+
+    @field_validator("name")
+    @classmethod
+    def _valid_name(cls, v: str) -> str:
+        name = _collapse_ws(v)
+        if not name:
+            raise ValueError("Name is required")
+        return name
 
 
 class NotebookArchiveBody(BaseModel):
@@ -570,13 +773,41 @@ class NotebookArchiveBody(BaseModel):
 
 
 class ProfileUpdate(BaseModel):
-    name: str | None = None
-    email: str | None = None
-    username: str | None = None
+    name: str | None = Field(None, max_length=80)
+    email: str | None = Field(None, max_length=254)
+    username: str | None = Field(None, max_length=32)
+
+    @field_validator("name")
+    @classmethod
+    def _valid_name(cls, v: str | None) -> str | None:
+        if v is None:
+            return None
+        name = _collapse_ws(v)
+        if not name:
+            raise ValueError("Name is required")
+        return name
+
+    @field_validator("email")
+    @classmethod
+    def _valid_email(cls, v: str | None) -> str | None:
+        if v is None:
+            return None
+        email = v.strip().lower()
+        if not email or not _EMAIL_RE.match(email):
+            raise ValueError("Enter a valid email address")
+        return email
 
 
 class SectionUpdate(BaseModel):
-    name: str
+    name: str = Field(..., min_length=1, max_length=120)
+
+    @field_validator("name")
+    @classmethod
+    def _valid_name(cls, v: str) -> str:
+        name = _collapse_ws(v)
+        if not name:
+            raise ValueError("Name is required")
+        return name
 
 
 def _bookshelf_owned(db: sqlite3.Connection, bookshelf_id: str, user_id: int) -> bool:
@@ -620,12 +851,19 @@ def _page_owned(db: sqlite3.Connection, page_id: str, user_id: int) -> bool:
     return row is not None
 
 
-app = FastAPI(title="Lumina Notes", docs_url="/swagger", openapi_url="/openapi.json")
+app = FastAPI(
+    title="Lumina Notes",
+    docs_url="/swagger" if ENABLE_DOCS else None,
+    redoc_url="/redoc" if ENABLE_DOCS else None,
+    openapi_url="/openapi.json" if ENABLE_DOCS else None,
+)
 
+_cors_wildcard = CORS_ORIGINS == ["*"]
 app.add_middleware(
     CORSMiddleware,
     allow_origins=CORS_ORIGINS,
-    allow_credentials=True,
+    # Browsers reject Access-Control-Allow-Origin: * with credentials
+    allow_credentials=not _cors_wildcard,
     allow_methods=["*"],
     allow_headers=["*"],
 )
@@ -636,8 +874,50 @@ def _startup() -> None:
     init_db()
 
 
+@app.get("/health", response_model=None)
+def health():
+    """Liveness + DB readiness for container / Kubernetes probes."""
+    try:
+        conn = sqlite3.connect(str(DB_PATH), timeout=2.0)
+        try:
+            conn.execute("SELECT 1").fetchone()
+            schema_version: str | None = None
+            try:
+                row = conn.execute(
+                    "SELECT value FROM schema_meta WHERE key = 'version'"
+                ).fetchone()
+                if row is not None:
+                    schema_version = str(row[0])
+            except sqlite3.OperationalError:
+                pass
+        finally:
+            conn.close()
+    except Exception as exc:
+        return JSONResponse(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            content={
+                "status": "unavailable",
+                "database": "error",
+                "detail": str(exc),
+            },
+        )
+    return {
+        "status": "ok",
+        "database": "ok",
+        "schema_version": schema_version,
+        "env": LUMINA_ENV,
+    }
+
+
+@app.get("/ready", response_model=None)
+def ready():
+    """Alias for /health (DB-ready)."""
+    return health()
+
+
 @app.post("/api/auth/signup")
-def auth_signup(body: SignupBody, db: Db):
+def auth_signup(request: Request, body: SignupBody, db: Db):
+    _rate_limit_auth(request)
     email = body.email.strip()
     if not email:
         raise HTTPException(
@@ -666,7 +946,8 @@ def auth_signup(body: SignupBody, db: Db):
 
 
 @app.post("/api/auth/login")
-def auth_login(body: LoginBody, db: Db):
+def auth_login(request: Request, body: LoginBody, db: Db):
+    _rate_limit_auth(request)
     key = body.login_key()
     if not key:
         raise HTTPException(
@@ -1282,7 +1563,17 @@ def delete_page(page_id: str, user: CurrentUser, db: Db):
 
 
 def _serve_dist_file(full_path: str):
-    if full_path.startswith("api"):
+    reserved = {
+        "api",
+        "health",
+        "ready",
+        "swagger",
+        "redoc",
+        "openapi.json",
+        "docs",
+    }
+    head = (full_path or "").split("/", 1)[0].lower()
+    if head in reserved or full_path.startswith("api"):
         raise HTTPException(status.HTTP_404_NOT_FOUND)
 
     base = DIST_DIR.resolve()

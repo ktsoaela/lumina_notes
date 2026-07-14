@@ -6,6 +6,7 @@ import type {
   User,
   UserStats,
 } from '../types';
+import { readApiError } from './validation';
 
 const getHeaders = () => {
   const token = localStorage.getItem('lumina_token');
@@ -17,27 +18,32 @@ const getHeaders = () => {
 
 export const api = {
   auth: {
-    signup: async (data: any) => {
+    signup: async (data: {
+      email: string;
+      password: string;
+      name: string;
+      username?: string;
+    }) => {
       const res = await fetch('/api/auth/signup', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(data)
       });
-      if (!res.ok) throw new Error('Signup failed');
+      if (!res.ok) throw new Error(await readApiError(res, 'Signup failed'));
       return res.json();
     },
-    login: async (data: any) => {
+    login: async (data: { identifier: string; password: string }) => {
       const res = await fetch('/api/auth/login', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(data)
       });
-      if (!res.ok) throw new Error('Login failed');
+      if (!res.ok) throw new Error(await readApiError(res, 'Login failed'));
       return res.json();
     },
     me: async () => {
       const res = await fetch('/api/auth/me', { headers: getHeaders() });
-      if (!res.ok) throw new Error('Auth failed');
+      if (!res.ok) throw new Error(await readApiError(res, 'Auth failed'));
       return res.json();
     },
     updateProfile: async (body: {
@@ -51,17 +57,7 @@ export const api = {
         body: JSON.stringify(body),
       });
       if (!res.ok) {
-        const err = await res.json().catch(() => ({})) as {
-          detail?: string | Array<{ msg?: string }>;
-        };
-        const d = err.detail;
-        const msg =
-          typeof d === 'string'
-            ? d
-            : Array.isArray(d)
-              ? d.map((x) => x.msg).filter(Boolean).join(', ')
-              : 'Profile update failed';
-        throw new Error(msg || 'Profile update failed');
+        throw new Error(await readApiError(res, 'Profile update failed'));
       }
       return res.json() as Promise<{ token: string; user: User }>;
     },
@@ -71,8 +67,7 @@ export const api = {
         headers: getHeaders(),
       });
       if (!res.ok) {
-        const err = await res.json().catch(() => ({})) as { detail?: string };
-        throw new Error(err.detail || 'Failed to close account');
+        throw new Error(await readApiError(res, 'Failed to close account'));
       }
     },
   },
@@ -93,10 +88,7 @@ export const api = {
         headers: getHeaders(),
         body: JSON.stringify(payload),
       });
-      if (!res.ok) {
-        const err = await res.json().catch(() => ({})) as { detail?: string };
-        throw new Error(err.detail || 'Import failed');
-      }
+      if (!res.ok) throw new Error(await readApiError(res, 'Import failed'));
       return res.json() as Promise<{ ok: boolean; stats?: UserStats }>;
     },
     deleteData: async () => {
@@ -104,10 +96,7 @@ export const api = {
         method: 'DELETE',
         headers: getHeaders(),
       });
-      if (!res.ok) {
-        const err = await res.json().catch(() => ({})) as { detail?: string };
-        throw new Error(err.detail || 'Failed to delete data');
-      }
+      if (!res.ok) throw new Error(await readApiError(res, 'Failed to delete data'));
     },
   },
   bookshelves: {

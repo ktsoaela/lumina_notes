@@ -21,6 +21,7 @@ import type { Notebook, User, UserStats } from '../types';
 import { writeSession } from '../lib/authCache';
 import { cn } from '../lib/utils';
 import { useAppDialogs } from '../context/AppDialogsContext';
+import { validateProfileInput } from '../lib/validation';
 
 type ProfileSection = 'account' | 'appearance' | 'storage' | 'danger';
 
@@ -162,10 +163,15 @@ export default function ProfilePage({
   const save = async (e: React.FormEvent) => {
     e.preventDefault();
     setErr(null);
-    const nameChanged = name.trim() !== user.name.trim();
-    const emailChanged = email.trim() !== user.email.trim();
+    const checked = validateProfileInput({ name, email, username });
+    if (checked.ok === false) {
+      setErr(checked.error);
+      return;
+    }
+    const nameChanged = checked.data.name !== user.name.trim();
+    const emailChanged = checked.data.email !== user.email.trim().toLowerCase();
     const usernameChanged =
-      username.trim().toLowerCase() !== (user.username ?? '').trim().toLowerCase();
+      (checked.data.username ?? '') !== (user.username ?? '').trim().toLowerCase();
     if (!nameChanged && !emailChanged && !usernameChanged) return;
     const ok = await confirm({
       title: 'Save profile changes?',
@@ -178,9 +184,9 @@ export default function ProfilePage({
     setSaving(true);
     try {
       const { token: newToken, user: u } = await api.auth.updateProfile({
-        name: name.trim(),
-        email: email.trim(),
-        username: username.trim() || null,
+        name: checked.data.name,
+        email: checked.data.email,
+        username: checked.data.username,
       });
       writeSession(u, newToken);
       onUserUpdated(u, newToken);

@@ -1,4 +1,5 @@
 import { marked } from 'marked';
+import { sanitizeHtml } from './sanitize';
 
 /**
  * Print / PDF HTML aligned with workbook/workbook EnhancedEditor (Markdown branch):
@@ -113,7 +114,7 @@ export function markdownToHtml(markdown: string): string {
   if (typeof result !== 'string') {
     throw new Error('Expected synchronous Markdown parse');
   }
-  return result;
+  return sanitizeHtml(result);
 }
 
 /** Full HTML document for print preview window (workbook pattern). */
