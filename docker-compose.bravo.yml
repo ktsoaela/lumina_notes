@@ -1,0 +1,30 @@
+# bravo = test / QA
+# Usage: docker compose -p bravo -f docker-compose.yml -f docker-compose.bravo.yml up --build
+
+name: bravo
+
+services:
+  db:
+    ports:
+      - "5434:5432"
+    volumes:
+      - bravo_pg:/var/lib/postgresql/data
+
+  api:
+    ports:
+      - "58882:58888"
+    environment:
+      LUMINA_ENV: production
+      # Override in .env.bravo — placeholder fails boot if left as-is once you tighten checks
+      JWT_SECRET: ${JWT_SECRET:-bravo-qa-change-me-to-strong-secret-32chars}
+      CORS_ORIGINS: ${CORS_ORIGINS:-http://127.0.0.1:58882,https://bravo.lumina.local}
+      SEED_DEMO_USER: "0"
+      ENABLE_DOCS: "0"
+      AUTH_RATE_LIMIT: "30"
+    env_file:
+      - path: .env.bravo
+        required: false
+
+volumes:
+  bravo_pg:
+  pgdata:

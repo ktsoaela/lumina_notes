@@ -28,6 +28,6 @@ The sample Ingress uses host `lumina-notes.local` and class `nginx`. Change host
 
 ## Persistence
 
-SQLite is stored on a PVC (`lumina-notes-data`). For multi-replica setups, switch to a networked database; SQLite is single-writer.
+Production uses **PostgreSQL** (`DATABASE_URL`). Apply `k8s/postgres.yaml` (or point `DATABASE_URL` at a managed Postgres).
 
-See also [Ops-Runbooks.md](Ops-Runbooks.md) for backup, secret rotation, and incident checks.
+Desktop/Electron still uses local SQLite. See [Ops-Runbooks.md](Ops-Runbooks.md).

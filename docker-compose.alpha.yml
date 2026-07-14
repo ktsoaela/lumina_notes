@@ -1,0 +1,30 @@
+# alpha = production
+# Usage: docker compose -p alpha -f docker-compose.yml -f docker-compose.alpha.yml up --build
+# Requires .env.alpha with real JWT_SECRET (not a placeholder).
+
+name: alpha
+
+services:
+  db:
+    # Not published on the host — only on the docker network
+    volumes:
+      - alpha_pg:/var/lib/postgresql/data
+
+  api:
+    ports:
+      - "58888:58888"
+    environment:
+      LUMINA_ENV: production
+      JWT_SECRET: ${JWT_SECRET:?Set JWT_SECRET in .env.alpha}
+      CORS_ORIGINS: ${CORS_ORIGINS:?Set CORS_ORIGINS in .env.alpha}
+      SEED_DEMO_USER: "0"
+      ENABLE_DOCS: "0"
+      AUTH_RATE_LIMIT: "20"
+      DJANGO_DEBUG: "0"
+    env_file:
+      - path: .env.alpha
+        required: true
+
+volumes:
+  alpha_pg:
+  pgdata:
