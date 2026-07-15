@@ -7,12 +7,13 @@ import type {
   UserStats,
 } from '../types';
 import { readApiError } from './validation';
+import { apiUrl } from './syncServer';
 
 const getHeaders = () => {
   const token = localStorage.getItem('lumina_token');
   return {
     'Content-Type': 'application/json',
-    ...(token ? { 'Authorization': `Bearer ${token}` } : {})
+    ...(token ? { Authorization: `Bearer ${token}` } : {}),
   };
 };
 
@@ -24,25 +25,25 @@ export const api = {
       name: string;
       username?: string;
     }) => {
-      const res = await fetch('/api/auth/signup', {
+      const res = await fetch(apiUrl('/api/auth/signup'), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(data)
+        body: JSON.stringify(data),
       });
       if (!res.ok) throw new Error(await readApiError(res, 'Signup failed'));
       return res.json();
     },
     login: async (data: { identifier: string; password: string }) => {
-      const res = await fetch('/api/auth/login', {
+      const res = await fetch(apiUrl('/api/auth/login'), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(data)
+        body: JSON.stringify(data),
       });
       if (!res.ok) throw new Error(await readApiError(res, 'Login failed'));
       return res.json();
     },
     me: async () => {
-      const res = await fetch('/api/auth/me', { headers: getHeaders() });
+      const res = await fetch(apiUrl('/api/auth/me'), { headers: getHeaders() });
       if (!res.ok) throw new Error(await readApiError(res, 'Auth failed'));
       return res.json();
     },
@@ -51,7 +52,7 @@ export const api = {
       email?: string;
       username?: string | null;
     }) => {
-      const res = await fetch('/api/auth/profile', {
+      const res = await fetch(apiUrl('/api/auth/profile'), {
         method: 'PUT',
         headers: getHeaders(),
         body: JSON.stringify(body),
@@ -65,7 +66,7 @@ export const api = {
       currentPassword: string;
       newPassword: string;
     }) => {
-      const res = await fetch('/api/auth/password', {
+      const res = await fetch(apiUrl('/api/auth/password'), {
         method: 'PUT',
         headers: getHeaders(),
         body: JSON.stringify(body),
@@ -75,7 +76,7 @@ export const api = {
       }
     },
     closeAccount: async () => {
-      const res = await fetch('/api/auth/account', {
+      const res = await fetch(apiUrl('/api/auth/account'), {
         method: 'DELETE',
         headers: getHeaders(),
       });
@@ -86,17 +87,17 @@ export const api = {
   },
   user: {
     stats: async () => {
-      const res = await fetch('/api/user/stats', { headers: getHeaders() });
+      const res = await fetch(apiUrl('/api/user/stats'), { headers: getHeaders() });
       if (!res.ok) throw new Error('Failed to load stats');
       return res.json() as Promise<UserStats>;
     },
     backup: async () => {
-      const res = await fetch('/api/user/backup', { headers: getHeaders() });
+      const res = await fetch(apiUrl('/api/user/backup'), { headers: getHeaders() });
       if (!res.ok) throw new Error('Failed to create backup');
       return res.json() as Promise<Record<string, unknown>>;
     },
     importBackup: async (payload: Record<string, unknown>) => {
-      const res = await fetch('/api/user/backup/import', {
+      const res = await fetch(apiUrl('/api/user/backup/import'), {
         method: 'POST',
         headers: getHeaders(),
         body: JSON.stringify(payload),
@@ -105,7 +106,7 @@ export const api = {
       return res.json() as Promise<{ ok: boolean; stats?: UserStats }>;
     },
     deleteData: async () => {
-      const res = await fetch('/api/user/data', {
+      const res = await fetch(apiUrl('/api/user/data'), {
         method: 'DELETE',
         headers: getHeaders(),
       });
@@ -114,7 +115,7 @@ export const api = {
   },
   bookshelves: {
     list: async (): Promise<Bookshelf[]> => {
-      const res = await fetch('/api/bookshelves', { headers: getHeaders() });
+      const res = await fetch(apiUrl('/api/bookshelves'), { headers: getHeaders() });
       if (!res.ok) throw new Error('Failed to load bookshelves');
       const rows = await res.json();
       return (rows as Array<{ id: string; name: string }>).map((r) => ({
@@ -123,7 +124,7 @@ export const api = {
       }));
     },
     create: async (id: string, name: string) => {
-      const res = await fetch('/api/bookshelves', {
+      const res = await fetch(apiUrl('/api/bookshelves'), {
         method: 'POST',
         headers: getHeaders(),
         body: JSON.stringify({ id, name }),
@@ -133,7 +134,7 @@ export const api = {
       return { id: j.id as string, title: j.name as string };
     },
     update: async (id: string, name: string) => {
-      const res = await fetch(`/api/bookshelves/${encodeURIComponent(id)}`, {
+      const res = await fetch(apiUrl(`/api/bookshelves/${encodeURIComponent(id)}`), {
         method: 'PUT',
         headers: getHeaders(),
         body: JSON.stringify({ name }),
@@ -143,12 +144,12 @@ export const api = {
       return { id: j.id as string, title: j.name as string };
     },
     delete: async (id: string) => {
-      const res = await fetch(`/api/bookshelves/${encodeURIComponent(id)}`, {
+      const res = await fetch(apiUrl(`/api/bookshelves/${encodeURIComponent(id)}`), {
         method: 'DELETE',
         headers: getHeaders(),
       });
       if (!res.ok) {
-        const err = await res.json().catch(() => ({})) as { detail?: string };
+        const err = (await res.json().catch(() => ({}))) as { detail?: string };
         throw new Error(err.detail || 'Failed to delete bookshelf');
       }
     },
@@ -158,7 +159,7 @@ export const api = {
       const params = new URLSearchParams();
       params.set('bookshelfId', bookshelfId);
       if (archived) params.set('archived', 'true');
-      const res = await fetch(`/api/notebooks?${params}`, {
+      const res = await fetch(apiUrl(`/api/notebooks?${params}`), {
         headers: getHeaders(),
       });
       if (!res.ok) throw new Error('Failed to load notebooks');
@@ -177,7 +178,7 @@ export const api = {
       );
     },
     create: async (id: string, name: string, bookshelfId: string) => {
-      const res = await fetch('/api/notebooks', {
+      const res = await fetch(apiUrl('/api/notebooks'), {
         method: 'POST',
         headers: getHeaders(),
         body: JSON.stringify({ id, name, bookshelfId }),
@@ -186,20 +187,23 @@ export const api = {
       return res.json();
     },
     update: async (id: string, name: string) => {
-      const res = await fetch(`/api/notebooks/${id}`, {
+      const res = await fetch(apiUrl(`/api/notebooks/${id}`), {
         method: 'PUT',
         headers: getHeaders(),
-        body: JSON.stringify({ name })
+        body: JSON.stringify({ name }),
       });
       if (!res.ok) throw new Error('Failed to update notebook');
       return res.json();
     },
     delete: async (id: string) => {
-      const res = await fetch(`/api/notebooks/${id}`, { method: 'DELETE', headers: getHeaders() });
+      const res = await fetch(apiUrl(`/api/notebooks/${id}`), {
+        method: 'DELETE',
+        headers: getHeaders(),
+      });
       if (!res.ok) throw new Error('Failed to delete notebook');
     },
     setArchive: async (id: string, archived: boolean) => {
-      const res = await fetch(`/api/notebooks/${id}/archive`, {
+      const res = await fetch(apiUrl(`/api/notebooks/${id}/archive`), {
         method: 'PATCH',
         headers: getHeaders(),
         body: JSON.stringify({ archived }),
@@ -210,9 +214,10 @@ export const api = {
   },
   sections: {
     list: async (notebookId: string): Promise<Section[]> => {
-      const res = await fetch(`/api/sections/${notebookId}`, { headers: getHeaders() });
+      const res = await fetch(apiUrl(`/api/sections/${notebookId}`), {
+        headers: getHeaders(),
+      });
       const sections = await res.json();
-      // Fetch pages for each section
       return Promise.all(
         sections.map(async (sec: { id: string; name: string }) => {
           const pages = await api.pages.list(sec.id);
@@ -221,54 +226,62 @@ export const api = {
       );
     },
     create: async (id: string, notebookId: string, name: string) => {
-      const res = await fetch('/api/sections', {
+      const res = await fetch(apiUrl('/api/sections'), {
         method: 'POST',
         headers: getHeaders(),
-        body: JSON.stringify({ id, notebookId, name })
+        body: JSON.stringify({ id, notebookId, name }),
       });
       if (!res.ok) throw new Error('Failed to create section');
       return res.json();
     },
     update: async (id: string, name: string) => {
-      const res = await fetch(`/api/sections/${id}`, {
+      const res = await fetch(apiUrl(`/api/sections/${id}`), {
         method: 'PUT',
         headers: getHeaders(),
-        body: JSON.stringify({ name })
+        body: JSON.stringify({ name }),
       });
       if (!res.ok) throw new Error('Failed to update section');
       return res.json();
     },
     delete: async (id: string) => {
-      const res = await fetch(`/api/sections/${id}`, { method: 'DELETE', headers: getHeaders() });
+      const res = await fetch(apiUrl(`/api/sections/${id}`), {
+        method: 'DELETE',
+        headers: getHeaders(),
+      });
       if (!res.ok) throw new Error('Failed to delete section');
-    }
+    },
   },
   pages: {
     list: async (sectionId: string): Promise<Page[]> => {
-      const res = await fetch(`/api/pages/${sectionId}`, { headers: getHeaders() });
+      const res = await fetch(apiUrl(`/api/pages/${sectionId}`), {
+        headers: getHeaders(),
+      });
       return res.json();
     },
     create: async (id: string, sectionId: string, title: string, content: string) => {
-      const res = await fetch('/api/pages', {
+      const res = await fetch(apiUrl('/api/pages'), {
         method: 'POST',
         headers: getHeaders(),
-        body: JSON.stringify({ id, sectionId, title, content })
+        body: JSON.stringify({ id, sectionId, title, content }),
       });
       if (!res.ok) throw new Error('Failed to create page');
       return res.json();
     },
     update: async (id: string, title: string, content: string) => {
-      const res = await fetch(`/api/pages/${id}`, {
+      const res = await fetch(apiUrl(`/api/pages/${id}`), {
         method: 'PUT',
         headers: getHeaders(),
-        body: JSON.stringify({ title, content })
+        body: JSON.stringify({ title, content }),
       });
       if (!res.ok) throw new Error('Failed to update page');
       return res.json();
     },
     delete: async (id: string) => {
-      const res = await fetch(`/api/pages/${id}`, { method: 'DELETE', headers: getHeaders() });
+      const res = await fetch(apiUrl(`/api/pages/${id}`), {
+        method: 'DELETE',
+        headers: getHeaders(),
+      });
       if (!res.ok) throw new Error('Failed to delete page');
-    }
-  }
+    },
+  },
 };

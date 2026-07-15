@@ -70,6 +70,8 @@ import { isElectronApp } from './lib/platform';
 import { coerceEntityTitle, validatePageContent } from './lib/validation';
 import { useAppDialogs } from './context/AppDialogsContext';
 import { useToast } from './context/ToastContext';
+import { useIsCompactLayout } from './hooks/useMediaQuery';
+import InstallPrompt from './components/InstallPrompt';
 
 const LandingPage = React.lazy(() => import('./components/LandingPage'));
 const ProfilePage = React.lazy(() => import('./components/ProfilePage'));
@@ -113,9 +115,25 @@ export default function App() {
     secondaryPageId: null,
   });
 
+  const isCompact = useIsCompactLayout();
   const [dualPageOpen, setDualPageOpen] = useState(false);
-  const [viewMode, setViewMode] = useState<EditorViewMode>('split');
-  const [isSidebarVisible, setIsSidebarVisible] = useState(true);
+  const [viewMode, setViewMode] = useState<EditorViewMode>(() =>
+    typeof window !== 'undefined' && window.matchMedia('(max-width: 1023px)').matches
+      ? 'preview'
+      : 'split'
+  );
+  const [isSidebarVisible, setIsSidebarVisible] = useState(() =>
+    typeof window === 'undefined'
+      ? true
+      : !window.matchMedia('(max-width: 1023px)').matches
+  );
+
+  /** Phone/tablet: read mode by default; no dual-pane chrome. */
+  useEffect(() => {
+    if (!isCompact) return;
+    setDualPageOpen(false);
+    setViewMode((m) => (m === 'split' ? 'preview' : m));
+  }, [isCompact]);
   const [isAppLoading, setIsAppLoading] = useState(false);
   // Desktop app skips the marketing landing page and opens Sign In.
   const [showAuth, setShowAuth] = useState(desktopShell);
@@ -850,9 +868,11 @@ export default function App() {
               onClick={() => setMainView('profile')}
               data-active={mainView === 'profile'}
               className="mind-nav-btn"
+              aria-label="Profile"
+              title="Profile"
             >
               <UserIcon className="h-3.5 w-3.5" />
-              Profile
+              <span className="mind-nav-label">Profile</span>
             </button>
             <button
               type="button"
@@ -862,18 +882,22 @@ export default function App() {
               }}
               data-active={mainView === 'bookshelf'}
               className="mind-nav-btn"
+              aria-label="Library"
+              title="Library"
             >
               <Library className="h-3.5 w-3.5" />
-              Library
+              <span className="mind-nav-label">Library</span>
             </button>
             <button
               type="button"
               onClick={() => setMainView('notes')}
               data-active={mainView === 'notes'}
               className="mind-nav-btn"
+              aria-label="Notes"
+              title="Notes"
             >
               <BookOpen className="h-3.5 w-3.5" />
-              Notes
+              <span className="mind-nav-label">Notes</span>
             </button>
           </nav>
         </div>
@@ -887,36 +911,44 @@ export default function App() {
                 data-active={viewMode === 'edit'}
                 className="app-topbar-btn !p-2"
                 title="Edit"
+                aria-label="Edit"
               >
                 <Edit3 className="h-4 w-4" />
               </button>
-              <button
-                type="button"
-                onClick={() => setViewMode('split')}
-                data-active={viewMode === 'split'}
-                className="app-topbar-btn !p-2"
-                title="Split"
-              >
-                <Columns className="h-4 w-4" />
-              </button>
+              {!isCompact ? (
+                <button
+                  type="button"
+                  onClick={() => setViewMode('split')}
+                  data-active={viewMode === 'split'}
+                  className="app-topbar-btn !p-2"
+                  title="Split"
+                  aria-label="Split"
+                >
+                  <Columns className="h-4 w-4" />
+                </button>
+              ) : null}
               <button
                 type="button"
                 onClick={() => setViewMode('preview')}
                 data-active={viewMode === 'preview'}
                 className="app-topbar-btn !p-2"
-                title="Preview"
+                title={isCompact ? 'Read' : 'Preview'}
+                aria-label={isCompact ? 'Read' : 'Preview'}
               >
                 <Eye className="h-4 w-4" />
               </button>
-              <button
-                type="button"
-                onClick={() => setDualPageOpen((v) => !v)}
-                data-active={dualPageOpen}
-                className="app-topbar-btn !p-2"
-                title="Two pages side by side — Shift+click a page for the right pane"
-              >
-                <SquareSplitHorizontal className="h-4 w-4" />
-              </button>
+              {!isCompact ? (
+                <button
+                  type="button"
+                  onClick={() => setDualPageOpen((v) => !v)}
+                  data-active={dualPageOpen}
+                  className="app-topbar-btn !p-2"
+                  title="Two pages side by side — Shift+click a page for the right pane"
+                  aria-label="Two pages"
+                >
+                  <SquareSplitHorizontal className="h-4 w-4" />
+                </button>
+              ) : null}
               <div className="mx-1 hidden h-4 w-px bg-[var(--app-border)] sm:block" />
             </>
           )}
@@ -1085,6 +1117,87 @@ export default function App() {
             >
               Open Library
             </button>
+          </div>
+        ) : isCompact ? (
+          <div className="relative h-full">
+            {isSidebarVisible ? (
+              <div className="notes-mobile-drawer" role="dialog" aria-label="Notebooks">
+                <button
+                  type="button"
+                  className="absolute inset-0 bg-black/35"
+                  aria-label="Close notebook list"
+                  onClick={() => setIsSidebarVisible(false)}
+                />
+                <div className="notes-mobile-drawer-panel">
+                  <Sidebar
+                    notebooks={state.notebooks.filter((nb) => !nb.archived)}
+                    activeNotebookId={state.activeNotebookId}
+                    activeSectionId={state.activeSectionId}
+                    activePageId={state.activePageId}
+                    secondaryPageId={state.secondaryPageId}
+                    dualPageOpen={false}
+                    onSelectNotebook={(id) =>
+                      setState((s) => ({ ...s, activeNotebookId: id }))
+                    }
+                    onSelectSection={(id) =>
+                      setState((s) => ({ ...s, activeSectionId: id }))
+                    }
+                    onSelectPage={(id) => {
+                      setState((s) => ({ ...s, activePageId: id }));
+                      setIsSidebarVisible(false);
+                    }}
+                    onAddNotebook={handleAddNotebook}
+                    onAddSection={handleAddSection}
+                    onAddPage={handleAddPage}
+                    onArchiveNotebook={handleArchiveNotebook}
+                    onDeleteSection={handleDeleteSection}
+                    onDeletePage={handleDeletePage}
+                    onRenameNotebook={handleRenameNotebook}
+                    onRenameSection={handleRenameSection}
+                    onRenamePage={handleRenamePage}
+                  />
+                </div>
+              </div>
+            ) : null}
+            {activePage && state.activePageId ? (
+              <NotePanel
+                page={activePage}
+                path={notePath}
+                viewMode={viewMode === 'split' ? 'preview' : viewMode}
+                onTitleChange={(t) => updatePageTitleById(state.activePageId!, t)}
+                onContentChange={(c) =>
+                  updatePageContentById(state.activePageId!, c)
+                }
+                onPrint={() => handlePrintPrimary()}
+                onExportPdf={handleExportPdfPrimary}
+                onExportMarkdown={() =>
+                  handleExportMarkdownPage(
+                    {
+                      book: notePath.bookTitle,
+                      chapter: notePath.chapterTitle,
+                      page: activePage.title,
+                    },
+                    activePage.content
+                  )
+                }
+                pdfExporting={pdfExportingPrimary}
+              />
+            ) : (
+              <div className="flex h-full flex-col items-center justify-center gap-4 px-6 text-[var(--app-muted)]">
+                <BookOpen className="h-10 w-10 text-[var(--spine)]" />
+                <p className="max-w-xs text-center text-sm leading-relaxed">
+                  Open the menu to pick a book and page — then read your Markdown notes
+                  on the go.
+                </p>
+                <button
+                  type="button"
+                  className="studio-btn-primary"
+                  onClick={() => setIsSidebarVisible(true)}
+                >
+                  Browse notes
+                </button>
+              </div>
+            )}
           </div>
         ) : (
           <PanelGroup orientation="horizontal" className="h-full">
@@ -1255,7 +1368,7 @@ export default function App() {
       </main>
 
       {/* Footer / Status Bar */}
-      <footer className="flex h-6 shrink-0 select-none items-center justify-between border-t border-[var(--app-border)] bg-[var(--app-surface)] px-4 text-[10px] font-semibold uppercase tracking-widest text-[var(--app-muted)]">
+      <footer className="hidden h-6 shrink-0 select-none items-center justify-between border-t border-[var(--app-border)] bg-[var(--app-surface)] px-4 text-[10px] font-semibold uppercase tracking-widest text-[var(--app-muted)] sm:flex">
         <div className="flex items-center gap-4">
           <span>Ready</span>
           {activeNotebook ? (
@@ -1276,6 +1389,7 @@ export default function App() {
         </div>
       </footer>
 
+      <InstallPrompt />
     </div>
   );
 }

@@ -1,0 +1,30 @@
+import { useEffect, useState } from 'react';
+
+/** Subscribe to a CSS media query (SSR-safe). */
+export function useMediaQuery(query: string): boolean {
+  const [matches, setMatches] = useState(() => {
+    if (typeof window === 'undefined' || !window.matchMedia) return false;
+    return window.matchMedia(query).matches;
+  });
+
+  useEffect(() => {
+    if (typeof window === 'undefined' || !window.matchMedia) return;
+    const mq = window.matchMedia(query);
+    const onChange = () => setMatches(mq.matches);
+    onChange();
+    mq.addEventListener('change', onChange);
+    return () => mq.removeEventListener('change', onChange);
+  }, [query]);
+
+  return matches;
+}
+
+/** Phone / tablet — list→detail Notes shell (drawer instead of split panes). */
+export function useIsCompactLayout(): boolean {
+  return useMediaQuery('(max-width: 1023px)');
+}
+
+/** Tablet-width and below (also useful for touch toolbars). */
+export function useIsTouchLayout(): boolean {
+  return useMediaQuery('(max-width: 1023px)');
+}

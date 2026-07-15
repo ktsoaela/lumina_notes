@@ -1,4 +1,5 @@
 import { buildPrintDocumentHtml } from './printDocument';
+import { apiUrl } from './syncServer';
 
 declare global {
   interface Window {
@@ -27,7 +28,7 @@ async function exportPdfViaApi(
   filenameBase: string
 ): Promise<void> {
   const token = localStorage.getItem('lumina_token');
-  const res = await fetch('/api/export/pdf', {
+  const res = await fetch(apiUrl('/api/export/pdf'), {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
