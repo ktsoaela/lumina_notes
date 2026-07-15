@@ -12,7 +12,7 @@ from pathlib import Path
 from typing import Annotated, Any
 
 from fastapi import Depends, FastAPI, HTTPException, Query, Request, status
-from fastapi.responses import FileResponse, JSONResponse
+from fastapi.responses import FileResponse, JSONResponse, Response
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from starlette.middleware.cors import CORSMiddleware
 import bcrypt
@@ -21,6 +21,7 @@ from pydantic import BaseModel, Field, field_validator, model_validator
 
 import db as database
 from db import Connection, IntegrityError, OperationalError, SQLITE_PATH, USE_POSTGRES
+from export_document import render_pdf_bytes
 
 
 def _paths() -> tuple[Path, Path]:
@@ -1555,6 +1556,35 @@ def delete_page(page_id: str, user: CurrentUser, db: Db):
         raise HTTPException(status.HTTP_404_NOT_FOUND, detail="Page not found")
     db.execute("DELETE FROM pages WHERE id = ?", (page_id,))
     return None
+
+
+class ExportPdfBody(BaseModel):
+    title: str = Field(default="Untitled", max_length=500)
+    markdown: str = Field(default="", max_length=1_500_000)
+    filename: str = Field(default="note", max_length=200)
+
+    @field_validator("filename")
+    @classmethod
+    def clean_filename(cls, v: str) -> str:
+        stem = re.sub(r'[<>:"/\\|?*\x00-\x1f]+', "", (v or "note")).strip() or "note"
+        return stem[:180]
+
+
+@app.post("/api/export/pdf")
+def export_pdf(user: CurrentUser, body: ExportPdfBody):
+    """Render page Markdown → HTML → PDF via Chrome/Edge (or Playwright)."""
+    try:
+        pdf = render_pdf_bytes(body.title, body.markdown, body.filename)
+    except Exception as e:
+        logger.exception("PDF export failed for user=%s", user.get("id"))
+        raise HTTPException(
+            status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail=str(e) or "PDF export unavailable",
+        ) from e
+    headers = {
+        "Content-Disposition": f'attachment; filename="{body.filename}.pdf"',
+    }
+    return Response(content=pdf, media_type="application/pdf", headers=headers)
 
 
 def _serve_dist_file(full_path: str):

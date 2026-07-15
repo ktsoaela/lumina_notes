@@ -40,6 +40,11 @@
   --spine: #547f72;
   --gutter: #e2ece9;
   --focus: #547f72;
+  /* Clay rose — warm danger that sits with sage/stone */
+  --danger: #8a5a4c;
+  --danger-fg: #6e453a;
+  --danger-soft: #f4ebe7;
+  --danger-border: #d4b5a8;
   --radius-ui: 1rem;
   --shadow-soft: 0 8px 32px -20px rgba(17, 17, 17, 0.18);
   --shadow-micro: 0 1px 2px rgba(17, 17, 17, 0.04), 0 8px 24px -16px rgba(17, 17, 17, 0.12);
@@ -64,6 +69,10 @@
   --spine: #8fb5a6;
   --gutter: #0e110f;
   --focus: #8fb5a6;
+  --danger: #c4917f;
+  --danger-fg: #e2b5a4;
+  --danger-soft: #241916;
+  --danger-border: #5c4036;
   --shadow-soft: 0 12px 40px -24px rgba(0, 0, 0, 0.55);
   --shadow-micro: 0 1px 2px rgba(0, 0, 0, 0.2), 0 10px 28px -18px rgba(0, 0, 0, 0.45);
 }
@@ -82,6 +91,10 @@
   --focus: #ffffff;
   --sage: #111111;
   --stone: #ffffff;
+  --danger: #ffb4a2;
+  --danger-fg: #ffd5c8;
+  --danger-soft: #1a0f0c;
+  --danger-border: #ffffff;
   --shadow-soft: none;
   --shadow-micro: none;
 }
@@ -167,6 +180,87 @@
   opacity: 0.45;
 }
 
+.studio-btn-danger {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.4rem;
+  border-radius: var(--radius-ui);
+  padding: 0.45rem 0.85rem;
+  font-size: 0.875rem;
+  font-weight: 500;
+  letter-spacing: 0.01em;
+  color: var(--danger-fg);
+  background: var(--paper);
+  border: 1px solid color-mix(in srgb, var(--danger-border) 85%, var(--danger));
+  transition: background var(--fluid-duration) var(--fluid-ease),
+    border-color var(--fluid-duration) var(--fluid-ease);
+}
+
+.studio-btn-danger:hover {
+  background: var(--danger-soft);
+  border-color: var(--danger);
+}
+
+.studio-btn-danger:disabled {
+  opacity: 0.45;
+}
+
+.studio-btn-danger-solid {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.4rem;
+  border-radius: var(--radius-ui);
+  padding: 0.45rem 0.85rem;
+  font-size: 0.875rem;
+  font-weight: 600;
+  letter-spacing: 0.01em;
+  color: #fff;
+  background: var(--danger);
+  border: 1px solid color-mix(in srgb, var(--danger) 75%, #3a2018);
+  box-shadow: var(--shadow-micro);
+  transition: filter var(--fluid-duration) var(--fluid-ease);
+}
+
+.studio-btn-danger-solid:hover {
+  filter: brightness(1.08);
+}
+
+.studio-btn-danger-solid:disabled {
+  opacity: 0.45;
+}
+
+.studio-danger-panel {
+  border-color: color-mix(in srgb, var(--danger-border) 90%, var(--danger));
+}
+
+.studio-danger-header {
+  border-bottom: 1px solid color-mix(in srgb, var(--danger-border) 80%, transparent);
+  background: color-mix(in srgb, var(--danger-soft) 88%, var(--paper));
+}
+
+.studio-danger-text {
+  color: var(--danger-fg);
+}
+
+.studio-danger-nav[data-active='true'] {
+  background: var(--danger-soft);
+  color: var(--danger-fg);
+}
+
+.studio-danger-nav:not([data-active='true']) {
+  color: var(--danger-fg);
+}
+
+.studio-danger-nav:not([data-active='true']):hover {
+  background: color-mix(in srgb, var(--danger-soft) 70%, transparent);
+}
+
+.studio-danger-divide > * + * {
+  border-top: 1px solid color-mix(in srgb, var(--danger-border) 55%, transparent);
+}
+
 .studio-input {
   width: 100%;
   border-radius: var(--radius-ui);
@@ -227,6 +321,9 @@
 }
 
 .app-topbar {
+  position: relative;
+  z-index: 60;
+  overflow: visible;
   border-bottom: 1px solid color-mix(in srgb, var(--app-border) 70%, transparent);
   background: color-mix(in srgb, var(--alabaster) 82%, transparent);
   backdrop-filter: blur(16px);
@@ -379,383 +476,363 @@
   }
 }
 
-/* —— Library: storage units → shelves → books —— */
-.library-unit {
-  overflow: hidden;
-  border-radius: var(--radius-ui);
-  border: 1px solid color-mix(in srgb, var(--stone) 80%, transparent);
-  background: var(--paper);
-  box-shadow: var(--shadow-micro);
-  transition: border-color var(--fluid-duration) var(--fluid-ease),
-    box-shadow var(--fluid-duration) var(--fluid-ease),
-    background var(--fluid-duration) var(--fluid-ease);
-}
-
-.library-unit:hover {
-  border-color: color-mix(in srgb, var(--spine) 40%, var(--app-border));
-  background: color-mix(in srgb, var(--sage) 28%, var(--paper));
-  box-shadow: var(--shadow-soft);
-}
-
-.library-unit-face {
-  display: flex;
-  flex-direction: column;
-  justify-content: flex-end;
-  gap: 0.45rem;
-  height: 4.25rem;
-  padding: 0.85rem 1rem 0.35rem;
+/* —— Library: storage units (scalable list) + virtual bookshelf —— */
+.library-unit-mark {
+  width: 0.35rem;
+  height: 1.65rem;
+  border-radius: 9999px;
   background: linear-gradient(
     180deg,
-    color-mix(in srgb, var(--sage) 45%, var(--paper)),
-    color-mix(in srgb, var(--stone) 22%, var(--paper))
+    color-mix(in srgb, var(--spine) 35%, transparent),
+    var(--spine)
   );
-  border-bottom: 1px solid color-mix(in srgb, var(--app-border) 80%, transparent);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--spine) 25%, transparent);
 }
 
-.library-unit-rail {
-  display: block;
-  height: 2px;
-  border-radius: 9999px;
-  background: color-mix(in srgb, var(--stone) 55%, transparent);
-}
-
-.library-shelf {
-  --shelf-depth: 14px;
+/* Virtual bookshelf — inspired by CSS Script 3D bookshelf, Lumina tokens
+   https://www.cssscript.com/demo/animated-virtual-bookshelf/ */
+.vb-shelf {
   position: relative;
-  perspective: 900px;
-  min-height: 9.5rem;
-  padding: 1rem 0.85rem 1.35rem;
+  padding: 0.5rem 0.35rem 1.35rem;
   border-radius: var(--radius-ui);
   border: 1px solid color-mix(in srgb, var(--app-border) 85%, transparent);
   background:
     linear-gradient(
       180deg,
-      color-mix(in srgb, var(--sage) 55%, var(--paper)) 0%,
-      color-mix(in srgb, var(--stone) 18%, var(--paper)) 72%,
-      color-mix(in srgb, var(--stone) 32%, var(--paper)) 100%
+      color-mix(in srgb, var(--sage) 50%, var(--paper)) 0%,
+      color-mix(in srgb, var(--stone) 16%, var(--paper)) 68%,
+      color-mix(in srgb, var(--stone) 28%, var(--paper)) 100%
     );
-  box-shadow: inset 0 18px 28px -24px rgba(17, 17, 17, 0.18);
-  overflow: hidden;
+  box-shadow: inset 0 16px 28px -24px rgba(17, 17, 17, 0.16);
+  overflow: visible;
 }
 
-.library-shelf-back {
-  pointer-events: none;
+.vb-shelf-plank {
   position: absolute;
-  inset: 0.55rem 0.55rem auto;
-  height: 42%;
-  border-radius: 0.55rem 0.55rem 0 0;
+  left: 0.4rem;
+  right: 0.4rem;
+  bottom: 0.35rem;
+  height: 0.7rem;
+  border-radius: 2px;
   background: linear-gradient(
     180deg,
-    color-mix(in srgb, var(--app-muted) 8%, transparent),
-    transparent
+    color-mix(in srgb, var(--stone) 88%, white),
+    color-mix(in srgb, var(--spine) 22%, var(--stone))
   );
-  opacity: 0.55;
+  box-shadow:
+    0 1px 0 color-mix(in srgb, white 30%, transparent),
+    0 8px 16px -10px rgba(17, 17, 17, 0.35);
 }
 
-.library-shelf-row {
+.vb-bookshelf {
   position: relative;
   z-index: 1;
   display: flex;
   flex-wrap: wrap;
   align-items: flex-end;
-  justify-content: flex-start;
-  gap: 0.2rem 0.28rem;
-  min-height: 6.5rem;
-  padding-bottom: 0.55rem;
+  gap: 4px;
+  min-height: 8.5rem;
+  padding: 1.25rem 0.65rem 0.95rem;
+  perspective: 1400px;
+  perspective-origin: 50% 70%;
   transform-style: preserve-3d;
 }
 
-.library-shelf-board {
-  position: absolute;
-  left: 0.45rem;
-  right: 0.45rem;
-  bottom: 0.7rem;
-  height: 0.55rem;
-  border-radius: 2px;
-  background: linear-gradient(
-    180deg,
-    color-mix(in srgb, var(--stone) 90%, white),
-    color-mix(in srgb, var(--spine) 28%, var(--stone))
-  );
-  box-shadow: 0 1px 0 color-mix(in srgb, white 35%, transparent);
-}
-
-.library-shelf-lip {
-  position: absolute;
-  left: 0.35rem;
-  right: 0.35rem;
-  bottom: 0.28rem;
-  height: 0.42rem;
-  border-radius: 0 0 4px 4px;
-  background: linear-gradient(
-    180deg,
-    color-mix(in srgb, var(--stone) 70%, var(--paper)),
-    color-mix(in srgb, var(--spine) 20%, var(--stone))
-  );
-  box-shadow: 0 6px 14px -8px rgba(17, 17, 17, 0.35);
-}
-
-/* Realistic book (CSS volume: spine + pages + edge) */
-.library-book {
-  --book-lean: 0deg;
+.vb-book {
+  --book-depth: 110px;
   position: relative;
+  z-index: 1;
   flex-shrink: 0;
-  display: block;
   padding: 0;
   border: none;
   background: transparent;
-  transform-origin: 50% 100%;
-  transform: rotate(var(--book-lean)) translateZ(0);
   transform-style: preserve-3d;
-  transition: transform 320ms var(--fluid-ease), filter 320ms var(--fluid-ease);
+  transform-origin: 50% 100%;
+  transform: translate3d(0, 0, 0) rotateY(0deg);
+  /* Stay above neighbors until it finishes sliding home */
+  transition:
+    transform 580ms cubic-bezier(0.22, 0.9, 0.28, 1),
+    z-index 0s linear 580ms,
+    filter 320ms ease;
   cursor: pointer;
-  isolation: isolate;
-}
-
-.library-book:hover,
-.library-book:focus-visible {
-  z-index: 3;
-  transform: rotate(calc(var(--book-lean) * 0.35)) translateY(-10px) translateZ(8px);
   outline: none;
+  will-change: transform;
 }
 
-.library-book:focus-visible .library-book-spine {
-  box-shadow:
-    0 0 0 2px var(--paper),
-    0 0 0 4px var(--spine),
-    4px 14px 28px -12px rgba(17, 17, 17, 0.45);
-}
-
-.library-book-active {
-  z-index: 4;
-  transform: rotate(0deg) translateY(-8px) translateZ(6px);
-}
-
-.library-book-active .library-book-spine {
-  box-shadow:
-    0 0 0 2px var(--paper),
-    0 0 0 4px var(--spine),
-    4px 16px 30px -12px rgba(17, 17, 17, 0.4);
-}
-
-.library-book--archived {
-  filter: saturate(0.55) brightness(0.96);
-  opacity: 0.78;
-}
-
-.library-book-spine {
+.vb-side {
   position: absolute;
+  border: 1px solid color-mix(in srgb, var(--spine-tone, var(--spine)) 55%, #111);
+  border-radius: 2px;
+  transform-origin: center left;
+  backface-visibility: hidden;
+}
+
+.vb-spine {
   inset: 0;
-  z-index: 2;
+  display: block;
   overflow: hidden;
-  border-radius: 0.18rem 0.32rem 0.32rem 0.18rem;
-  color: color-mix(in srgb, white 90%, var(--paper));
-  background:
-    linear-gradient(
-      90deg,
-      rgba(0, 0, 0, 0.28) 0%,
-      transparent 10%,
-      transparent 88%,
-      rgba(255, 255, 255, 0.12) 100%
-    ),
-    linear-gradient(
-      180deg,
-      rgba(255, 255, 255, 0.12) 0%,
-      transparent 18%,
-      transparent 82%,
-      rgba(0, 0, 0, 0.22) 100%
-    ),
-    linear-gradient(
-      90deg,
-      color-mix(in srgb, var(--spine-tone, var(--spine)) 86%, #0c0c0c),
-      color-mix(in srgb, var(--spine-tone, var(--spine)) 72%, white) 42%,
-      color-mix(in srgb, var(--spine-tone, var(--spine)) 90%, #111) 100%
-    );
+  color: color-mix(in srgb, white 88%, var(--paper));
+  background-color: var(--spine-tone, var(--spine));
   box-shadow:
     inset 1px 0 0 rgba(255, 255, 255, 0.12),
-    inset -1px 0 0 rgba(0, 0, 0, 0.22),
+    inset -1px 0 0 rgba(0, 0, 0, 0.28),
     2px 6px 14px -8px rgba(17, 17, 17, 0.4);
+  transform: rotateY(0deg) translateZ(0);
 }
 
-/* Cloth / linen grain */
-.library-book--p0 .library-book-spine {
+.vb-book--cloth .vb-spine {
   background-image:
     repeating-linear-gradient(
       115deg,
       transparent 0 1px,
-      rgba(255, 255, 255, 0.035) 1px 2px
+      rgba(255, 255, 255, 0.04) 1px 2px
     ),
     linear-gradient(
       90deg,
-      rgba(0, 0, 0, 0.28) 0%,
-      transparent 10%,
+      rgba(0, 0, 0, 0.3) 0%,
+      transparent 12%,
       transparent 88%,
-      rgba(255, 255, 255, 0.12) 100%
+      rgba(255, 255, 255, 0.1) 100%
     ),
     linear-gradient(
       90deg,
-      color-mix(in srgb, var(--spine-tone, var(--spine)) 86%, #0c0c0c),
-      color-mix(in srgb, var(--spine-tone, var(--spine)) 72%, white) 42%,
-      color-mix(in srgb, var(--spine-tone, var(--spine)) 90%, #111) 100%
+      color-mix(in srgb, var(--spine-tone, var(--spine)) 88%, #0c0c0c),
+      color-mix(in srgb, var(--spine-tone, var(--spine)) 72%, white) 45%,
+      color-mix(in srgb, var(--spine-tone, var(--spine)) 90%, #111)
     );
 }
 
-.library-book--p1 .library-book-spine {
+.vb-book--linen .vb-spine {
   background-image:
     repeating-linear-gradient(
       180deg,
-      transparent 0 7px,
-      rgba(0, 0, 0, 0.06) 7px 8px
+      transparent 0 8px,
+      rgba(0, 0, 0, 0.07) 8px 9px
     ),
     linear-gradient(
       90deg,
       rgba(0, 0, 0, 0.28) 0%,
-      transparent 10%,
+      transparent 12%,
       transparent 88%,
-      rgba(255, 255, 255, 0.12) 100%
+      rgba(255, 255, 255, 0.1) 100%
     ),
     linear-gradient(
       90deg,
-      color-mix(in srgb, var(--spine-tone, var(--spine)) 86%, #0c0c0c),
-      color-mix(in srgb, var(--spine-tone, var(--spine)) 72%, white) 42%,
-      color-mix(in srgb, var(--spine-tone, var(--spine)) 90%, #111) 100%
+      color-mix(in srgb, var(--spine-tone, var(--spine)) 88%, #0c0c0c),
+      color-mix(in srgb, var(--spine-tone, var(--spine)) 72%, white) 45%,
+      color-mix(in srgb, var(--spine-tone, var(--spine)) 90%, #111)
     );
 }
 
-.library-book--p2 .library-book-spine {
+.vb-book--foil .vb-spine {
   background-image:
     linear-gradient(
       90deg,
       rgba(0, 0, 0, 0.28) 0%,
-      transparent 10%,
+      transparent 12%,
       transparent 88%,
-      rgba(255, 255, 255, 0.12) 100%
+      rgba(255, 255, 255, 0.1) 100%
     ),
     linear-gradient(
       180deg,
-      rgba(255, 255, 255, 0.1) 0%,
-      transparent 14%,
-      transparent 86%,
-      rgba(0, 0, 0, 0.2) 100%
+      rgba(217, 198, 160, 0.22) 8%,
+      transparent 12%,
+      transparent 88%,
+      rgba(217, 198, 160, 0.18) 92%
     ),
     linear-gradient(
       90deg,
-      color-mix(in srgb, var(--spine-tone, var(--spine)) 86%, #0c0c0c),
-      color-mix(in srgb, var(--spine-tone, var(--spine)) 72%, white) 42%,
-      color-mix(in srgb, var(--spine-tone, var(--spine)) 90%, #111) 100%
+      color-mix(in srgb, var(--spine-tone, var(--spine)) 88%, #0c0c0c),
+      color-mix(in srgb, var(--spine-tone, var(--spine)) 72%, white) 45%,
+      color-mix(in srgb, var(--spine-tone, var(--spine)) 90%, #111)
     );
 }
 
-.library-book-headband,
-.library-book-footband {
+.vb-book--plain .vb-spine {
+  background-image:
+    linear-gradient(
+      90deg,
+      rgba(0, 0, 0, 0.28) 0%,
+      transparent 12%,
+      transparent 88%,
+      rgba(255, 255, 255, 0.1) 100%
+    ),
+    linear-gradient(
+      90deg,
+      color-mix(in srgb, var(--spine-tone, var(--spine)) 88%, #0c0c0c),
+      color-mix(in srgb, var(--spine-tone, var(--spine)) 72%, white) 45%,
+      color-mix(in srgb, var(--spine-tone, var(--spine)) 90%, #111)
+    );
+}
+
+.vb-spine-title {
   position: absolute;
-  left: 12%;
-  right: 12%;
-  height: 3px;
-  border-radius: 1px;
-  background: linear-gradient(
-    90deg,
-    transparent,
-    color-mix(in srgb, var(--alabaster) 55%, var(--spine-tone, var(--spine))),
-    transparent
-  );
-  opacity: 0.7;
-  box-shadow: 0 1px 0 rgba(0, 0, 0, 0.18);
-}
-
-.library-book-headband {
-  top: 9%;
-}
-
-.library-book-footband {
-  bottom: 9%;
-}
-
-.library-book--p2 .library-book-headband,
-.library-book--p2 .library-book-footband {
-  height: 4px;
-  opacity: 0.85;
-  background: linear-gradient(
-    90deg,
-    transparent,
-    color-mix(in srgb, #d9c6a0 65%, var(--spine-tone, var(--spine))),
-    transparent
-  );
-}
-
-.library-book-title {
-  position: absolute;
-  inset: 16% 14% 16%;
+  top: 12%;
+  left: 0;
+  right: 0;
+  bottom: 22%;
   display: flex;
   align-items: center;
   justify-content: center;
+  padding: 0 18%;
   writing-mode: vertical-rl;
   text-orientation: mixed;
   font-family: var(--font-display);
-  font-size: 0.58rem;
+  font-size: 0.62rem;
   font-weight: 560;
-  letter-spacing: 0.055em;
+  letter-spacing: 0.06em;
   line-height: 1.1;
   overflow: hidden;
   text-shadow: 0 1px 1px rgba(0, 0, 0, 0.35);
 }
 
-/* Paper block peeking behind spine */
-.library-book-pages {
+.vb-spine-meta {
   position: absolute;
-  top: 3%;
-  bottom: 3%;
-  right: -3px;
-  width: 7px;
-  z-index: 1;
-  border-radius: 0 2px 2px 0;
-  background:
-    repeating-linear-gradient(
-      180deg,
-      #f4f1ea 0 1px,
-      #e8e2d6 1px 2px
-    );
-  box-shadow:
-    inset -1px 0 0 rgba(0, 0, 0, 0.08),
-    2px 0 4px -2px rgba(17, 17, 17, 0.25);
-  transform: skewY(-0.4deg);
+  bottom: 8%;
+  left: 0;
+  right: 0;
+  text-align: center;
+  font-size: 0.55rem;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  color: color-mix(in srgb, #d9c6a0 70%, white);
+  opacity: 0.85;
 }
 
-.dark .library-book-pages,
-.contrast .library-book-pages {
-  background:
-    repeating-linear-gradient(
-      180deg,
-      #2a2c28 0 1px,
-      #1e211d 1px 2px
-    );
-}
-
-/* Thin cover face on the right edge */
-.library-book-edge {
-  position: absolute;
-  top: 2%;
-  bottom: 2%;
-  right: -1px;
-  width: 3px;
-  z-index: 3;
-  border-radius: 0 2px 2px 0;
-  background: linear-gradient(
+.vb-top {
+  width: 100%;
+  height: var(--book-depth);
+  top: -1px;
+  left: 0;
+  background-image: repeating-linear-gradient(
     90deg,
-    color-mix(in srgb, var(--spine-tone, var(--spine)) 70%, #111),
-    color-mix(in srgb, var(--spine-tone, var(--spine)) 55%, white)
+    color-mix(in srgb, var(--paper) 92%, var(--stone)) 0 4px,
+    color-mix(in srgb, var(--stone) 55%, var(--paper)) 4px 5px
   );
-  box-shadow: 1px 0 2px rgba(0, 0, 0, 0.2);
-  opacity: 0.9;
+  transform: rotateX(90deg) translateZ(calc(var(--book-depth) / 2))
+    translateY(calc(var(--book-depth) / -2));
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 220ms ease 80ms;
 }
 
-.reduce-motion .library-book,
-.reduce-motion .library-book:hover,
-.reduce-motion .library-book:focus-visible,
-.reduce-motion .library-book-active {
+.vb-cover {
+  width: var(--book-depth);
+  height: 100%;
+  top: 0;
+  left: 100%;
+  background:
+    linear-gradient(
+      135deg,
+      color-mix(in srgb, var(--spine-tone, var(--spine)) 78%, white),
+      color-mix(in srgb, var(--spine-tone, var(--spine)) 88%, #111)
+    );
+  /* Collapsed at rest so cover can't poke through neighbors */
+  transform: rotateY(90deg) translateZ(0) scaleX(0.02);
+  transform-origin: left center;
+  pointer-events: none;
+  display: flex;
+  align-items: flex-end;
+  justify-content: flex-start;
+  padding: 0.75rem;
+  opacity: 0;
+  transition:
+    transform 360ms cubic-bezier(0.4, 0, 0.2, 1),
+    opacity 140ms ease;
+}
+
+.vb-cover-mark {
+  width: 42%;
+  height: 3px;
+  border-radius: 9999px;
+  background: color-mix(in srgb, white 35%, transparent);
+}
+
+/* Pull forward toward the reader — no sideways swing through the row */
+.vb-book:hover,
+.vb-book:focus-visible {
+  z-index: 30;
+  transition:
+    transform 520ms cubic-bezier(0.2, 0.85, 0.25, 1),
+    z-index 0s,
+    filter 320ms ease;
+  transform: translate3d(0, -16px, 64px) rotateY(-26deg);
+}
+
+.vb-book:hover .vb-cover,
+.vb-book:focus-visible .vb-cover,
+.vb-book--active .vb-cover {
+  opacity: 1;
+  transform: rotateY(90deg) translateZ(0) scaleX(1);
+  transition:
+    transform 440ms cubic-bezier(0.22, 0.9, 0.28, 1) 50ms,
+    opacity 180ms ease 40ms;
+}
+
+.vb-book:hover .vb-top,
+.vb-book:focus-visible .vb-top,
+.vb-book--active .vb-top {
+  opacity: 1;
+}
+
+.vb-book:hover .vb-spine,
+.vb-book:focus-visible .vb-spine {
+  box-shadow:
+    inset 1px 0 0 rgba(255, 255, 255, 0.12),
+    inset -1px 0 0 rgba(0, 0, 0, 0.28),
+    8px 18px 28px -12px rgba(17, 17, 17, 0.42);
+}
+
+/* Selected: stay slightly forward, seated above the row while panel is open */
+.vb-book--active {
+  z-index: 28;
+  transition:
+    transform 520ms cubic-bezier(0.2, 0.85, 0.25, 1),
+    z-index 0s,
+    filter 320ms ease;
+  transform: translate3d(0, -10px, 40px) rotateY(-16deg);
+}
+
+.vb-book--active .vb-spine {
+  box-shadow:
+    0 0 0 2px var(--paper),
+    0 0 0 4px var(--spine),
+    6px 14px 24px -10px rgba(17, 17, 17, 0.4);
+}
+
+/* When leaving hover while another is active, don't fight z-order */
+.vb-bookshelf:has(.vb-book--active) .vb-book:not(.vb-book--active):hover {
+  z-index: 26;
+}
+
+.vb-book--archived {
+  filter: saturate(0.55) brightness(0.96);
+  opacity: 0.8;
+}
+
+.reduce-motion .vb-book,
+.reduce-motion .vb-book:hover,
+.reduce-motion .vb-book:focus-visible,
+.reduce-motion .vb-book--active {
   transition: none;
   transform: none;
+  will-change: auto;
 }
+
+.reduce-motion .vb-cover,
+.reduce-motion .vb-top {
+  transition: none;
+  opacity: 0;
+  transform: rotateY(90deg) translateZ(0) scaleX(0.02);
+}
+
+.reduce-motion .vb-book:hover .vb-spine,
+.reduce-motion .vb-book:focus-visible .vb-spine,
+.reduce-motion .vb-book--active .vb-spine {
+  outline: 2px solid var(--spine);
+  outline-offset: 2px;
+}
+
 
 /* —— Inner Resonance Mirror (Profile) —— */
 .resonance-aura {
@@ -812,9 +889,8 @@
 .contrast .studio-btn,
 .contrast .studio-panel,
 .contrast .paper-page,
-.contrast .library-unit,
-.contrast .library-shelf,
-.contrast .library-book-spine {
+.contrast .vb-shelf,
+.contrast .vb-spine {
   border-width: 2px;
 }
 
