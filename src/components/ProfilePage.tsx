@@ -24,7 +24,7 @@ import type { Notebook, User, UserStats } from '../types';
 import { writeSession } from '../lib/authCache';
 import { cn } from '../lib/utils';
 import { useAppDialogs } from '../context/AppDialogsContext';
-import { validateProfileInput } from '../lib/validation';
+import { validatePasswordChangeInput, validateProfileInput } from '../lib/validation';
 
 type ProfileSection = 'account' | 'appearance' | 'accessibility' | 'storage' | 'danger';
 
@@ -136,8 +136,14 @@ export default function ProfilePage({
   const [stats, setStats] = useState<UserStats | null>(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [pwSaving, setPwSaving] = useState(false);
+  const [currentPassword, setCurrentPassword] = useState('');
+  const [newPassword, setNewPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
   const [busy, setBusy] = useState<string | null>(null);
   const [err, setErr] = useState<string | null>(null);
+  const [pwErr, setPwErr] = useState<string | null>(null);
+  const [pwOk, setPwOk] = useState(false);
   const [zoneErr, setZoneErr] = useState<string | null>(null);
 
   const refreshStats = async () => {
@@ -237,6 +243,33 @@ export default function ProfilePage({
       setErr(e2 instanceof Error ? e2.message : 'Update failed');
     } finally {
       setSaving(false);
+    }
+  };
+
+  const changePassword = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setPwErr(null);
+    setPwOk(false);
+    const checked = validatePasswordChangeInput({
+      currentPassword,
+      newPassword,
+      confirmPassword,
+    });
+    if (checked.ok === false) {
+      setPwErr(checked.error);
+      return;
+    }
+    setPwSaving(true);
+    try {
+      await api.auth.changePassword(checked.data);
+      setCurrentPassword('');
+      setNewPassword('');
+      setConfirmPassword('');
+      setPwOk(true);
+    } catch (e2) {
+      setPwErr(e2 instanceof Error ? e2.message : 'Password change failed');
+    } finally {
+      setPwSaving(false);
     }
   };
 
@@ -538,6 +571,83 @@ export default function ProfilePage({
                 </section>
               ) : null}
 
+              {section === 'account' ? (
+                <section className={cn(sectionClass, 'mt-6')}>
+                  <h2 className="mb-1 font-display text-base font-semibold text-[var(--app-fg)]">
+                    Password
+                  </h2>
+                  <p className={cn(mutedText, 'mb-6')}>
+                    Change your sign-in password. You will stay logged in after updating.
+                  </p>
+                  <form onSubmit={changePassword} className="space-y-5">
+                    <div className="grid grid-cols-1 gap-5 sm:grid-cols-12 sm:items-start">
+                      <label className={cn(labelClass, 'sm:col-span-4 sm:pt-2')} htmlFor="pw-current">
+                        Current password
+                      </label>
+                      <div className="sm:col-span-8">
+                        <input
+                          id="pw-current"
+                          type="password"
+                          autoComplete="current-password"
+                          value={currentPassword}
+                          onChange={(e) => setCurrentPassword(e.target.value)}
+                          className={fieldClass}
+                        />
+                      </div>
+                    </div>
+                    <div className="grid grid-cols-1 gap-5 sm:grid-cols-12 sm:items-start">
+                      <label className={cn(labelClass, 'sm:col-span-4 sm:pt-2')} htmlFor="pw-new">
+                        New password
+                      </label>
+                      <div className="sm:col-span-8">
+                        <input
+                          id="pw-new"
+                          type="password"
+                          autoComplete="new-password"
+                          value={newPassword}
+                          onChange={(e) => setNewPassword(e.target.value)}
+                          className={fieldClass}
+                        />
+                        <p className="mt-1.5 text-xs text-[var(--app-muted)]">
+                          At least 6 characters.
+                        </p>
+                      </div>
+                    </div>
+                    <div className="grid grid-cols-1 gap-5 sm:grid-cols-12 sm:items-start">
+                      <label className={cn(labelClass, 'sm:col-span-4 sm:pt-2')} htmlFor="pw-confirm">
+                        Confirm new password
+                      </label>
+                      <div className="sm:col-span-8">
+                        <input
+                          id="pw-confirm"
+                          type="password"
+                          autoComplete="new-password"
+                          value={confirmPassword}
+                          onChange={(e) => setConfirmPassword(e.target.value)}
+                          className={fieldClass}
+                        />
+                      </div>
+                    </div>
+                    {pwErr ? (
+                      <p className="text-sm text-red-600 dark:text-red-400">{pwErr}</p>
+                    ) : null}
+                    {pwOk ? (
+                      <p className="text-sm text-[var(--spine)]">Password updated.</p>
+                    ) : null}
+                    <div className="flex justify-end border-t border-[var(--app-border)] pt-4">
+                      <button
+                        type="submit"
+                        disabled={pwSaving}
+                        className="studio-btn-primary disabled:opacity-50"
+                      >
+                        {pwSaving ? <Loader2 className="w-4 h-4 animate-spin" /> : null}
+                        Update password
+                      </button>
+                    </div>
+                  </form>
+                </section>
+              ) : null}
+
               {section === 'appearance' ? (
                 <section className={sectionClass}>
                   <h2 className="mb-1 font-display text-base font-medium text-[var(--app-fg)]">
@@ -640,7 +750,7 @@ export default function ProfilePage({
                       checked={a11y.reduceMotion}
                       onChange={(reduceMotion) => onA11yChange({ ...a11y, reduceMotion })}
                       label="Reduce motion"
-                      description="Minimize animations (including the storage rail aisle motion)."
+                      description="Minimize animations across Notes, Library, and Profile."
                     />
                     <A11yToggle
                       checked={a11y.underlineLinks}

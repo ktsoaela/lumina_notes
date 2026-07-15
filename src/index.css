@@ -379,248 +379,382 @@
   }
 }
 
-/* —— Mind palace: rooms → memories (books) —— */
-.mind-palace,
-.horizon-canvas {
-  position: relative;
-  min-height: 380px;
-  border-radius: 1.5rem;
+/* —— Library: storage units → shelves → books —— */
+.library-unit {
   overflow: hidden;
-  background:
-    radial-gradient(ellipse 70% 55% at 50% 0%, color-mix(in srgb, var(--spine) 12%, transparent), transparent 55%),
-    radial-gradient(ellipse 90% 40% at 50% 100%, color-mix(in srgb, var(--sage) 70%, transparent), transparent 50%),
-    linear-gradient(165deg, var(--alabaster) 0%, color-mix(in srgb, var(--sage) 40%, var(--alabaster)) 100%);
+  border-radius: var(--radius-ui);
   border: 1px solid color-mix(in srgb, var(--stone) 80%, transparent);
+  background: var(--paper);
   box-shadow: var(--shadow-micro);
+  transition: border-color var(--fluid-duration) var(--fluid-ease),
+    box-shadow var(--fluid-duration) var(--fluid-ease),
+    background var(--fluid-duration) var(--fluid-ease);
 }
 
-.dark .mind-palace,
-.contrast .mind-palace,
-.dark .horizon-canvas,
-.contrast .horizon-canvas {
-  background:
-    radial-gradient(ellipse 70% 50% at 50% 0%, color-mix(in srgb, var(--spine) 16%, transparent), transparent 55%),
-    linear-gradient(165deg, #121612 0%, #1a221e 100%);
+.library-unit:hover {
+  border-color: color-mix(in srgb, var(--spine) 40%, var(--app-border));
+  background: color-mix(in srgb, var(--sage) 28%, var(--paper));
+  box-shadow: var(--shadow-soft);
 }
 
-.mind-palace-glow {
-  pointer-events: none;
-  position: absolute;
-  inset: -20%;
-  background: radial-gradient(
-    circle at 50% 40%,
-    color-mix(in srgb, var(--spine) 8%, transparent),
-    transparent 55%
+.library-unit-face {
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
+  gap: 0.45rem;
+  height: 4.25rem;
+  padding: 0.85rem 1rem 0.35rem;
+  background: linear-gradient(
+    180deg,
+    color-mix(in srgb, var(--sage) 45%, var(--paper)),
+    color-mix(in srgb, var(--stone) 22%, var(--paper))
   );
+  border-bottom: 1px solid color-mix(in srgb, var(--app-border) 80%, transparent);
 }
 
-.mind-room {
+.library-unit-rail {
+  display: block;
+  height: 2px;
+  border-radius: 9999px;
+  background: color-mix(in srgb, var(--stone) 55%, transparent);
+}
+
+.library-shelf {
+  --shelf-depth: 14px;
   position: relative;
-  min-height: 8.5rem;
-  border-radius: 1.15rem;
-  text-align: left;
-  overflow: hidden;
-  border: 1px solid color-mix(in srgb, var(--stone) 75%, transparent);
+  perspective: 900px;
+  min-height: 9.5rem;
+  padding: 1rem 0.85rem 1.35rem;
+  border-radius: var(--radius-ui);
+  border: 1px solid color-mix(in srgb, var(--app-border) 85%, transparent);
   background:
     linear-gradient(
-      145deg,
-      hsl(var(--room-hue) / 0.14),
-      color-mix(in srgb, var(--paper) 88%, transparent)
+      180deg,
+      color-mix(in srgb, var(--sage) 55%, var(--paper)) 0%,
+      color-mix(in srgb, var(--stone) 18%, var(--paper)) 72%,
+      color-mix(in srgb, var(--stone) 32%, var(--paper)) 100%
     );
-  box-shadow: var(--shadow-micro);
-  transition: transform var(--fluid-duration) var(--fluid-ease),
-    box-shadow var(--fluid-duration) var(--fluid-ease),
-    border-color var(--fluid-duration) var(--fluid-ease);
-}
-
-.mind-room:hover,
-.mind-room[data-active='true'] {
-  transform: translateY(-3px) scale(1.015);
-  border-color: hsl(var(--room-hue) / 0.45);
-  box-shadow: 0 16px 40px -22px hsl(var(--room-hue) / 0.45);
-}
-
-.mind-room-door {
-  position: absolute;
-  left: 0.85rem;
-  top: 50%;
-  width: 0.55rem;
-  height: 52%;
-  transform: translateY(-50%);
-  border-radius: 9999px;
-  background: linear-gradient(
-    180deg,
-    hsl(var(--room-hue) / 0.15),
-    hsl(var(--room-hue) / 0.65)
-  );
-  box-shadow: inset 0 0 0 1px hsl(var(--room-hue) / 0.25);
-}
-
-.mind-room-label {
-  display: block;
-  padding: 1.1rem 1.1rem 1.1rem 2rem;
-  color: var(--app-fg);
-}
-
-.memory-shelf {
-  min-height: 7.5rem;
-  padding: 0.5rem 0.25rem 0.25rem;
-  border-radius: 0.85rem;
-  background: linear-gradient(
-    180deg,
-    transparent,
-    color-mix(in srgb, var(--stone) 28%, transparent)
-  );
-}
-
-.memory-book {
-  position: relative;
-  width: 2.15rem;
-  flex-shrink: 0;
-  border-radius: 0.28rem 0.45rem 0.45rem 0.28rem;
-  border: 1px solid hsl(var(--book-hue) / 0.35);
-  background: linear-gradient(
-    90deg,
-    hsl(var(--book-hue) / 0.95) 0%,
-    hsl(var(--book-hue) / 0.72) 14%,
-    hsl(var(--book-hue) / 0.88) 100%
-  );
-  box-shadow:
-    2px 0 0 hsl(var(--book-hue) / 0.25),
-    4px 8px 18px -10px rgba(17, 17, 17, 0.35);
-  transition: transform var(--fluid-duration) var(--fluid-ease),
-    filter var(--fluid-duration) var(--fluid-ease);
-  color: #fff;
-}
-
-.memory-book:hover {
-  transform: translateY(-8px) rotate(-2deg);
-  filter: brightness(1.06);
-  z-index: 2;
-}
-
-.memory-book-title {
-  position: absolute;
-  inset: 0.45rem 0.2rem;
-  writing-mode: vertical-rl;
-  text-orientation: mixed;
-  font-size: 0.62rem;
-  font-weight: 600;
-  letter-spacing: 0.04em;
-  line-height: 1.15;
+  box-shadow: inset 0 18px 28px -24px rgba(17, 17, 17, 0.18);
   overflow: hidden;
-  text-shadow: 0 1px 1px rgba(0, 0, 0, 0.25);
 }
 
-.chrono-rib {
-  position: relative;
-  height: 2.5rem;
-  display: flex;
-  align-items: center;
-}
-
-.chrono-rib::before {
-  content: '';
+.library-shelf-back {
+  pointer-events: none;
   position: absolute;
-  left: 0;
-  right: 0;
-  top: 50%;
-  height: 2px;
-  transform: translateY(-50%);
+  inset: 0.55rem 0.55rem auto;
+  height: 42%;
+  border-radius: 0.55rem 0.55rem 0 0;
   background: linear-gradient(
-    90deg,
-    transparent,
-    color-mix(in srgb, var(--stone) 90%, var(--spine)),
+    180deg,
+    color-mix(in srgb, var(--app-muted) 8%, transparent),
     transparent
   );
-  box-shadow: inset 0 1px 1px rgba(17, 17, 17, 0.06);
+  opacity: 0.55;
 }
 
-.chrono-rib input[type='range'] {
+.library-shelf-row {
   position: relative;
   z-index: 1;
-  width: 100%;
-  appearance: none;
-  background: transparent;
-  cursor: pointer;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  justify-content: flex-start;
+  gap: 0.2rem 0.28rem;
+  min-height: 6.5rem;
+  padding-bottom: 0.55rem;
+  transform-style: preserve-3d;
 }
 
-.chrono-rib input[type='range']::-webkit-slider-thumb {
-  appearance: none;
-  width: 14px;
-  height: 14px;
-  border-radius: 50%;
-  background: var(--spine);
-  box-shadow: var(--shadow-micro);
-  border: 2px solid var(--paper);
-}
-
-.thought-cluster {
+.library-shelf-board {
   position: absolute;
-  border-radius: 9999px;
-  background: radial-gradient(
-    circle at 35% 30%,
-    color-mix(in srgb, var(--sage) 90%, white),
-    color-mix(in srgb, var(--spine) 28%, var(--sage))
+  left: 0.45rem;
+  right: 0.45rem;
+  bottom: 0.7rem;
+  height: 0.55rem;
+  border-radius: 2px;
+  background: linear-gradient(
+    180deg,
+    color-mix(in srgb, var(--stone) 90%, white),
+    color-mix(in srgb, var(--spine) 28%, var(--stone))
   );
-  box-shadow: var(--shadow-micro);
-  border: 1px solid color-mix(in srgb, var(--spine) 20%, transparent);
-  transition: transform var(--fluid-duration) var(--fluid-ease),
-    box-shadow var(--fluid-duration) var(--fluid-ease),
-    filter var(--fluid-duration) var(--fluid-ease);
+  box-shadow: 0 1px 0 color-mix(in srgb, white 35%, transparent);
+}
+
+.library-shelf-lip {
+  position: absolute;
+  left: 0.35rem;
+  right: 0.35rem;
+  bottom: 0.28rem;
+  height: 0.42rem;
+  border-radius: 0 0 4px 4px;
+  background: linear-gradient(
+    180deg,
+    color-mix(in srgb, var(--stone) 70%, var(--paper)),
+    color-mix(in srgb, var(--spine) 20%, var(--stone))
+  );
+  box-shadow: 0 6px 14px -8px rgba(17, 17, 17, 0.35);
+}
+
+/* Realistic book (CSS volume: spine + pages + edge) */
+.library-book {
+  --book-lean: 0deg;
+  position: relative;
+  flex-shrink: 0;
+  display: block;
+  padding: 0;
+  border: none;
+  background: transparent;
+  transform-origin: 50% 100%;
+  transform: rotate(var(--book-lean)) translateZ(0);
+  transform-style: preserve-3d;
+  transition: transform 320ms var(--fluid-ease), filter 320ms var(--fluid-ease);
   cursor: pointer;
+  isolation: isolate;
 }
 
-.thought-cluster:hover,
-.thought-cluster[data-active='true'] {
-  transform: scale(1.06);
-  box-shadow: 0 12px 36px -16px color-mix(in srgb, var(--spine) 45%, transparent);
-  filter: saturate(1.08);
+.library-book:hover,
+.library-book:focus-visible {
+  z-index: 3;
+  transform: rotate(calc(var(--book-lean) * 0.35)) translateY(-10px) translateZ(8px);
+  outline: none;
 }
 
-.thought-cluster-label {
+.library-book:focus-visible .library-book-spine {
+  box-shadow:
+    0 0 0 2px var(--paper),
+    0 0 0 4px var(--spine),
+    4px 14px 28px -12px rgba(17, 17, 17, 0.45);
+}
+
+.library-book-active {
+  z-index: 4;
+  transform: rotate(0deg) translateY(-8px) translateZ(6px);
+}
+
+.library-book-active .library-book-spine {
+  box-shadow:
+    0 0 0 2px var(--paper),
+    0 0 0 4px var(--spine),
+    4px 16px 30px -12px rgba(17, 17, 17, 0.4);
+}
+
+.library-book--archived {
+  filter: saturate(0.55) brightness(0.96);
+  opacity: 0.78;
+}
+
+.library-book-spine {
   position: absolute;
-  left: 50%;
-  top: calc(100% + 0.4rem);
-  transform: translateX(-50%);
-  white-space: nowrap;
-  font-size: 0.65rem;
-  font-weight: 500;
-  letter-spacing: 0.04em;
-  color: var(--app-muted);
+  inset: 0;
+  z-index: 2;
+  overflow: hidden;
+  border-radius: 0.18rem 0.32rem 0.32rem 0.18rem;
+  color: color-mix(in srgb, white 90%, var(--paper));
+  background:
+    linear-gradient(
+      90deg,
+      rgba(0, 0, 0, 0.28) 0%,
+      transparent 10%,
+      transparent 88%,
+      rgba(255, 255, 255, 0.12) 100%
+    ),
+    linear-gradient(
+      180deg,
+      rgba(255, 255, 255, 0.12) 0%,
+      transparent 18%,
+      transparent 82%,
+      rgba(0, 0, 0, 0.22) 100%
+    ),
+    linear-gradient(
+      90deg,
+      color-mix(in srgb, var(--spine-tone, var(--spine)) 86%, #0c0c0c),
+      color-mix(in srgb, var(--spine-tone, var(--spine)) 72%, white) 42%,
+      color-mix(in srgb, var(--spine-tone, var(--spine)) 90%, #111) 100%
+    );
+  box-shadow:
+    inset 1px 0 0 rgba(255, 255, 255, 0.12),
+    inset -1px 0 0 rgba(0, 0, 0, 0.22),
+    2px 6px 14px -8px rgba(17, 17, 17, 0.4);
 }
 
-.horizon-summary {
+/* Cloth / linen grain */
+.library-book--p0 .library-book-spine {
+  background-image:
+    repeating-linear-gradient(
+      115deg,
+      transparent 0 1px,
+      rgba(255, 255, 255, 0.035) 1px 2px
+    ),
+    linear-gradient(
+      90deg,
+      rgba(0, 0, 0, 0.28) 0%,
+      transparent 10%,
+      transparent 88%,
+      rgba(255, 255, 255, 0.12) 100%
+    ),
+    linear-gradient(
+      90deg,
+      color-mix(in srgb, var(--spine-tone, var(--spine)) 86%, #0c0c0c),
+      color-mix(in srgb, var(--spine-tone, var(--spine)) 72%, white) 42%,
+      color-mix(in srgb, var(--spine-tone, var(--spine)) 90%, #111) 100%
+    );
+}
+
+.library-book--p1 .library-book-spine {
+  background-image:
+    repeating-linear-gradient(
+      180deg,
+      transparent 0 7px,
+      rgba(0, 0, 0, 0.06) 7px 8px
+    ),
+    linear-gradient(
+      90deg,
+      rgba(0, 0, 0, 0.28) 0%,
+      transparent 10%,
+      transparent 88%,
+      rgba(255, 255, 255, 0.12) 100%
+    ),
+    linear-gradient(
+      90deg,
+      color-mix(in srgb, var(--spine-tone, var(--spine)) 86%, #0c0c0c),
+      color-mix(in srgb, var(--spine-tone, var(--spine)) 72%, white) 42%,
+      color-mix(in srgb, var(--spine-tone, var(--spine)) 90%, #111) 100%
+    );
+}
+
+.library-book--p2 .library-book-spine {
+  background-image:
+    linear-gradient(
+      90deg,
+      rgba(0, 0, 0, 0.28) 0%,
+      transparent 10%,
+      transparent 88%,
+      rgba(255, 255, 255, 0.12) 100%
+    ),
+    linear-gradient(
+      180deg,
+      rgba(255, 255, 255, 0.1) 0%,
+      transparent 14%,
+      transparent 86%,
+      rgba(0, 0, 0, 0.2) 100%
+    ),
+    linear-gradient(
+      90deg,
+      color-mix(in srgb, var(--spine-tone, var(--spine)) 86%, #0c0c0c),
+      color-mix(in srgb, var(--spine-tone, var(--spine)) 72%, white) 42%,
+      color-mix(in srgb, var(--spine-tone, var(--spine)) 90%, #111) 100%
+    );
+}
+
+.library-book-headband,
+.library-book-footband {
   position: absolute;
-  left: 50%;
-  bottom: 1.25rem;
-  transform: translateX(-50%);
-  max-width: min(90%, 28rem);
-  text-align: center;
-  padding: 0.65rem 1rem;
-  border-radius: 9999px;
-  background: color-mix(in srgb, var(--paper) 88%, transparent);
-  border: 1px solid color-mix(in srgb, var(--stone) 70%, transparent);
-  box-shadow: var(--shadow-micro);
-  font-size: 0.75rem;
-  letter-spacing: 0.02em;
-  color: var(--app-muted);
-  animation: fluid-dissolve var(--fluid-duration) var(--fluid-ease) both;
-  pointer-events: none;
+  left: 12%;
+  right: 12%;
+  height: 3px;
+  border-radius: 1px;
+  background: linear-gradient(
+    90deg,
+    transparent,
+    color-mix(in srgb, var(--alabaster) 55%, var(--spine-tone, var(--spine))),
+    transparent
+  );
+  opacity: 0.7;
+  box-shadow: 0 1px 0 rgba(0, 0, 0, 0.18);
 }
 
-.horizon-vibrate {
-  animation: horizon-pulse 520ms var(--fluid-ease);
+.library-book-headband {
+  top: 9%;
 }
 
-@keyframes horizon-pulse {
-  0%,
-  100% {
-    filter: brightness(1);
-  }
-  50% {
-    filter: brightness(1.03);
-  }
+.library-book-footband {
+  bottom: 9%;
+}
+
+.library-book--p2 .library-book-headband,
+.library-book--p2 .library-book-footband {
+  height: 4px;
+  opacity: 0.85;
+  background: linear-gradient(
+    90deg,
+    transparent,
+    color-mix(in srgb, #d9c6a0 65%, var(--spine-tone, var(--spine))),
+    transparent
+  );
+}
+
+.library-book-title {
+  position: absolute;
+  inset: 16% 14% 16%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  writing-mode: vertical-rl;
+  text-orientation: mixed;
+  font-family: var(--font-display);
+  font-size: 0.58rem;
+  font-weight: 560;
+  letter-spacing: 0.055em;
+  line-height: 1.1;
+  overflow: hidden;
+  text-shadow: 0 1px 1px rgba(0, 0, 0, 0.35);
+}
+
+/* Paper block peeking behind spine */
+.library-book-pages {
+  position: absolute;
+  top: 3%;
+  bottom: 3%;
+  right: -3px;
+  width: 7px;
+  z-index: 1;
+  border-radius: 0 2px 2px 0;
+  background:
+    repeating-linear-gradient(
+      180deg,
+      #f4f1ea 0 1px,
+      #e8e2d6 1px 2px
+    );
+  box-shadow:
+    inset -1px 0 0 rgba(0, 0, 0, 0.08),
+    2px 0 4px -2px rgba(17, 17, 17, 0.25);
+  transform: skewY(-0.4deg);
+}
+
+.dark .library-book-pages,
+.contrast .library-book-pages {
+  background:
+    repeating-linear-gradient(
+      180deg,
+      #2a2c28 0 1px,
+      #1e211d 1px 2px
+    );
+}
+
+/* Thin cover face on the right edge */
+.library-book-edge {
+  position: absolute;
+  top: 2%;
+  bottom: 2%;
+  right: -1px;
+  width: 3px;
+  z-index: 3;
+  border-radius: 0 2px 2px 0;
+  background: linear-gradient(
+    90deg,
+    color-mix(in srgb, var(--spine-tone, var(--spine)) 70%, #111),
+    color-mix(in srgb, var(--spine-tone, var(--spine)) 55%, white)
+  );
+  box-shadow: 1px 0 2px rgba(0, 0, 0, 0.2);
+  opacity: 0.9;
+}
+
+.reduce-motion .library-book,
+.reduce-motion .library-book:hover,
+.reduce-motion .library-book:focus-visible,
+.reduce-motion .library-book-active {
+  transition: none;
+  transform: none;
 }
 
 /* —— Inner Resonance Mirror (Profile) —— */
@@ -678,9 +812,9 @@
 .contrast .studio-btn,
 .contrast .studio-panel,
 .contrast .paper-page,
-.contrast .horizon-canvas,
-.contrast .mind-palace,
-.contrast .mind-room {
+.contrast .library-unit,
+.contrast .library-shelf,
+.contrast .library-book-spine {
   border-width: 2px;
 }
 
@@ -768,84 +902,6 @@
 }
 
 .notes-atelier {
-}
-
-/* —— Earth garden (Mind) — minimal botanical, matches studio —— */
-.earth-plot-stage {
-  background:
-    linear-gradient(
-      180deg,
-      color-mix(in srgb, var(--sage) 35%, var(--paper)) 0%,
-      var(--paper) 42%,
-      color-mix(in srgb, #d5ddd0 55%, var(--paper)) 100%
-    );
-}
-
-.earth-horizon {
-  pointer-events: none;
-  position: absolute;
-  left: 8%;
-  right: 8%;
-  bottom: 2.75rem;
-  height: 1px;
-  background: linear-gradient(
-    90deg,
-    transparent,
-    color-mix(in srgb, var(--stone) 85%, transparent),
-    transparent
-  );
-}
-
-.earth-season-slider {
-  appearance: none;
-  height: 2px;
-  border-radius: 9999px;
-  background: linear-gradient(
-    90deg,
-    color-mix(in srgb, var(--stone) 80%, transparent),
-    var(--spine)
-  );
-}
-
-.earth-season-slider::-webkit-slider-thumb {
-  appearance: none;
-  width: 14px;
-  height: 14px;
-  border-radius: 50%;
-  background: var(--paper);
-  border: 2px solid var(--spine);
-  box-shadow: var(--shadow-micro);
-  cursor: pointer;
-}
-
-.earth-season-slider::-moz-range-thumb {
-  width: 14px;
-  height: 14px;
-  border-radius: 50%;
-  background: var(--paper);
-  border: 2px solid var(--spine);
-  box-shadow: var(--shadow-micro);
-  cursor: pointer;
-}
-
-.earth-sway {
-  display: inline-block;
-  transform-origin: 50% 100%;
-  animation: earth-sway 5.5s ease-in-out infinite;
-}
-
-@keyframes earth-sway {
-  0%,
-  100% {
-    transform: rotate(-1.2deg);
-  }
-  50% {
-    transform: rotate(1.4deg);
-  }
-}
-
-.reduce-motion .earth-sway {
-  animation: none;
 }
 
 ::-webkit-scrollbar {

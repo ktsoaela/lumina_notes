@@ -155,7 +155,7 @@ const Sidebar: React.FC<SidebarProps> = ({
               Book · chapter · page
             </h2>
             <p className="mt-1 text-xs leading-relaxed text-[var(--app-muted)]">
-              In the garden: plant → leaf cluster → leaf. Here you write the leaves.
+              Books live in Library storage units. Here you write chapter by page.
             </p>
           </div>
           <button
