@@ -607,7 +607,7 @@ export default function App() {
     const nb = state.notebooks.find((n) => n.id === id);
     const ok = await confirm({
       title: 'Archive notebook?',
-      message: `“${nb?.title?.trim() || 'Memory'}” will move to Archived. Restore it from Mind → Archived.`,
+      message: `“${nb?.title?.trim() || 'Notebook'}” will move to Archived. Restore it from Library → Archived.`,
       confirmLabel: 'Archive',
       variant: 'default',
     });
@@ -836,7 +836,7 @@ export default function App() {
               className="mind-nav-btn"
             >
               <Library className="h-3.5 w-3.5" />
-              Mind
+              Library
             </button>
             <button
               type="button"
@@ -1034,7 +1034,6 @@ export default function App() {
               onBack={() => setMainView('notes')}
               onOpenShelfForNotes={handleOpenShelfForNotes}
               onOpenNotebook={handleOpenNotebookFromShelf}
-              onOpenPage={handleOpenNotebookFromShelf}
               onLibraryChanged={fetchData}
               onRefreshBookshelves={refreshBookshelves}
             />
@@ -1043,12 +1042,12 @@ export default function App() {
           <div className="flex h-full flex-col items-center justify-center px-6 text-[var(--app-muted)]">
             <Library className="mb-4 h-12 w-12 text-[var(--spine)]" />
             <p className="mb-4 max-w-md text-center font-display text-lg text-[var(--app-fg)]">
-              Open a garden bed
+              Open a storage unit
             </p>
             <p className="mb-6 max-w-md text-center text-sm">
               {bookshelves.length === 0
-                ? 'In Mind, prepare a garden bed, plant books, then open a leaf (page) to write Markdown.'
-                : 'Choose a garden bed in Mind — its plants become the notebooks you write in Notes.'}
+                ? 'In Library, add a storage unit, put books on its shelves, then open one in Notes to write.'
+                : 'Open a storage unit in Library — its books become the notebooks you write in Notes.'}
             </p>
             <button
               type="button"
@@ -1224,7 +1223,7 @@ export default function App() {
             {mainView === 'notes'
               ? 'Acoustic pillar'
               : mainView === 'bookshelf'
-                ? 'Mind garden'
+                ? 'Library'
                 : 'Inner resonance'}
           </span>
         </div>
