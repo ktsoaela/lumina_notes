@@ -7,7 +7,7 @@ import {
 } from './markdownIO';
 import { coerceEntityTitle, validateEntityTitle } from './validation';
 import { searchNotes, matchSnippet } from './search';
-import { sanitizeFilename } from './filename';
+import { sanitizeFilename, buildExportFilename } from './filename';
 import type { AppState } from '../types';
 
 describe('notes markdown IO', () => {
@@ -93,6 +93,26 @@ describe('notes filename + title coercion', () => {
     expect(sanitizeFilename('a/b:c*')).toBe('abc');
     expect(sanitizeFilename('Ward / Notes')).toBe('Ward Notes');
     expect(sanitizeFilename('???')).toBe('note');
+  });
+
+  it('builds book_chapter_page export stems', () => {
+    expect(
+      buildExportFilename({
+        book: 'AWS Notes',
+        chapter: 'AWS Modules',
+        page: 'Security: How to implement',
+      })
+    ).toBe('AWS-Notes_AWS-Modules_Security-How-to-implement');
+    expect(buildExportFilename({ page: 'Day 1' })).toBe('Day-1');
+    expect(buildExportFilename({ book: 'Work', page: 'Inbox' })).toBe('Work_Inbox');
+    expect(
+      buildExportFilename({
+        book: 'AWS Notes',
+        chapter: 'AWS Modules',
+        page: '',
+      })
+    ).toBe('AWS-Notes_AWS-Modules_untitled');
+    expect(buildExportFilename({ page: '   ' })).toBe('untitled');
   });
 
   it('keeps rename paths production-safe', () => {

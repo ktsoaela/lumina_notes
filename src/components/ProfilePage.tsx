@@ -385,8 +385,7 @@ export default function ProfilePage({
     }
   };
 
-  const dangerBtn =
-    'inline-flex shrink-0 items-center justify-center gap-2 rounded-lg border border-red-400/60 bg-[var(--paper)] px-3 py-1.5 text-sm font-medium text-red-700 hover:bg-red-50 disabled:opacity-50 dark:border-red-800 dark:text-red-400 dark:hover:bg-red-950/40';
+  const dangerBtn = 'studio-btn-danger shrink-0';
 
   const storageBtn =
     'studio-btn shrink-0 text-sm text-[var(--spine)]';
@@ -490,15 +489,13 @@ export default function ProfilePage({
                         onClick={() => setSection(item.id)}
                         className={cn(
                           'inline-flex shrink-0 items-center gap-2 rounded-lg px-3 py-2 text-sm font-medium transition-colors',
+                          item.danger && 'studio-danger-nav',
                           active && !item.danger &&
                             'bg-[color-mix(in_srgb,var(--spine)_12%,var(--paper))] text-[var(--spine)]',
-                          active && item.danger &&
-                            'bg-red-50 text-red-700 dark:bg-red-950/40 dark:text-red-400',
                           !active && !item.danger &&
-                            'text-[var(--app-muted)] hover:bg-[var(--gutter)]',
-                          !active && item.danger &&
-                            'text-red-600 hover:bg-red-50/70 dark:text-red-400 dark:hover:bg-red-950/20'
+                            'text-[var(--app-muted)] hover:bg-[var(--gutter)]'
                         )}
+                        data-active={active ? 'true' : undefined}
                       >
                         {item.icon}
                         {item.label}
@@ -555,7 +552,7 @@ export default function ProfilePage({
                       </div>
                     </div>
                     {err ? (
-                      <p className="text-sm text-red-600 dark:text-red-400">{err}</p>
+                      <p className="text-sm studio-danger-text">{err}</p>
                     ) : null}
                     <div className="flex justify-end border-t border-[var(--app-border)] pt-4">
                       <button
@@ -629,7 +626,7 @@ export default function ProfilePage({
                       </div>
                     </div>
                     {pwErr ? (
-                      <p className="text-sm text-red-600 dark:text-red-400">{pwErr}</p>
+                      <p className="text-sm studio-danger-text">{pwErr}</p>
                     ) : null}
                     {pwOk ? (
                       <p className="text-sm text-[var(--spine)]">Password updated.</p>
@@ -917,7 +914,7 @@ export default function ProfilePage({
                       </li>
                     </ul>
                     {zoneErr ? (
-                      <div className="border-t border-[var(--app-border)] px-6 py-3 text-sm text-red-600 dark:text-red-400">
+                      <div className="border-t border-[var(--app-border)] px-6 py-3 text-sm studio-danger-text">
                         {zoneErr}
                       </div>
                     ) : null}
@@ -927,23 +924,23 @@ export default function ProfilePage({
 
               {section === 'danger' ? (
                 <section
-                  className="studio-panel overflow-hidden border-red-400/70 bg-[var(--paper)] shadow-sm dark:border-red-900/70"
+                  className="studio-panel studio-danger-panel overflow-hidden bg-[var(--paper)] shadow-sm"
                   aria-labelledby="danger-zone-heading"
                 >
-                  <div className="border-b border-red-200 bg-red-50/80 px-6 py-4 dark:border-red-900/50 dark:bg-red-950/30">
+                  <div className="studio-danger-header px-6 py-4">
                     <h2
                       id="danger-zone-heading"
-                      className="text-sm font-semibold uppercase tracking-wide text-red-700 dark:text-red-400"
+                      className="text-sm font-semibold uppercase tracking-wide studio-danger-text"
                     >
                       Danger Zone
                     </h2>
-                    <p className="mt-1 text-xs text-red-700/80 dark:text-red-400/80">
+                    <p className="mt-1 text-xs studio-danger-text opacity-80">
                       Destructive or irreversible actions. Confirm by typing your username
                       {user.username ? '' : ' (or email)'} when prompted.
                     </p>
                   </div>
 
-                  <ul className="divide-y divide-red-100 dark:divide-red-900/40">
+                  <ul className="studio-danger-divide">
                     <li className="flex flex-col gap-3 px-6 py-4 sm:flex-row sm:items-center sm:justify-between">
                       <div className="min-w-0 sm:max-w-[60%]">
                         <p className="text-sm font-semibold text-[var(--app-fg)]">Delete data</p>
@@ -977,7 +974,7 @@ export default function ProfilePage({
                         type="button"
                         disabled={!!busy}
                         onClick={closeAccount}
-                        className="inline-flex shrink-0 items-center justify-center gap-2 rounded-lg border border-red-600 bg-red-600 px-3 py-1.5 text-sm font-semibold text-white hover:bg-red-700 disabled:opacity-50 dark:border-red-500 dark:bg-red-700 dark:hover:bg-red-600"
+                        className="studio-btn-danger-solid shrink-0"
                       >
                         {busy === 'close' ? (
                           <Loader2 className="w-4 h-4 animate-spin" />
@@ -990,7 +987,7 @@ export default function ProfilePage({
                   </ul>
 
                   {zoneErr ? (
-                    <div className="border-t border-red-200 px-6 py-3 text-sm text-red-600 dark:border-red-900/50 dark:text-red-400">
+                    <div className="border-t border-[color-mix(in_srgb,var(--danger-border)_70%,transparent)] px-6 py-3 text-sm studio-danger-text">
                       {zoneErr}
                     </div>
                   ) : null}

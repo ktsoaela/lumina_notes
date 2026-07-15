@@ -14,6 +14,11 @@ import { motion, AnimatePresence } from 'motion/react';
 import { Notebook, Section, Page } from '../types';
 import { cn } from '../lib/utils';
 import { virtualWindow } from '../lib/virtualWindow';
+import {
+  displayBookTitle,
+  displayPageTitle,
+  displaySectionTitle,
+} from '../lib/displayTitle';
 
 const NOTEBOOK_ROW_H = 44;
 
@@ -144,35 +149,36 @@ const Sidebar: React.FC<SidebarProps> = ({
   };
 
   return (
-    <aside className="flex h-full min-w-0 w-full flex-col select-none border-r border-[var(--app-border)] bg-[var(--app-surface)] text-[var(--app-fg)]">
-      <div className="shrink-0 border-b border-[var(--app-border)] px-4 pb-4 pt-5">
+    <aside className="@container/sidebar flex h-full min-w-0 w-full flex-col select-none border-r border-[var(--app-border)] bg-[var(--app-surface)] text-[var(--app-fg)]">
+      <div className="shrink-0 border-b border-[var(--app-border)] px-2 pb-3 pt-4 @[14rem]/sidebar:px-4 @[14rem]/sidebar:pb-4 @[14rem]/sidebar:pt-5">
         <div className="flex items-start justify-between gap-2">
           <div className="min-w-0">
-            <p className="text-[10px] font-medium uppercase tracking-[0.26em] text-[var(--app-muted)]">
+            <p className="hidden text-[10px] font-medium uppercase tracking-[0.26em] text-[var(--app-muted)] @[16rem]/sidebar:block">
               Quiet spine
             </p>
-            <h2 className="mt-1 font-display text-xl font-medium tracking-tight text-[var(--app-fg)]">
-              Book · chapter · page
+            <h2 className="font-display text-base font-medium tracking-tight text-[var(--app-fg)] @[14rem]/sidebar:mt-1 @[14rem]/sidebar:text-xl">
+              <span className="@[16rem]/sidebar:hidden">Books</span>
+              <span className="hidden @[16rem]/sidebar:inline">Book · chapter · page</span>
             </h2>
-            <p className="mt-1 text-xs leading-relaxed text-[var(--app-muted)]">
-              Books live in Library storage units. Here you write chapter by page.
+            <p className="mt-1 hidden text-xs leading-relaxed text-[var(--app-muted)] @[20rem]/sidebar:block">
+              Open a book, chapter, or page. Library stores units · here you write.
             </p>
           </div>
           <button
             type="button"
             onClick={onAddNotebook}
-            className="studio-btn-primary !px-3 !py-1.5 !text-xs"
+            className="studio-btn-primary !px-2 !py-1.5 !text-xs @[14rem]/sidebar:!px-3"
             title="New book"
             aria-label="New book"
           >
             <Plus className="h-3.5 w-3.5" />
-            Book
+            <span className="hidden @[12rem]/sidebar:inline">Book</span>
           </button>
         </div>
       </div>
 
       {dualPageOpen && (
-        <div className="mx-3 mt-3 rounded-[var(--radius-ui)] border border-[var(--app-border)] bg-[var(--gutter)]/50 px-3 py-2 text-[11px] leading-snug text-[var(--app-fg)]">
+        <div className="mx-2 mt-2 hidden rounded-[var(--radius-ui)] border border-[var(--app-border)] bg-[var(--gutter)]/50 px-3 py-2 text-[11px] leading-snug text-[var(--app-fg)] @[16rem]/sidebar:mx-3 @[16rem]/sidebar:mt-3 @[16rem]/sidebar:block">
           <span className="font-medium text-[var(--spine)]">Compare pages:</span> click
           left ·{' '}
           <kbd className="rounded border border-[var(--app-border)] bg-[var(--paper)] px-1 font-mono text-[10px]">
@@ -184,7 +190,7 @@ const Sidebar: React.FC<SidebarProps> = ({
 
       <div
         ref={listRef}
-        className="min-h-0 flex-1 overflow-y-auto px-2 py-3"
+        className="min-h-0 flex-1 overflow-y-auto px-1.5 py-2 @[14rem]/sidebar:px-2 @[14rem]/sidebar:py-3"
         role="navigation"
         aria-label="Books and chapters"
         onScroll={(e) => {
@@ -288,7 +294,7 @@ interface NotebookItemProps {
 }
 
 const actionBtn =
-  'rounded-md p-1.5 text-[var(--app-muted)] opacity-0 transition group-hover:opacity-100 focus:opacity-100 hover:bg-[var(--gutter)] hover:text-[var(--app-fg)]';
+  'rounded-md p-1 text-[var(--app-muted)] opacity-0 transition group-hover:opacity-100 focus-visible:opacity-100 hover:bg-[var(--gutter)] hover:text-[var(--app-fg)] @[14rem]/sidebar:p-1.5 @[16rem]/sidebar:opacity-100';
 
 const NotebookItem: React.FC<NotebookItemProps> = ({
   notebook,
@@ -320,6 +326,7 @@ const NotebookItem: React.FC<NotebookItemProps> = ({
     editTarget?.kind === 'notebook' && editTarget.id === notebook.id;
   const chapterCount = notebook.sections.length;
   const pageCount = notebook.sections.reduce((n, s) => n + s.pages.length, 0);
+  const bookLabel = displayBookTitle(notebook.title);
 
   return (
     <div className="mb-3">
@@ -382,10 +389,16 @@ const NotebookItem: React.FC<NotebookItemProps> = ({
             />
           ) : (
             <>
-              <div className="truncate font-display text-sm font-semibold tracking-tight">
-                {notebook.title}
+              <div
+                className={cn(
+                  'truncate font-display text-sm font-semibold tracking-tight',
+                  bookLabel.untitled && 'italic text-[var(--app-muted)]'
+                )}
+                title={bookLabel.text}
+              >
+                {bookLabel.text}
               </div>
-              <div className="text-[10px] uppercase tracking-wider text-[var(--app-muted)]">
+              <div className="hidden text-[10px] uppercase tracking-wider text-[var(--app-muted)] @[13rem]/sidebar:block">
                 Book · {chapterCount} ch · {pageCount} pg
               </div>
             </>
@@ -411,7 +424,7 @@ const NotebookItem: React.FC<NotebookItemProps> = ({
               e.stopPropagation();
               onAddSection(notebook.id);
             }}
-            className={actionBtn}
+            className={cn(actionBtn, 'hidden @[12rem]/sidebar:inline-flex')}
             title="Add chapter"
             aria-label="Add chapter"
           >
@@ -423,7 +436,10 @@ const NotebookItem: React.FC<NotebookItemProps> = ({
               e.stopPropagation();
               onArchiveNotebook(notebook.id);
             }}
-            className={cn(actionBtn, 'hover:text-amber-800 dark:hover:text-amber-300')}
+            className={cn(
+              actionBtn,
+              'hidden hover:text-amber-800 @[14rem]/sidebar:inline-flex dark:hover:text-amber-300'
+            )}
             title="Archive book"
             aria-label="Archive book"
           >
@@ -441,7 +457,7 @@ const NotebookItem: React.FC<NotebookItemProps> = ({
             transition={{ duration: 0.2 }}
             className="overflow-hidden"
           >
-            <div className="relative ml-4 mt-1 space-y-1 border-l border-[var(--app-border)] pl-3">
+            <div className="relative ml-2 mt-1 space-y-1 border-l border-[var(--app-border)] pl-2 @[14rem]/sidebar:ml-4 @[14rem]/sidebar:pl-3">
               {notebook.sections.length === 0 ? (
                 <button
                   type="button"
@@ -544,6 +560,7 @@ const SectionItem: React.FC<SectionItemProps> = ({
     editTarget?.kind === 'section' &&
     editTarget.id === section.id &&
     editTarget.notebookId === notebookId;
+  const chapterLabel = displaySectionTitle(section.title, chapterIndex);
 
   return (
     <div className="mb-1">
@@ -572,7 +589,7 @@ const SectionItem: React.FC<SectionItemProps> = ({
             <ChevronRight className="h-3.5 w-3.5" />
           )}
         </button>
-        <Bookmark className="h-3.5 w-3.5 shrink-0 opacity-70" />
+        <Bookmark className="hidden h-3.5 w-3.5 shrink-0 opacity-70 @[12rem]/sidebar:block" />
         <div className="min-w-0 flex-1">
           {editingSection ? (
             <input
@@ -595,8 +612,16 @@ const SectionItem: React.FC<SectionItemProps> = ({
             />
           ) : (
             <>
-              <div className="truncate text-sm font-medium">{section.title}</div>
-              <div className="text-[10px] uppercase tracking-wider text-[var(--app-muted)]">
+              <div
+                className={cn(
+                  'truncate text-sm font-medium',
+                  chapterLabel.untitled && 'italic text-[var(--app-muted)]'
+                )}
+                title={chapterLabel.text}
+              >
+                {chapterLabel.text}
+              </div>
+              <div className="hidden text-[10px] uppercase tracking-wider text-[var(--app-muted)] @[13rem]/sidebar:block">
                 Chapter {chapterIndex}
               </div>
             </>
@@ -622,7 +647,7 @@ const SectionItem: React.FC<SectionItemProps> = ({
               e.stopPropagation();
               onAddPage(section.id);
             }}
-            className={actionBtn}
+            className={cn(actionBtn, 'hidden @[12rem]/sidebar:inline-flex')}
             title="Add page"
             aria-label="Add page"
           >
@@ -634,7 +659,10 @@ const SectionItem: React.FC<SectionItemProps> = ({
               e.stopPropagation();
               onDeleteSection(notebookId, section.id);
             }}
-            className={cn(actionBtn, 'hover:text-red-700 dark:hover:text-red-300')}
+            className={cn(
+              actionBtn,
+              'hidden hover:text-red-700 @[14rem]/sidebar:inline-flex dark:hover:text-red-300'
+            )}
             title="Delete chapter"
             aria-label="Delete chapter"
           >
@@ -652,7 +680,7 @@ const SectionItem: React.FC<SectionItemProps> = ({
             transition={{ duration: 0.18 }}
             className="overflow-hidden"
           >
-            <div className="ml-5 mt-0.5 space-y-0.5 border-l border-dashed border-[var(--app-border)] pl-2">
+            <div className="ml-2 mt-0.5 space-y-0.5 border-l border-dashed border-[var(--app-border)] pl-1.5 @[14rem]/sidebar:ml-5 @[14rem]/sidebar:pl-2">
               {section.pages.length === 0 ? (
                 <button
                   type="button"
@@ -724,6 +752,7 @@ const PageRow: React.FC<PageRowProps> = ({
     editTarget?.kind === 'page' &&
     editTarget.id === page.id &&
     editTarget.sectionId === sectionId;
+  const pageLabel = displayPageTitle(page);
 
   return (
     <div
@@ -734,6 +763,7 @@ const PageRow: React.FC<PageRowProps> = ({
         !isActive && !isSecondary && 'hover:bg-[var(--gutter)]'
       )}
       onClick={(e) => onSelectPage(page.id, e.shiftKey)}
+      title={pageLabel.text}
     >
       <FileText
         className={cn(
@@ -761,11 +791,22 @@ const PageRow: React.FC<PageRowProps> = ({
           onClick={(e) => e.stopPropagation()}
         />
       ) : (
-        <span className="min-w-0 flex-1 truncate text-xs">
-          <span className={cn('mr-1 tabular-nums opacity-60', isActive && 'opacity-80')}>
+        <span
+          className={cn(
+            'min-w-0 flex-1 truncate text-xs',
+            pageLabel.untitled && !isActive && 'italic text-[var(--app-muted)]',
+            pageLabel.untitled && isActive && 'italic opacity-90'
+          )}
+        >
+          <span
+            className={cn(
+              'mr-1 hidden tabular-nums opacity-60 @[12rem]/sidebar:inline',
+              isActive && 'opacity-80'
+            )}
+          >
             {pageIndex}.
           </span>
-          {page.title}
+          {pageLabel.text}
         </span>
       )}
       <button
@@ -776,7 +817,7 @@ const PageRow: React.FC<PageRowProps> = ({
           setEditDraft(page.title);
         }}
         className={cn(
-          'rounded p-1 opacity-0 transition group-hover:opacity-100 focus:opacity-100',
+          'rounded p-1 opacity-0 transition group-hover:opacity-100 focus-visible:opacity-100 @[14rem]/sidebar:opacity-100',
           isActive ? 'hover:bg-white/15' : 'hover:bg-[var(--paper)]'
         )}
         title="Rename page"
@@ -791,7 +832,7 @@ const PageRow: React.FC<PageRowProps> = ({
           onDeletePage(sectionId, page.id);
         }}
         className={cn(
-          'rounded p-1 opacity-0 transition group-hover:opacity-100 focus:opacity-100',
+          'hidden rounded p-1 opacity-0 transition group-hover:opacity-100 focus-visible:opacity-100 @[14rem]/sidebar:inline-flex @[14rem]/sidebar:opacity-100',
           isActive ? 'hover:bg-white/15' : 'hover:bg-red-50 hover:text-red-700 dark:hover:bg-red-950/40'
         )}
         title="Delete page"

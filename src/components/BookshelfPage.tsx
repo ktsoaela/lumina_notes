@@ -2,17 +2,21 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import {
   ArrowLeft,
   Archive,
+  Bookmark,
   BookOpen,
   FileDown,
+  FileText,
+  List,
   Loader2,
   Pencil,
   Plus,
+  Search,
   Trash2,
   Upload,
   X,
 } from 'lucide-react';
 import { api } from '../lib/api';
-import type { Bookshelf, Notebook } from '../types';
+import type { Bookshelf, Notebook, Page, Section } from '../types';
 import { notebookToMarkdown, downloadText, parseImportedMarkdown } from '../lib/markdownIO';
 import { sanitizeFilename } from '../lib/filename';
 import { cn } from '../lib/utils';
@@ -20,9 +24,9 @@ import { useAppDialogs } from '../context/AppDialogsContext';
 import { useToast } from '../context/ToastContext';
 import { coerceEntityTitle, validateEntityTitle } from '../lib/validation';
 
-const BOOKS_PER_SHELF = 14;
+const BOOKS_PER_SHELF = 16;
 
-/** Quiet cloth / board tones — studio palette, not rainbow */
+/** Quiet cloth tones — Lumina studio family (no neon chart colors) */
 const SPINE_TONES = [
   '#3f5c52',
   '#547f72',
@@ -32,7 +36,11 @@ const SPINE_TONES = [
   '#7a6b5c',
   '#455a62',
   '#6e7870',
+  '#5a5348',
+  '#48605a',
 ] as const;
+
+type SpinePattern = 'cloth' | 'linen' | 'foil' | 'plain';
 
 function chunk<T>(items: T[], size: number): T[][] {
   const out: T[][] = [];
@@ -48,7 +56,6 @@ function sectionCount(nb: Notebook) {
   return nb.sections.length;
 }
 
-/** Stable 0–1 from id for width / lean / pattern */
 function bookSeed(id: string) {
   let h = 2166136261;
   for (let i = 0; i < id.length; i++) {
@@ -60,19 +67,213 @@ function bookSeed(id: string) {
 
 function bookMetrics(nb: Notebook, toneIndex: number) {
   const pages = pageCount(nb);
+  const chapters = sectionCount(nb);
   const s = bookSeed(nb.id);
-  const width = 22 + Math.min(18, pages * 0.65) + s * 6;
-  const height = Math.min(148, 74 + pages * 2.2 + s * 10);
-  const lean = (s - 0.5) * 2.4;
-  const pattern = Math.floor(s * 3); // 0 cloth, 1 linen bands, 2 soft foil
+  const width = 28 + Math.min(22, pages * 0.55 + chapters * 1.2) + s * 8;
+  const height = Math.min(220, 110 + pages * 2.4 + chapters * 4 + s * 18);
+  const depth = 90 + Math.min(70, pages * 1.8);
+  const patterns: SpinePattern[] = ['cloth', 'linen', 'foil', 'plain'];
   return {
     pages,
+    chapters,
     width,
     height,
-    lean,
-    pattern,
+    depth,
+    pattern: patterns[Math.floor(s * patterns.length)],
     tone: SPINE_TONES[toneIndex % SPINE_TONES.length],
+    initials: (nb.title?.trim() || 'LN')
+      .split(/\s+/)
+      .slice(0, 2)
+      .map((w) => w[0]?.toUpperCase() ?? '')
+      .join(''),
   };
+}
+
+function BookContentsPanel({
+  notebook,
+  unitTitle,
+  tab,
+  busyId,
+  onClose,
+  onOpenInNotes,
+  onOpenPage,
+  onExport,
+  onArchive,
+  onRestore,
+  onDeleteForever,
+}: {
+  notebook: Notebook;
+  unitTitle: string;
+  tab: 'active' | 'archived';
+  busyId: string | null;
+  onClose: () => void;
+  onOpenInNotes: () => void;
+  onOpenPage: (section: Section, page: Page) => void;
+  onExport: () => void;
+  onArchive: () => void;
+  onRestore: () => void;
+  onDeleteForever: () => void;
+}) {
+  const pages = pageCount(notebook);
+  const chapters = sectionCount(notebook);
+  const busy = busyId === notebook.id;
+  const tone = SPINE_TONES[notebook.title.length % SPINE_TONES.length];
+
+  return (
+    <div className="studio-panel mt-5 overflow-hidden bg-[var(--paper)] shadow-sm">
+      <div className="flex flex-wrap items-center justify-between gap-3 border-b border-[var(--app-border)] bg-[var(--gutter)]/40 px-4 py-3">
+        <div className="flex min-w-0 items-center gap-2">
+          <button type="button" onClick={onClose} className="studio-btn !px-2.5 !py-1.5 !text-xs">
+            <X className="h-3.5 w-3.5" />
+            Close
+          </button>
+          <span className="truncate text-[10px] font-medium uppercase tracking-[0.2em] text-[var(--app-muted)]">
+            {unitTitle} · book contents
+          </span>
+        </div>
+        {tab === 'active' ? (
+          <button
+            type="button"
+            onClick={onOpenInNotes}
+            className="studio-btn-primary !px-3 !py-1.5 !text-xs"
+          >
+            <BookOpen className="h-3.5 w-3.5" />
+            Open in Notes
+          </button>
+        ) : null}
+      </div>
+
+      <div className="grid gap-6 p-4 sm:p-6 md:grid-cols-12">
+        <div className="md:col-span-4">
+          <div
+            className="mx-auto flex aspect-[3/4] max-h-[min(340px,48vh)] w-full max-w-xs flex-col justify-between rounded-r-[var(--radius-ui)] rounded-l-md border-l-[6px] border-black/25 p-5 text-white shadow-[var(--shadow-soft)]"
+            style={{
+              background: `linear-gradient(155deg, ${tone} 0%, color-mix(in srgb, ${tone} 75%, #1a1a1a) 55%, #1a221e 100%)`,
+            }}
+          >
+            <p className="text-[10px] font-medium uppercase tracking-[0.28em] text-white/70">
+              Book
+            </p>
+            <div>
+              <h2 className="font-display text-2xl font-medium leading-tight tracking-tight">
+                {notebook.title?.trim() || 'Untitled'}
+              </h2>
+              <p className="mt-2 text-sm text-white/80">{unitTitle || 'Storage unit'}</p>
+            </div>
+            <dl className="grid grid-cols-2 gap-x-3 gap-y-1 rounded-lg bg-black/25 px-3 py-2 text-xs backdrop-blur-sm">
+              <dt className="text-white/65">Chapters</dt>
+              <dd className="font-medium">{chapters}</dd>
+              <dt className="text-white/65">Pages</dt>
+              <dd className="font-medium">{pages}</dd>
+              <dt className="text-white/65">Status</dt>
+              <dd className="font-medium">{tab === 'archived' ? 'Archived' : 'Active'}</dd>
+            </dl>
+          </div>
+
+          <div className="mt-4 flex flex-wrap gap-2">
+            {tab === 'active' ? (
+              <>
+                <button type="button" onClick={onOpenInNotes} className="studio-btn !text-xs">
+                  <BookOpen className="h-3.5 w-3.5" />
+                  Open
+                </button>
+                <button type="button" onClick={onExport} className="studio-btn !text-xs">
+                  <FileDown className="h-3.5 w-3.5" />
+                  Export MD
+                </button>
+                <button
+                  type="button"
+                  disabled={busy}
+                  onClick={onArchive}
+                  className="studio-btn !text-xs disabled:opacity-50"
+                >
+                  {busy ? (
+                    <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                  ) : (
+                    <Archive className="h-3.5 w-3.5" />
+                  )}
+                  Archive
+                </button>
+              </>
+            ) : (
+              <>
+                <button
+                  type="button"
+                  disabled={busy}
+                  onClick={onRestore}
+                  className="studio-btn-primary !text-xs disabled:opacity-50"
+                >
+                  <BookOpen className="h-3.5 w-3.5" />
+                  Restore
+                </button>
+                <button
+                  type="button"
+                  disabled={busy}
+                  onClick={onDeleteForever}
+                  className="studio-btn !text-xs text-red-700 disabled:opacity-50 dark:text-red-400"
+                >
+                  <Trash2 className="h-3.5 w-3.5" />
+                  Delete forever
+                </button>
+              </>
+            )}
+          </div>
+        </div>
+
+        <div className="md:col-span-8">
+          <div className="mb-3 flex items-center gap-2">
+            <List className="h-4 w-4 text-[var(--spine)]" />
+            <h3 className="font-display text-base font-medium">Book contents</h3>
+          </div>
+          <p className="mb-3 text-xs text-[var(--app-muted)]">
+            Book · chapter · page — open any page in Notes.
+          </p>
+          <div className="max-h-[min(55vh,480px)] space-y-2 overflow-y-auto pr-1">
+            {notebook.sections.length === 0 ? (
+              <p className="py-8 text-center text-sm text-[var(--app-muted)]">No chapters yet.</p>
+            ) : (
+              notebook.sections.map((sec, si) => (
+                <div
+                  key={sec.id}
+                  className="rounded-[var(--radius-ui)] border border-[var(--app-border)] bg-[var(--gutter)]/30 p-3"
+                >
+                  <div className="flex items-center gap-2">
+                    <Bookmark className="h-3.5 w-3.5 shrink-0 text-[var(--spine)]" />
+                    <h4 className="min-w-0 truncate text-sm font-medium">
+                      {sec.title?.trim() || `Chapter ${si + 1}`}
+                    </h4>
+                    <span className="ml-auto text-[10px] uppercase tracking-wide text-[var(--app-muted)]">
+                      {sec.pages.length} pg
+                    </span>
+                  </div>
+                  {sec.pages.length === 0 ? (
+                    <p className="mt-2 text-xs text-[var(--app-muted)]">No pages</p>
+                  ) : (
+                    <ul className="mt-2 space-y-1 border-t border-[var(--app-border)] pt-2">
+                      {sec.pages.map((pg) => (
+                        <li key={pg.id}>
+                          <button
+                            type="button"
+                            onClick={() => onOpenPage(sec, pg)}
+                            className="flex w-full items-start gap-2 rounded-lg px-2 py-1.5 text-left text-sm transition hover:bg-[var(--sage)]"
+                          >
+                            <FileText className="mt-0.5 h-3.5 w-3.5 shrink-0 text-[var(--app-muted)]" />
+                            <span className="min-w-0 truncate text-[var(--app-fg)]">
+                              {pg.title?.trim() || 'Untitled page'}
+                            </span>
+                          </button>
+                        </li>
+                      ))}
+                    </ul>
+                  )}
+                </div>
+              ))
+            )}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
 }
 
 interface BookshelfPageProps {
@@ -80,7 +281,12 @@ interface BookshelfPageProps {
   activeBookshelfId: string | null;
   onBack: () => void;
   onOpenShelfForNotes: (shelfId: string) => void;
-  onOpenNotebook: (notebookId: string, bookshelfId: string) => void;
+  onOpenNotebook: (
+    notebookId: string,
+    bookshelfId: string,
+    sectionId?: string,
+    pageId?: string
+  ) => void;
   onLibraryChanged: () => void;
   onRefreshBookshelves: () => Promise<void>;
 }
@@ -97,7 +303,8 @@ export default function BookshelfPage({
   const { confirm, promptText } = useAppDialogs();
   const toast = useToast();
   const [newUnitName, setNewUnitName] = useState('');
-  const [openUnitId, setOpenUnitId] = useState<string | null>(activeBookshelfId);
+  const [unitQuery, setUnitQuery] = useState('');
+  const [openUnitId, setOpenUnitId] = useState<string | null>(null);
   const [tab, setTab] = useState<'active' | 'archived'>('active');
   const [activeList, setActiveList] = useState<Notebook[]>([]);
   const [archivedList, setArchivedList] = useState<Notebook[]>([]);
@@ -105,6 +312,7 @@ export default function BookshelfPage({
   const [busy, setBusy] = useState<string | null>(null);
   const [preview, setPreview] = useState<Notebook | null>(null);
   const importRef = useRef<HTMLInputElement>(null);
+  const contentsRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     if (openUnitId && !bookshelves.some((b) => b.id === openUnitId)) {
@@ -148,6 +356,13 @@ export default function BookshelfPage({
     () => bookshelves.find((b) => b.id === openUnitId) ?? null,
     [bookshelves, openUnitId]
   );
+
+  const filteredUnits = useMemo(() => {
+    const q = unitQuery.trim().toLowerCase();
+    if (!q) return bookshelves;
+    return bookshelves.filter((u) => (u.title || '').toLowerCase().includes(q));
+  }, [bookshelves, unitQuery]);
+
   const list = tab === 'active' ? activeList : archivedList;
   const shelves = useMemo(() => chunk(list, BOOKS_PER_SHELF), [list]);
 
@@ -222,7 +437,7 @@ export default function BookshelfPage({
     const name = await promptText({
       title: 'New book',
       label: 'Title',
-      placeholder: 'e.g. Intake notes',
+      placeholder: 'e.g. Project notes',
       confirmLabel: 'Create',
     });
     if (name === null) return;
@@ -232,7 +447,7 @@ export default function BookshelfPage({
       const secId = `sec-${Date.now()}`;
       const pageId = `page-${Date.now()}`;
       await api.notebooks.create(nbId, coerceEntityTitle(name, 'notebook').slice(0, 80), openUnitId);
-      await api.sections.create(secId, nbId, 'Notes');
+      await api.sections.create(secId, nbId, 'Chapter 1');
       await api.pages.create(pageId, secId, 'Untitled page', '');
       await loadNotebooks();
       onLibraryChanged();
@@ -315,7 +530,7 @@ export default function BookshelfPage({
       const secId = `sec-${Date.now()}`;
       const pageId = `page-${Date.now()}`;
       await api.notebooks.create(nbId, base.slice(0, 80), openUnitId);
-      await api.sections.create(secId, nbId, 'Notes');
+      await api.sections.create(secId, nbId, 'Chapter 1');
       await api.pages.create(pageId, secId, title, content);
       await loadNotebooks();
       onLibraryChanged();
@@ -326,6 +541,13 @@ export default function BookshelfPage({
     } finally {
       setBusy(null);
     }
+  };
+
+  const selectBook = (nb: Notebook) => {
+    setPreview(nb);
+    requestAnimationFrame(() => {
+      contentsRef.current?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+    });
   };
 
   return (
@@ -341,7 +563,7 @@ export default function BookshelfPage({
         </button>
         <div>
           <p className="text-[10px] font-medium uppercase tracking-[0.28em] text-[var(--app-muted)]">
-            Place
+            Quiet place
           </p>
           <h1 className="font-display text-lg font-medium text-[var(--app-fg)]">
             {openUnit ? openUnit.title || 'Storage unit' : 'Library'}
@@ -354,12 +576,18 @@ export default function BookshelfPage({
           {!openUnit ? (
             <>
               <section className="studio-panel bg-[var(--paper)] p-6 shadow-sm">
-                <h2 className="mb-1 font-display text-base font-medium">Storage units</h2>
-                <p className="mb-4 text-sm text-[var(--app-muted)]">
-                  A place for your books. Open a unit to see its shelves.
+                <p className="text-[10px] font-medium uppercase tracking-[0.22em] text-[var(--app-muted)]">
+                  Collection
+                </p>
+                <h2 className="mt-1 font-display text-xl font-medium tracking-tight">
+                  Storage units
+                </h2>
+                <p className="mt-2 max-w-xl text-sm leading-relaxed text-[var(--app-muted)]">
+                  Units hold your books. Open one for shelves — then write chapters and pages in
+                  Notes.
                 </p>
                 <form
-                  className="flex flex-col gap-2 sm:flex-row"
+                  className="mt-5 flex flex-col gap-2 sm:flex-row sm:items-center"
                   onSubmit={(e) => {
                     e.preventDefault();
                     void createUnit();
@@ -389,71 +617,87 @@ export default function BookshelfPage({
               </section>
 
               {bookshelves.length === 0 ? (
-                <div className="flex flex-col items-center py-20 text-center">
-                  <svg
-                    width="56"
-                    height="48"
-                    viewBox="0 0 56 48"
-                    aria-hidden
-                    className="mb-4 opacity-60"
-                  >
-                    <rect
-                      x="4"
-                      y="6"
-                      width="48"
-                      height="36"
-                      rx="4"
-                      fill="var(--sage)"
-                      stroke="var(--app-border)"
-                    />
-                    <path
-                      d="M10 36h36M10 26h36M10 16h36"
-                      stroke="var(--stone)"
-                      strokeWidth="1.5"
-                      opacity="0.7"
-                    />
-                    <rect x="14" y="18" width="5" height="7" rx="0.5" fill="var(--spine)" opacity="0.55" />
-                    <rect x="21" y="20" width="4" height="5" rx="0.5" fill="#547f72" opacity="0.5" />
-                    <rect x="28" y="17" width="5" height="8" rx="0.5" fill="#6b7c75" opacity="0.5" />
-                  </svg>
+                <div className="studio-panel flex flex-col items-center bg-[var(--paper)] px-6 py-16 text-center shadow-sm">
                   <p className="font-display text-lg font-medium">No storage units yet</p>
                   <p className="mt-1 max-w-sm text-sm text-[var(--app-muted)]">
-                    Add a unit above, then fill its shelves with books.
+                    Add a unit above, then put books on its shelves.
                   </p>
                 </div>
               ) : (
-                <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-                  {bookshelves.map((unit) => (
-                    <button
-                      key={unit.id}
-                      type="button"
-                      onClick={() => setOpenUnitId(unit.id)}
-                      className="library-unit group text-left"
-                    >
-                      <span className="library-unit-face" aria-hidden>
-                        <span className="library-unit-rail" />
-                        <span className="library-unit-rail" />
-                        <span className="library-unit-rail" />
-                      </span>
-                      <span className="block px-4 pb-4 pt-3">
-                        <span className="block text-[10px] font-medium uppercase tracking-[0.2em] text-[var(--app-muted)]">
-                          Storage unit
-                        </span>
-                        <span className="mt-1 block truncate font-display text-lg font-medium tracking-tight">
-                          {unit.title || 'Untitled'}
-                        </span>
-                        <span className="mt-2 block text-xs text-[var(--app-muted)] transition group-hover:text-[var(--spine)]">
-                          Open shelves →
-                        </span>
-                      </span>
-                    </button>
-                  ))}
-                </div>
+                <section className="studio-panel overflow-hidden bg-[var(--paper)] shadow-sm">
+                  <div className="flex flex-wrap items-center gap-3 border-b border-[var(--app-border)] px-4 py-3">
+                    <div className="relative min-w-0 flex-1">
+                      <Search className="pointer-events-none absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-[var(--app-muted)]" />
+                      <input
+                        type="search"
+                        value={unitQuery}
+                        onChange={(e) => setUnitQuery(e.target.value)}
+                        placeholder="Find a storage unit…"
+                        className="studio-input !pl-9"
+                        aria-label="Search storage units"
+                      />
+                    </div>
+                    <p className="text-xs tabular-nums text-[var(--app-muted)]">
+                      {filteredUnits.length}
+                      {unitQuery.trim() ? ` of ${bookshelves.length}` : ''} unit
+                      {filteredUnits.length === 1 ? '' : 's'}
+                    </p>
+                  </div>
+
+                  {filteredUnits.length === 0 ? (
+                    <p className="px-4 py-12 text-center text-sm text-[var(--app-muted)]">
+                      No units match “{unitQuery.trim()}”.
+                    </p>
+                  ) : (
+                    <ul className="max-h-[min(62vh,640px)] divide-y divide-[var(--app-border)] overflow-y-auto">
+                      {filteredUnits.map((unit) => {
+                        const inNotes = activeBookshelfId === unit.id;
+                        return (
+                          <li key={unit.id}>
+                            <button
+                              type="button"
+                              onClick={() => setOpenUnitId(unit.id)}
+                              className={cn(
+                                'flex w-full items-center gap-3 px-4 py-3 text-left transition hover:bg-[var(--sage)]/50',
+                                inNotes && 'bg-[var(--sage)]/35'
+                              )}
+                            >
+                              <span
+                                className="library-unit-mark shrink-0"
+                                aria-hidden
+                              />
+                              <span className="min-w-0 flex-1">
+                                <span className="block truncate font-medium tracking-tight">
+                                  {unit.title || 'Untitled'}
+                                </span>
+                                <span className="mt-0.5 block text-[11px] text-[var(--app-muted)]">
+                                  Storage unit
+                                  {inNotes ? ' · open in Notes' : ''}
+                                </span>
+                              </span>
+                              <span className="shrink-0 text-xs text-[var(--app-muted)]">
+                                Open →
+                              </span>
+                            </button>
+                          </li>
+                        );
+                      })}
+                    </ul>
+                  )}
+                </section>
               )}
             </>
           ) : (
             <>
               <section className="studio-panel flex flex-wrap items-center gap-2 bg-[var(--paper)] p-3 shadow-sm">
+                <button
+                  type="button"
+                  onClick={() => setOpenUnitId(null)}
+                  className="studio-btn !px-3 !py-2 !text-xs"
+                >
+                  <ArrowLeft className="h-3.5 w-3.5" />
+                  All units
+                </button>
                 <button
                   type="button"
                   onClick={() => onOpenShelfForNotes(openUnit.id)}
@@ -493,7 +737,7 @@ export default function BookshelfPage({
                   ) : (
                     <Upload className="h-3.5 w-3.5" />
                   )}
-                  Import
+                  Import MD
                 </button>
                 <button
                   type="button"
@@ -542,9 +786,12 @@ export default function BookshelfPage({
               </section>
 
               <section className="studio-panel bg-[var(--paper)] p-5 shadow-sm sm:p-6">
-                <h2 className="mb-1 font-display text-base font-medium">Shelves</h2>
-                <p className="mb-5 text-sm text-[var(--app-muted)]">
-                  Select a book to preview, then open it in Notes to write.
+                <p className="text-[10px] font-medium uppercase tracking-[0.22em] text-[var(--app-muted)]">
+                  Shelves
+                </p>
+                <h2 className="mt-1 font-display text-base font-medium">Books in this unit</h2>
+                <p className="mt-1 mb-5 text-sm text-[var(--app-muted)]">
+                  Hover to lift a book · click for contents (chapters &amp; pages).
                 </p>
 
                 {loading ? (
@@ -556,136 +803,79 @@ export default function BookshelfPage({
                     This unit is empty. Add a book or import Markdown.
                   </p>
                 ) : (
-                  <div className="space-y-5">
+                  <div className="space-y-6">
                     {shelves.map((row, ri) => (
-                      <div key={ri} className="library-shelf">
-                        <div className="library-shelf-back" aria-hidden />
-                        <div className="library-shelf-row">
+                      <div key={ri} className="vb-shelf">
+                        <div className="vb-shelf-plank" aria-hidden />
+                        <div className="vb-bookshelf">
                           {row.map((nb, bi) => {
                             const title = nb.title?.trim() || 'Untitled';
-                            const m = bookMetrics(
-                              nb,
-                              ri * BOOKS_PER_SHELF + bi
-                            );
+                            const m = bookMetrics(nb, ri * BOOKS_PER_SHELF + bi);
                             return (
                               <button
                                 key={nb.id}
                                 type="button"
-                                title={`${title} · ${m.pages} pages`}
-                                aria-label={`${title}, ${m.pages} pages`}
+                                title={`${title} · ${m.chapters} ch · ${m.pages} pg`}
+                                aria-label={`${title}, ${m.chapters} chapters, ${m.pages} pages`}
                                 aria-pressed={preview?.id === nb.id}
-                                onClick={() => setPreview(nb)}
+                                onClick={() => selectBook(nb)}
                                 className={cn(
-                                  'library-book',
-                                  `library-book--p${m.pattern}`,
-                                  tab === 'archived' && 'library-book--archived',
-                                  preview?.id === nb.id && 'library-book-active'
+                                  'vb-book',
+                                  `vb-book--${m.pattern}`,
+                                  tab === 'archived' && 'vb-book--archived',
+                                  preview?.id === nb.id && 'vb-book--active'
                                 )}
                                 style={
                                   {
                                     width: `${m.width}px`,
                                     height: `${m.height}px`,
                                     ['--spine-tone' as string]: m.tone,
-                                    ['--book-lean' as string]: `${m.lean}deg`,
+                                    ['--book-depth' as string]: `${m.depth}px`,
                                   } as React.CSSProperties
                                 }
                               >
-                                <span className="library-book-pages" aria-hidden />
-                                <span className="library-book-spine">
-                                  <span className="library-book-headband" aria-hidden />
-                                  <span className="library-book-title">
-                                    {title.length > 34 ? `${title.slice(0, 32)}…` : title}
+                                <span className="vb-side vb-spine">
+                                  <span className="vb-spine-title">
+                                    {title.length > 42 ? `${title.slice(0, 40)}…` : title}
                                   </span>
-                                  <span className="library-book-footband" aria-hidden />
+                                  <span className="vb-spine-meta">{m.initials || '·'}</span>
                                 </span>
-                                <span className="library-book-edge" aria-hidden />
+                                <span className="vb-side vb-top" aria-hidden />
+                                <span className="vb-side vb-cover" aria-hidden>
+                                  <span className="vb-cover-mark" />
+                                </span>
                               </button>
                             );
                           })}
                         </div>
-                        <div className="library-shelf-board" aria-hidden />
-                        <div className="library-shelf-lip" aria-hidden />
                       </div>
                     ))}
                   </div>
                 )}
 
-                {preview ? (
-                  <div className="mt-6 border-t border-[var(--app-border)] pt-5">
-                    <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
-                      <div>
-                        <p className="text-[10px] font-medium uppercase tracking-[0.2em] text-[var(--app-muted)]">
-                          Book
-                        </p>
-                        <h3 className="font-display text-lg font-medium">
-                          {preview.title?.trim() || 'Untitled'}
-                        </h3>
-                        <p className="mt-0.5 text-xs text-[var(--app-muted)]">
-                          {sectionCount(preview)} chapters · {pageCount(preview)} pages
-                        </p>
-                      </div>
-                      <button type="button" onClick={() => setPreview(null)} className="studio-btn">
-                        <X className="h-3.5 w-3.5" />
-                        Close
-                      </button>
-                    </div>
-                    <div className="flex flex-wrap gap-2">
-                      {tab === 'active' ? (
-                        <>
-                          <button
-                            type="button"
-                            onClick={() => {
-                              onOpenNotebook(preview.id, openUnit.id);
-                              setPreview(null);
-                            }}
-                            className="studio-btn-primary !px-3 !py-2 !text-xs"
-                          >
-                            <BookOpen className="h-3.5 w-3.5" />
-                            Open in Notes
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => exportNb(preview)}
-                            className="studio-btn"
-                          >
-                            <FileDown className="h-3.5 w-3.5" />
-                            Export
-                          </button>
-                          <button
-                            type="button"
-                            disabled={busy === preview.id}
-                            onClick={() => void archive(preview.id)}
-                            className="studio-btn"
-                          >
-                            <Archive className="h-3.5 w-3.5" />
-                            Archive
-                          </button>
-                        </>
-                      ) : (
-                        <>
-                          <button
-                            type="button"
-                            disabled={busy === preview.id}
-                            onClick={() => void restore(preview)}
-                            className="studio-btn-primary !px-3 !py-2 !text-xs"
-                          >
-                            <BookOpen className="h-3.5 w-3.5" />
-                            Restore
-                          </button>
-                          <button
-                            type="button"
-                            disabled={busy === preview.id}
-                            onClick={() => void removeForever(preview.id)}
-                            className="studio-btn text-red-700 dark:text-red-400"
-                          >
-                            <Trash2 className="h-3.5 w-3.5" />
-                            Delete forever
-                          </button>
-                        </>
-                      )}
-                    </div>
-                  </div>
-                ) : null}
+                <div ref={contentsRef}>
+                  {preview ? (
+                    <BookContentsPanel
+                      notebook={preview}
+                      unitTitle={openUnit.title}
+                      tab={tab}
+                      busyId={busy}
+                      onClose={() => setPreview(null)}
+                      onOpenInNotes={() => {
+                        onOpenNotebook(preview.id, openUnit.id);
+                        setPreview(null);
+                      }}
+                      onOpenPage={(sec, pg) => {
+                        onOpenNotebook(preview.id, openUnit.id, sec.id, pg.id);
+                        setPreview(null);
+                      }}
+                      onExport={() => exportNb(preview)}
+                      onArchive={() => void archive(preview.id)}
+                      onRestore={() => void restore(preview)}
+                      onDeleteForever={() => void removeForever(preview.id)}
+                    />
+                  ) : null}
+                </div>
               </section>
             </>
           )}

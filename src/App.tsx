@@ -48,7 +48,7 @@ import {
 } from './lib/authCache';
 import { exportMarkdownToPdf } from './lib/exportPdf';
 import { openPrintWindow } from './lib/printDocument';
-import { sanitizeFilename } from './lib/filename';
+import { buildExportFilename, buildExportTitle } from './lib/filename';
 import {
   applyTheme,
   getStoredTheme,
@@ -174,6 +174,7 @@ export default function App() {
 
   type MainView = 'notes' | 'profile' | 'bookshelf';
   const [mainView, setMainView] = useState<MainView>('notes');
+  const [librarySession, setLibrarySession] = useState(0);
 
   useEffect(() => {
     setProfileMenuOpen(false);
@@ -356,22 +357,37 @@ export default function App() {
 
   const handlePrintPrimary = useCallback(() => {
     if (!activePage) return;
-    openPrintWindow(activePage.title, activePage.content);
-  }, [activePage]);
+    const parts = {
+      book: activeNotebook?.title,
+      chapter: activeSection?.title,
+      page: activePage.title,
+    };
+    openPrintWindow(buildExportTitle(parts), activePage.content, buildExportFilename(parts));
+  }, [activePage, activeNotebook?.title, activeSection?.title]);
 
   const handlePrintSecondary = useCallback(() => {
     if (!secondaryPage) return;
-    openPrintWindow(secondaryPage.title, secondaryPage.content);
-  }, [secondaryPage]);
+    const parts = {
+      book: activeNotebook?.title,
+      chapter: secondarySection?.title,
+      page: secondaryPage.title,
+    };
+    openPrintWindow(buildExportTitle(parts), secondaryPage.content, buildExportFilename(parts));
+  }, [secondaryPage, activeNotebook?.title, secondarySection?.title]);
 
   const handleExportPdfPrimary = useCallback(async () => {
     if (!activePage) return;
     setPdfExportingPrimary(true);
     try {
+      const parts = {
+        book: activeNotebook?.title,
+        chapter: activeSection?.title,
+        page: activePage.title,
+      };
       await exportMarkdownToPdf(
-        activePage.title,
+        buildExportTitle(parts),
         activePage.content,
-        sanitizeFilename(activePage.title)
+        buildExportFilename(parts)
       );
     } catch (err) {
       console.error('PDF export failed', err);
@@ -379,16 +395,21 @@ export default function App() {
     } finally {
       setPdfExportingPrimary(false);
     }
-  }, [activePage, toast]);
+  }, [activePage, activeNotebook?.title, activeSection?.title, toast]);
 
   const handleExportPdfSecondary = useCallback(async () => {
     if (!secondaryPage) return;
     setPdfExportingSecondary(true);
     try {
+      const parts = {
+        book: activeNotebook?.title,
+        chapter: secondarySection?.title,
+        page: secondaryPage.title,
+      };
       await exportMarkdownToPdf(
-        secondaryPage.title,
+        buildExportTitle(parts),
         secondaryPage.content,
-        sanitizeFilename(secondaryPage.title)
+        buildExportFilename(parts)
       );
     } catch (err) {
       console.error('PDF export failed', err);
@@ -396,7 +417,7 @@ export default function App() {
     } finally {
       setPdfExportingSecondary(false);
     }
-  }, [secondaryPage, toast]);
+  }, [secondaryPage, activeNotebook?.title, secondarySection?.title, toast]);
 
   const updatePageContentById = useCallback(async (pageId: string, content: string) => {
     const contentCheck = validatePageContent(content);
@@ -667,9 +688,13 @@ export default function App() {
     setMainView('notes');
   };
 
-  const handleExportMarkdownPage = useCallback((title: string, content: string) => {
-    downloadText(sanitizeFilename(title), pageToMarkdown(title, content));
-  }, []);
+  const handleExportMarkdownPage = useCallback(
+    (parts: { book?: string | null; chapter?: string | null; page: string }, content: string) => {
+      const stem = buildExportFilename(parts);
+      downloadText(stem, pageToMarkdown(parts.page, content));
+    },
+    []
+  );
 
   const handleUserUpdated = (user: User, token: string) => {
     writeSession(user, token);
@@ -831,7 +856,10 @@ export default function App() {
             </button>
             <button
               type="button"
-              onClick={() => setMainView('bookshelf')}
+              onClick={() => {
+                setLibrarySession((n) => n + 1);
+                setMainView('bookshelf');
+              }}
               data-active={mainView === 'bookshelf'}
               className="mind-nav-btn"
             >
@@ -911,7 +939,7 @@ export default function App() {
             </button>
           )}
 
-          <div className="relative" ref={profileMenuRef}>
+          <div className="relative z-[70]" ref={profileMenuRef}>
             <button
               type="button"
               onClick={() => setProfileMenuOpen((o) => !o)}
@@ -933,7 +961,7 @@ export default function App() {
             </button>
             {profileMenuOpen ? (
               <div
-                className="studio-panel absolute top-full right-0 z-50 mt-1 w-52 bg-[var(--paper)] p-1"
+                className="studio-panel absolute top-full right-0 z-[80] mt-1 w-52 bg-[var(--paper)] p-1 shadow-[var(--shadow-soft)]"
                 role="menu"
               >
                 <button
@@ -961,7 +989,7 @@ export default function App() {
                     setProfileMenuOpen(false);
                     handleLogout();
                   }}
-                  className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-xs text-red-600 transition-colors hover:bg-red-50 dark:text-red-400 dark:hover:bg-red-950/40"
+                  className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-xs studio-danger-text transition-colors hover:bg-[var(--danger-soft)]"
                 >
                   <LogOut className="h-3 w-3 shrink-0" />
                   Logout
@@ -988,7 +1016,7 @@ export default function App() {
         }}
       />
 
-      <main className="flex-1 overflow-hidden relative min-h-0">
+      <main className="relative z-0 min-h-0 flex-1 overflow-hidden">
         {isAppLoading && (
           <div className="absolute inset-0 bg-white/80 dark:bg-[var(--app-bg)]/80 backdrop-blur-[1px] z-50 flex items-center justify-center">
             <Loader2 className="w-8 h-8 text-brand-600 animate-spin" />
@@ -1029,6 +1057,7 @@ export default function App() {
             }
           >
             <BookshelfPage
+              key={librarySession}
               bookshelves={bookshelves}
               activeBookshelfId={activeBookshelfId}
               onBack={() => setMainView('notes')}
@@ -1124,7 +1153,14 @@ export default function App() {
                         onPrint={() => handlePrintPrimary()}
                         onExportPdf={handleExportPdfPrimary}
                         onExportMarkdown={() =>
-                          handleExportMarkdownPage(activePage.title, activePage.content)
+                          handleExportMarkdownPage(
+                            {
+                              book: notePath.bookTitle,
+                              chapter: notePath.chapterTitle,
+                              page: activePage.title,
+                            },
+                            activePage.content
+                          )
                         }
                         pdfExporting={pdfExportingPrimary}
                       />
@@ -1147,7 +1183,11 @@ export default function App() {
                           onExportPdf={handleExportPdfSecondary}
                           onExportMarkdown={() =>
                             handleExportMarkdownPage(
-                              secondaryPage.title,
+                              {
+                                book: secondaryPath.bookTitle,
+                                chapter: secondaryPath.chapterTitle,
+                                page: secondaryPage.title,
+                              },
                               secondaryPage.content
                             )
                           }
@@ -1183,7 +1223,14 @@ export default function App() {
                     onPrint={() => handlePrintPrimary()}
                     onExportPdf={handleExportPdfPrimary}
                     onExportMarkdown={() =>
-                      handleExportMarkdownPage(activePage.title, activePage.content)
+                      handleExportMarkdownPage(
+                        {
+                          book: notePath.bookTitle,
+                          chapter: notePath.chapterTitle,
+                          page: activePage.title,
+                        },
+                        activePage.content
+                      )
                     }
                     pdfExporting={pdfExportingPrimary}
                   />

@@ -165,7 +165,7 @@ export function AppDialogsProvider({ children }: { children: React.ReactNode }) 
                   className={cn(
                     'inline-flex items-center justify-center rounded-lg px-4 py-2 text-sm font-semibold text-white transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-500 focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--app-surface)]',
                     pending.options.variant === 'danger'
-                      ? 'bg-red-600 hover:bg-red-700'
+                      ? 'studio-btn-danger-solid !rounded-lg'
                       : 'bg-brand-700 hover:bg-brand-800'
                   )}
                   onClick={() => {

@@ -1,80 +1,112 @@
-import html2pdf from 'html2pdf.js';
-import { createPrintRootElement } from './printDocument';
+import { buildPrintDocumentHtml } from './printDocument';
+
+declare global {
+  interface Window {
+    luminaDesktop?: {
+      isDesktop: boolean;
+      exportPdf: (
+        html: string,
+        filename: string
+      ) => Promise<{ ok: boolean; path?: string; canceled?: boolean; error?: string }>;
+    };
+  }
+}
+
+function downloadBlob(blob: Blob, filename: string) {
+  const a = document.createElement('a');
+  const url = URL.createObjectURL(blob);
+  a.href = url;
+  a.download = filename.endsWith('.pdf') ? filename : `${filename}.pdf`;
+  a.click();
+  URL.revokeObjectURL(url);
+}
+
+async function exportPdfViaApi(
+  title: string,
+  markdown: string,
+  filenameBase: string
+): Promise<void> {
+  const token = localStorage.getItem('lumina_token');
+  const res = await fetch('/api/export/pdf', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+    },
+    body: JSON.stringify({
+      title,
+      markdown,
+      filename: filenameBase,
+    }),
+  });
+  if (!res.ok) {
+    let detail = 'PDF export failed';
+    try {
+      const j = (await res.json()) as { detail?: string };
+      if (j.detail) detail = j.detail;
+    } catch {
+      /* ignore */
+    }
+    throw new Error(detail);
+  }
+  const blob = await res.blob();
+  const type = (blob.type || res.headers.get('content-type') || '').toLowerCase();
+  // Reject empty / non-PDF bodies (e.g. stale proxy HTML, broken renderer)
+  if (blob.size < 1024 || (type && !type.includes('pdf') && !type.includes('octet-stream'))) {
+    throw new Error(
+      `PDF export returned invalid file (${blob.size} bytes, ${type || 'unknown type'})`
+    );
+  }
+  downloadBlob(blob, `${filenameBase}.pdf`);
+}
+
+async function exportPdfViaHtml2Pdf(
+  title: string,
+  markdown: string,
+  filenameBase: string
+): Promise<void> {
+  const { exportMarkdownToPdf: legacy } = await import('./exportPdfLegacy');
+  await legacy(title, markdown, filenameBase);
+}
 
 /**
- * PDF from the same rendered Markdown/HTML as print (workbook-style document + metadata).
+ * Hybrid PDF export:
+ * 1) Electron Chromium printToPDF (desktop)
+ * 2) Python API → Chrome/Edge --print-to-pdf (or Playwright)
+ * 3) Browser html2pdf fallback
  */
 export async function exportMarkdownToPdf(
   title: string,
   markdown: string,
   filenameBase: string
 ): Promise<void> {
-  const el = createPrintRootElement(title, markdown);
-  document.body.appendChild(el);
-  try {
-    await exportPageToPdf(el, filenameBase);
-  } finally {
-    el.remove();
+  const html = buildPrintDocumentHtml(title, markdown, filenameBase);
+  const errors: string[] = [];
+
+  if (window.luminaDesktop?.exportPdf) {
+    try {
+      const result = await window.luminaDesktop.exportPdf(html, `${filenameBase}.pdf`);
+      if (result.ok) return;
+      if (result.canceled) return;
+      if (result.error) errors.push(`electron: ${result.error}`);
+    } catch (e) {
+      errors.push(`electron: ${e instanceof Error ? e.message : String(e)}`);
+    }
   }
-}
-
-/**
- * Renders a DOM subtree to A4 PDF via html2canvas + jsPDF.
- * Temporarily moves the node on-screen — html2canvas often returns a blank PDF
- * for elements far outside the viewport (e.g. left: -12000px) or display:none.
- */
-export async function exportPageToPdf(
-  sourceElement: HTMLElement,
-  filenameBase: string
-): Promise<void> {
-  const el = sourceElement;
-  const prevCss = el.style.cssText;
-
-  // Bring on-screen for rasterization; inline styles override Tailwind opacity/position.
-  Object.assign(el.style, {
-    position: 'fixed',
-    left: '0',
-    top: '0',
-    width: '210mm',
-    maxWidth: '210mm',
-    boxSizing: 'border-box',
-    background: '#ffffff',
-    zIndex: '2147483646',
-    opacity: '1',
-    visibility: 'visible',
-    pointerEvents: 'none',
-    overflow: 'visible',
-  });
-
-  await document.fonts.ready.catch(() => undefined);
-  await new Promise<void>((resolve) => {
-    requestAnimationFrame(() => requestAnimationFrame(() => resolve()));
-  });
-  // Mermaid / async SVG layout
-  await new Promise((r) => setTimeout(r, 250));
 
   try {
-    await html2pdf()
-      .set({
-        margin: [12, 12, 12, 12],
-        filename: `${filenameBase}.pdf`,
-        image: { type: 'jpeg', quality: 0.92 },
-        html2canvas: {
-          scale: 2,
-          useCORS: true,
-          allowTaint: true,
-          logging: false,
-          backgroundColor: '#ffffff',
-          scrollX: 0,
-          scrollY: 0,
-        },
-        jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' },
-        pagebreak: { mode: ['css', 'legacy'] },
-        // html2pdf.js supports pagebreak; typings omit it
-      } as never)
-      .from(el)
-      .save();
-  } finally {
-    el.style.cssText = prevCss;
+    await exportPdfViaApi(title, markdown, filenameBase);
+    return;
+  } catch (e) {
+    errors.push(`api: ${e instanceof Error ? e.message : String(e)}`);
   }
+
+  try {
+    await exportPdfViaHtml2Pdf(title, markdown, filenameBase);
+    return;
+  } catch (e) {
+    errors.push(`html2pdf: ${e instanceof Error ? e.message : String(e)}`);
+  }
+
+  throw new Error(errors.join(' · ') || 'PDF export failed');
 }

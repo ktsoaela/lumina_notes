@@ -1,4 +1,4 @@
-const { app, BrowserWindow, dialog, nativeImage } = require("electron");
+const { app, BrowserWindow, dialog, ipcMain, nativeImage } = require("electron");
 const path = require("path");
 const fs = require("fs");
 const { spawn } = require("child_process");
@@ -77,7 +77,6 @@ function startBackend() {
   backendProc.on("exit", (code, signal) => {
     if (code && code !== 0) {
       console.error(`Backend exited code=${code} signal=${signal}`);
-      if (stderr) console.error(stderr);
     }
   });
   return waitForServer(PROD_URL).catch((err) => {
@@ -99,6 +98,7 @@ function killBackend() {
 
 function webPrefs() {
   return {
+    preload: path.join(__dirname, "preload.cjs"),
     nodeIntegration: false,
     contextIsolation: true,
     sandbox: true,
@@ -131,6 +131,62 @@ async function createWindow() {
     mainWindow = null;
   });
 }
+
+/** Chromium printToPDF in a hidden window — same engine as Chrome. */
+ipcMain.handle("lumina:export-pdf", async (_event, payload) => {
+  const html = typeof payload?.html === "string" ? payload.html : "";
+  let filename = String(payload?.filename || "note.pdf").replace(
+    /[<>:"/\\|?*\x00-\x1f]/g,
+    ""
+  );
+  if (!filename.toLowerCase().endsWith(".pdf")) filename += ".pdf";
+  if (!html.trim()) {
+    return { ok: false, error: "Empty document" };
+  }
+
+  const win = new BrowserWindow({
+    show: false,
+    width: 800,
+    height: 1100,
+    webPreferences: {
+      offscreen: true,
+      nodeIntegration: false,
+      contextIsolation: true,
+      sandbox: true,
+    },
+  });
+
+  try {
+    await win.loadURL(
+      `data:text/html;charset=utf-8,${encodeURIComponent(html)}`
+    );
+    await new Promise((r) => setTimeout(r, 400));
+    const pdf = await win.webContents.printToPDF({
+      printBackground: true,
+      pageSize: "A4",
+      margins: { marginType: "default" },
+    });
+
+    const { canceled, filePath } = await dialog.showSaveDialog(
+      mainWindow || win,
+      {
+        title: "Save PDF",
+        defaultPath: filename,
+        filters: [{ name: "PDF", extensions: ["pdf"] }],
+      }
+    );
+    if (canceled || !filePath) {
+      return { ok: false, canceled: true };
+    }
+    fs.writeFileSync(filePath, pdf);
+    return { ok: true, path: filePath };
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
+    return { ok: false, error: message };
+  } finally {
+    if (!win.isDestroyed()) win.destroy();
+  }
+});
 
 async function boot() {
   try {
