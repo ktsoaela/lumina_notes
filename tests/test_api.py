@@ -91,6 +91,46 @@ class ApiIntegrationTests(unittest.TestCase):
         )
         self.assertEqual(res.status_code, 422)
 
+    def test_change_password(self) -> None:
+        signup = self.client.post(
+            "/api/auth/signup",
+            json={
+                "email": "carol@example.com",
+                "password": "oldpass1",
+                "name": "Carol",
+                "username": "carol",
+            },
+        )
+        self.assertEqual(signup.status_code, 200, signup.text)
+        token = signup.json()["token"]
+        headers = {"Authorization": f"Bearer {token}"}
+
+        bad = self.client.put(
+            "/api/auth/password",
+            headers=headers,
+            json={"currentPassword": "wrong", "newPassword": "newpass1"},
+        )
+        self.assertEqual(bad.status_code, 400)
+
+        ok = self.client.put(
+            "/api/auth/password",
+            headers=headers,
+            json={"currentPassword": "oldpass1", "newPassword": "newpass1"},
+        )
+        self.assertEqual(ok.status_code, 200, ok.text)
+
+        old_login = self.client.post(
+            "/api/auth/login",
+            json={"identifier": "carol", "password": "oldpass1"},
+        )
+        self.assertEqual(old_login.status_code, 401)
+
+        new_login = self.client.post(
+            "/api/auth/login",
+            json={"identifier": "carol", "password": "newpass1"},
+        )
+        self.assertEqual(new_login.status_code, 200)
+
     def test_notebook_crud_requires_auth(self) -> None:
         res = self.client.get("/api/notebooks")
         self.assertEqual(res.status_code, 401)

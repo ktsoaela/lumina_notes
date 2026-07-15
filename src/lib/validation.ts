@@ -216,6 +216,28 @@ export function validateProfileInput(input: {
   };
 }
 
+export function validatePasswordChangeInput(input: {
+  currentPassword: string;
+  newPassword: string;
+  confirmPassword: string;
+}): { ok: true; data: { currentPassword: string; newPassword: string } } | { ok: false; error: string } {
+  if (!input.currentPassword) {
+    return { ok: false, error: 'Current password is required' };
+  }
+  const next = validatePassword(input.newPassword);
+  if (next.ok === false) return { ok: false, error: next.error };
+  if (input.newPassword !== input.confirmPassword) {
+    return { ok: false, error: 'New passwords do not match' };
+  }
+  if (input.currentPassword === input.newPassword) {
+    return { ok: false, error: 'New password must be different from the current password' };
+  }
+  return {
+    ok: true,
+    data: { currentPassword: input.currentPassword, newPassword: next.value },
+  };
+}
+
 /** Extract FastAPI `detail` from JSON error bodies. */
 export function parseApiErrorDetail(
   body: unknown,

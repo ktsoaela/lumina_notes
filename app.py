@@ -715,6 +715,11 @@ class NotebookArchiveBody(BaseModel):
     archived: bool
 
 
+class PasswordChange(BaseModel):
+    currentPassword: str = Field(..., min_length=1, max_length=128)
+    newPassword: str = Field(..., min_length=6, max_length=128)
+
+
 class ProfileUpdate(BaseModel):
     name: str | None = Field(None, max_length=80)
     email: str | None = Field(None, max_length=254)
@@ -976,6 +981,32 @@ def auth_me(user: CurrentUser, db: Db):
     if row is None:
         return user
     return _row_to_user(row)
+
+
+@app.put("/api/auth/password")
+def auth_password_change(
+    request: Request, user: CurrentUser, body: PasswordChange, db: Db
+):
+    _rate_limit_auth(request)
+    if body.currentPassword == body.newPassword:
+        raise HTTPException(
+            status.HTTP_400_BAD_REQUEST,
+            detail="New password must be different from the current password",
+        )
+    row = db.execute(
+        "SELECT id, password FROM users WHERE id = ?", (user["id"],)
+    ).fetchone()
+    if row is None:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, detail="User not found")
+    if not verify_password(body.currentPassword, row["password"]):
+        raise HTTPException(
+            status.HTTP_400_BAD_REQUEST, detail="Current password is incorrect"
+        )
+    db.execute(
+        "UPDATE users SET password = ? WHERE id = ?",
+        (hash_password(body.newPassword), user["id"]),
+    )
+    return {"ok": True}
 
 
 @app.put("/api/auth/profile")

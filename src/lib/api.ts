@@ -61,6 +61,19 @@ export const api = {
       }
       return res.json() as Promise<{ token: string; user: User }>;
     },
+    changePassword: async (body: {
+      currentPassword: string;
+      newPassword: string;
+    }) => {
+      const res = await fetch('/api/auth/password', {
+        method: 'PUT',
+        headers: getHeaders(),
+        body: JSON.stringify(body),
+      });
+      if (!res.ok) {
+        throw new Error(await readApiError(res, 'Password change failed'));
+      }
+    },
     closeAccount: async () => {
       const res = await fetch('/api/auth/account', {
         method: 'DELETE',
