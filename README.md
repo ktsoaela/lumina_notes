@@ -6,7 +6,7 @@
 
 **simple_markdown_notebook_application**
 
-A Markdown note-taking app with a OneNote-inspired hierarchy (bookshelves → notebooks → sections → pages), Mermaid diagrams, Plotly charts, print/PDF export, and a Windows Electron desktop shell.
+A Markdown note-taking app with a OneNote-inspired hierarchy (bookshelves → notebooks → sections → pages), Mermaid diagrams, Plotly charts, print/PDF export, desktop installers (Windows / macOS), Android APK, and free sync via your own FastAPI (no Supabase).
 
 **Author:** [Khotso Tsoaela](https://github.com/ktsoaela) (`@ktsoaela`)
 
@@ -17,7 +17,8 @@ A Markdown note-taking app with a OneNote-inspired hierarchy (bookshelves → no
 - Print and A4 PDF export from the rendered preview
 - JWT authentication and shared SQLite storage
 - Optional Django admin over the same database
-- Windows installer via Electron (Start menu — no terminal required day to day)
+- Windows / macOS desktop apps (Electron) and Android APK (Capacitor)
+- **Devices & sync** — same FastAPI URL on every device (self-hosted, free)
 
 ## Stack
 
@@ -26,7 +27,8 @@ A Markdown note-taking app with a OneNote-inspired hierarchy (bookshelves → no
 | Frontend | React 19, TypeScript, Vite, Tailwind CSS |
 | API | FastAPI, Uvicorn, SQLite |
 | Admin (optional) | Django 5 |
-| Desktop | Electron + electron-builder (NSIS) |
+| Desktop | Electron + electron-builder (Windows / macOS) |
+| Mobile | Capacitor (Android APK) |
 
 ## Prerequisites
 
@@ -84,6 +86,8 @@ npm run build:installer
 ```
 
 Or double-click `scripts/build_installer.bat`. The installer appears under `release/electron/`.
+
+**macOS / Android / free sync:** see [docs/PACKAGING.md](docs/PACKAGING.md) (`npm run build:win`, `npm run build:mac`, `npm run build:apk`).
 
 Default data file: `database.sqlite` next to `LuminaApi.exe` in the app’s `resources/backend` folder.
 
