@@ -61,7 +61,11 @@ if _sentry_dsn:
 _DEFAULT_CORS = (
     "http://127.0.0.1:5173,"
     "http://127.0.0.1:8001,"
-    "http://127.0.0.1:58888"
+    "http://127.0.0.1:58888,"
+    "http://localhost:5173,"
+    "https://localhost,"
+    "capacitor://localhost,"
+    "http://localhost"
 )
 _raw_cors = os.environ.get("CORS_ORIGINS", _DEFAULT_CORS).strip()
 if _raw_cors == "*":

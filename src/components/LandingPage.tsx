@@ -10,6 +10,7 @@ import {
   Code,
   BarChart3,
   Loader2,
+  Smartphone,
 } from 'lucide-react';
 import { Logo } from './Logo';
 
@@ -74,7 +75,8 @@ export default function LandingPage({
             </h1>
             <p className="text-lg md:text-xl text-gray-600 dark:text-[var(--app-muted)] mb-10 max-w-2xl mx-auto leading-relaxed">
               Lumina Notes combines the simplicity of OneNote with the power of Markdown,
-              Mermaid diagrams, and Plotly charts. Built for developers and thinkers.
+              Mermaid diagrams, and Plotly charts. Install it on your phone or tablet to
+              read your notes on the go.
             </p>
             <div className="flex flex-col sm:flex-row items-center justify-center gap-4">
               <button
@@ -160,6 +162,11 @@ export default function LandingPage({
                 icon: <BarChart3 className="w-6 h-6 text-brand-700" />,
                 title: 'Plotly Integration',
                 desc: 'Embed interactive charts and data visualizations directly in your notes.',
+              },
+              {
+                icon: <Smartphone className="w-6 h-6 text-brand-600" />,
+                title: 'Phone & tablet',
+                desc: 'Install Lumina as an app on your home screen and read Markdown notes wherever you are.',
               },
               {
                 icon: <Notebook className="w-6 h-6 text-brand-600" />,

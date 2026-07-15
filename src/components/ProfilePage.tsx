@@ -2,6 +2,7 @@ import React, { useEffect, useRef, useState } from 'react';
 import {
   Accessibility,
   ArrowLeft,
+  Cloud,
   Contrast,
   Database,
   Download,
@@ -25,8 +26,19 @@ import { writeSession } from '../lib/authCache';
 import { cn } from '../lib/utils';
 import { useAppDialogs } from '../context/AppDialogsContext';
 import { validatePasswordChangeInput, validateProfileInput } from '../lib/validation';
+import {
+  getSyncServerUrl,
+  probeSyncServer,
+  setSyncServerUrl,
+} from '../lib/syncServer';
 
-type ProfileSection = 'account' | 'appearance' | 'accessibility' | 'storage' | 'danger';
+type ProfileSection =
+  | 'account'
+  | 'sync'
+  | 'appearance'
+  | 'accessibility'
+  | 'storage'
+  | 'danger';
 
 const NAV: {
   id: ProfileSection;
@@ -35,6 +47,7 @@ const NAV: {
   danger?: boolean;
 }[] = [
   { id: 'account', label: 'Account', icon: <UserIcon className="w-4 h-4" /> },
+  { id: 'sync', label: 'Devices & sync', icon: <Cloud className="w-4 h-4" /> },
   { id: 'appearance', label: 'Appearance', icon: <Palette className="w-4 h-4" /> },
   {
     id: 'accessibility',
@@ -145,6 +158,10 @@ export default function ProfilePage({
   const [pwErr, setPwErr] = useState<string | null>(null);
   const [pwOk, setPwOk] = useState(false);
   const [zoneErr, setZoneErr] = useState<string | null>(null);
+  const [syncUrlDraft, setSyncUrlDraft] = useState(() => getSyncServerUrl());
+  const [syncBusy, setSyncBusy] = useState(false);
+  const [syncMsg, setSyncMsg] = useState<string | null>(null);
+  const [syncOk, setSyncOk] = useState<boolean | null>(null);
 
   const refreshStats = async () => {
     try {
@@ -642,6 +659,101 @@ export default function ProfilePage({
                       </button>
                     </div>
                   </form>
+                </section>
+              ) : null}
+
+              {section === 'sync' ? (
+                <section className={sectionClass}>
+                  <h2 className="mb-1 font-display text-base font-medium text-[var(--app-fg)]">
+                    Devices & sync
+                  </h2>
+                  <p className={cn(mutedText, 'mb-6')}>
+                    Sync for free without Supabase: run Lumina&apos;s own FastAPI once (Docker on a free
+                    host, or a PC on your Wi‑Fi), then enter that URL on Windows, Mac, and Android.
+                    Same login = same notes everywhere.
+                  </p>
+                  <label className={labelClass} htmlFor="sync-server-url">
+                    Sync server URL
+                  </label>
+                  <input
+                    id="sync-server-url"
+                    className={cn(fieldClass, 'mb-3')}
+                    placeholder="https://your-lumina.example.com"
+                    value={syncUrlDraft}
+                    onChange={(e) => {
+                      setSyncUrlDraft(e.target.value);
+                      setSyncMsg(null);
+                      setSyncOk(null);
+                    }}
+                    autoComplete="url"
+                    inputMode="url"
+                  />
+                  <p className={cn(mutedText, 'mb-4 text-xs')}>
+                    Leave empty to use this device&apos;s local API (desktop app, or Vite in dev). Phone APK
+                    needs a reachable URL — LAN IP like{' '}
+                    <span className="font-mono">http://192.168.x.x:58888</span> works on the same Wi‑Fi.
+                  </p>
+                  <div className="flex flex-wrap gap-2">
+                    <button
+                      type="button"
+                      disabled={syncBusy}
+                      className="studio-btn-primary inline-flex items-center gap-2 !px-4 !py-2 !text-xs"
+                      onClick={async () => {
+                        setSyncBusy(true);
+                        setSyncMsg(null);
+                        try {
+                          const trimmed = syncUrlDraft.trim();
+                          if (!trimmed) {
+                            setSyncServerUrl('');
+                            setSyncOk(true);
+                            setSyncMsg('Using local / same-origin API.');
+                            return;
+                          }
+                          const result = await probeSyncServer(trimmed);
+                          setSyncOk(result.ok);
+                          if (result.ok) {
+                            setSyncServerUrl(trimmed);
+                            setSyncMsg(
+                              `${result.detail} Saved. Sign out and back in if you changed servers.`
+                            );
+                          } else {
+                            setSyncMsg(result.detail);
+                          }
+                        } finally {
+                          setSyncBusy(false);
+                        }
+                      }}
+                    >
+                      {syncBusy ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Cloud className="h-3.5 w-3.5" />}
+                      Test &amp; save
+                    </button>
+                    <button
+                      type="button"
+                      className="rounded-full border border-[var(--app-border)] px-4 py-2 text-xs font-medium text-[var(--app-muted)] hover:bg-[var(--gutter)] hover:text-[var(--app-fg)]"
+                      onClick={() => {
+                        setSyncUrlDraft('');
+                        setSyncServerUrl('');
+                        setSyncOk(null);
+                        setSyncMsg('Using local / same-origin API.');
+                      }}
+                    >
+                      Use local API
+                    </button>
+                  </div>
+                  {syncMsg ? (
+                    <p
+                      className={cn(
+                        'mt-4 text-sm',
+                        syncOk === false
+                          ? 'text-[var(--danger)]'
+                          : syncOk
+                            ? 'text-[var(--spine)]'
+                            : mutedText
+                      )}
+                    >
+                      {syncMsg}
+                    </p>
+                  ) : null}
                 </section>
               ) : null}
 
