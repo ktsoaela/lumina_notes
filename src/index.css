@@ -1068,10 +1068,10 @@ html.sticky-strip-mode #root {
   /* Win11 DWM: opaque theme fills must not paint under the neon strips */
   background-color: transparent !important;
   background-image: none !important;
-  color-scheme: light;
 }
 
 .stickn-root {
+  --film-accent: var(--spine);
   width: 100vw;
   height: 100vh;
   overflow: visible;
@@ -1079,7 +1079,8 @@ html.sticky-strip-mode #root {
   align-items: center;
   justify-content: flex-end;
   background: transparent;
-  font-family: "Segoe UI", Roboto, system-ui, sans-serif;
+  font-family: var(--font-sans);
+  color: var(--app-fg);
   padding: 8px 4px;
   box-sizing: border-box;
 }
@@ -1099,7 +1100,7 @@ html.sticky-strip-mode #root {
   width: 28px;
   height: 10px;
   border-radius: 4px;
-  background: rgba(0, 0, 0, 0.08);
+  background: color-mix(in srgb, var(--app-fg) 12%, transparent);
   margin-bottom: 4px;
   cursor: grab;
 }
@@ -1129,7 +1130,8 @@ html.sticky-strip-mode #root {
   align-items: center;
   justify-content: flex-start;
   overflow: hidden;
-  font-weight: bold;
+  font-family: var(--font-sans);
+  font-weight: 700;
   font-size: 12px;
   color: rgba(0, 0, 0, 0.55);
   user-select: none;
@@ -1159,8 +1161,7 @@ html.sticky-strip-mode #root {
   pointer-events: none;
 }
 
-.neon-film-name,
-.sheet-count {
+.neon-film-name {
   opacity: 0;
   transition: opacity 0.15s ease;
   pointer-events: none;
@@ -1169,173 +1170,140 @@ html.sticky-strip-mode #root {
 
 .neon-film-stack.is-expanded .neon-film-name,
 .neon-film-stack:hover .neon-film-name,
-.neon-film-stack:focus-visible .neon-film-name,
-.neon-film-stack.is-expanded .sheet-count,
-.neon-film-stack:hover .sheet-count,
-.neon-film-stack:focus-visible .sheet-count {
+.neon-film-stack:focus-visible .neon-film-name {
   opacity: 1;
-}
-
-.sheet-count {
-  position: absolute;
-  right: 8px;
-  top: 50%;
-  transform: translateY(-50%);
-  font-size: 9px;
-  font-weight: bold;
-  color: rgba(0, 0, 0, 0.45);
 }
 
 .stand-hint {
   font-size: 10px;
-  color: #999;
+  color: var(--app-muted);
   margin: 8px 0 0;
   max-width: 120px;
   text-align: right;
 }
 
-/* Writer card */
-.dispenser-pack {
+/* Writer — same shell / paper / studio buttons as main Lumina notes UI */
+.stickn-root.is-writing {
+  padding: 0;
+  align-items: stretch;
+  justify-content: stretch;
+}
+
+.film-writer-shell {
   width: 100%;
   height: 100%;
   box-sizing: border-box;
   display: flex;
   flex-direction: column;
-  align-items: center;
-  padding: 16px;
-  text-align: center;
-  background: rgba(255, 255, 255, 0.95);
-  border: 2px solid #e2dacb;
-  border-radius: 12px;
-  box-shadow: 0 10px 28px rgba(0, 0, 0, 0.1);
+  overflow: hidden;
+  border-radius: var(--radius-ui);
+  border: 1px solid color-mix(in srgb, var(--app-border) 85%, transparent);
+  box-shadow: var(--shadow-micro);
 }
 
 .film-writer {
+  position: relative;
   display: flex;
   flex-direction: column;
   width: 100%;
   height: 100%;
-  text-align: left;
+  min-height: 0;
+  gap: 0.5rem;
+  padding: 0.75rem 0.85rem 0.85rem;
 }
 
-.film-back {
-  align-self: flex-start;
-  border: none;
-  background: none;
-  color: #b09a86;
-  font-size: 11px;
-  font-weight: 600;
-  cursor: pointer;
-  padding: 0;
-  margin-bottom: 8px;
+.film-writer-top {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  position: relative;
+  z-index: 1;
 }
 
-.film-back:hover {
-  color: #6d4f2a;
-}
-
-.film-writer h3 {
-  font-size: 1.05rem;
-  font-weight: 600;
-  color: #3d3229;
-  margin: 0 0 10px;
+.film-writer-toolbar {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 0.5rem;
+}
+
+.film-writer-path {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  gap: 0.35rem;
 }
 
 .neon-swatch {
-  width: 14px;
-  height: 14px;
+  width: 12px;
+  height: 12px;
   border-radius: 3px;
-  box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.12);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--app-fg) 18%, transparent);
   flex-shrink: 0;
 }
 
-.strip-field {
+.film-tabs {
   display: flex;
-  flex-direction: column;
-  gap: 3px;
-  font-size: 0.65rem;
-  font-weight: 600;
-  letter-spacing: 0.04em;
-  text-transform: uppercase;
-  color: #b09a86;
-  margin-bottom: 8px;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+  align-items: center;
+  position: relative;
+  z-index: 1;
 }
 
-.strip-field select {
-  border: 1px solid #e2dacb;
-  border-radius: 8px;
-  background: #fff;
-  color: #3d3229;
-  font-size: 0.8rem;
-  padding: 4px 8px;
-  outline: none;
-  text-transform: none;
-  letter-spacing: 0;
-  font-weight: 500;
+.film-tabs .studio-btn.is-active-tab {
+  background: var(--sage);
+  box-shadow: inset 0 -2px 0 var(--spine);
+}
+
+.film-writer-paper {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  position: relative;
+  z-index: 1;
 }
 
 .strip-textarea {
   flex: 1;
-  min-height: 100px;
+  min-height: 0;
+  width: 100%;
   resize: none;
-  border: 1px dashed #ede3d6;
-  border-radius: 10px;
-  background: rgba(255, 255, 255, 0.85);
-  padding: 8px 10px;
-  font-size: 0.9rem;
-  color: #5a4d3f;
+  border: none;
   outline: none;
-  line-height: 1.45;
+  background: transparent;
+  /* Match main Editor.tsx */
+  font-family: var(--font-serif);
+  font-size: 16px;
+  line-height: 1.8;
+  letter-spacing: 0.01em;
+  color: var(--app-fg);
+  padding: 1rem 1.1rem;
 }
 
-.strip-textarea:focus {
-  background: #fff;
+.strip-textarea::placeholder {
+  color: color-mix(in srgb, var(--app-muted) 45%, transparent);
+  font-style: italic;
+}
+
+.strip-preview-inner {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+  padding: 1rem 1.1rem !important;
+  font-size: 16px;
 }
 
 .strip-actions {
   display: flex;
-  gap: 6px;
-  margin-top: 10px;
+  gap: 0.5rem;
+  align-items: stretch;
+  position: relative;
+  z-index: 1;
 }
 
-.strip-save {
+.strip-actions .studio-btn-primary {
   flex: 1;
-  border: none;
-  border-radius: 8px;
-  background: linear-gradient(145deg, #f7c67a, #e8b86a);
-  color: #6d4f2a;
-  font-weight: 700;
-  font-size: 0.75rem;
-  padding: 8px 10px;
-  cursor: pointer;
-}
-
-.strip-save:disabled,
-.strip-open-page:disabled {
-  opacity: 0.45;
-  cursor: default;
-}
-
-.strip-open-page {
-  border: 1px solid #e6dccc;
-  border-radius: 8px;
-  background: #fff;
-  color: #6d5b4a;
-  font-weight: 600;
-  font-size: 0.75rem;
-  padding: 8px 10px;
-  cursor: pointer;
-}
-
-.strip-error {
-  font-size: 0.75rem;
-  color: #b91c1c;
-}
-
-.pack-book {
-  width: 100%;
-  text-align: left;
 }
