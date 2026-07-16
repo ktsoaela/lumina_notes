@@ -24,6 +24,8 @@ declare global {
           pageId: string;
         }) => void
       ) => () => void;
+      notifyStickyTargetChanged?: () => void;
+      onStickyTargetChanged?: (cb: () => void) => () => void;
     };
   }
 }
