@@ -668,6 +668,10 @@ export default function App() {
     patch?: { content?: string; title?: string }
   ) => {
     setMainView('notes');
+    // Sticky saves must land in the editable note surface, not preview-only.
+    if (patch?.content !== undefined) {
+      setViewMode('edit');
+    }
     setIsAppLoading(true);
     try {
       if (bookshelfId !== activeBookshelfId) {
