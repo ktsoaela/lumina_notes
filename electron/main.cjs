@@ -1,4 +1,4 @@
-const { app, BrowserWindow, dialog, ipcMain, nativeImage } = require("electron");
+const { app, BrowserWindow, dialog, ipcMain, nativeImage, screen } = require("electron");
 const path = require("path");
 const fs = require("fs");
 const { spawn } = require("child_process");
@@ -15,8 +15,18 @@ function windowIcon() {
 
 const API_PORT = process.env.PORT || "58888";
 const PROD_URL = `http://127.0.0.1:${API_PORT}/`;
+const STICKY_PACK_W = 150;
+const STICKY_PACK_H = 280;
+const STICKY_WRITE_W = 280;
+const STICKY_WRITE_H = 420;
+
+const STICKY_SIZES = {
+  pack: { width: STICKY_PACK_W, height: STICKY_PACK_H },
+  writing: { width: STICKY_WRITE_W, height: STICKY_WRITE_H },
+};
 
 let mainWindow = null;
+let stickyWindow = null;
 let backendProc = null;
 
 function isDev() {
@@ -106,6 +116,64 @@ function webPrefs() {
   };
 }
 
+function appUrl(query) {
+  const q = query ? `?${query}` : "";
+  if (isDev()) return `http://127.0.0.1:5173/${q}`;
+  return `${PROD_URL}${q}`;
+}
+
+function stickyBounds(mode = "pack") {
+  const area = screen.getPrimaryDisplay().workArea;
+  const size = STICKY_SIZES[mode] || STICKY_SIZES.pack;
+  const y =
+    stickyWindow && !stickyWindow.isDestroyed()
+      ? stickyWindow.getBounds().y
+      : area.y + Math.round((area.height - size.height) / 2);
+  return {
+    width: size.width,
+    height: size.height,
+    x: area.x + area.width - size.width - 12,
+    y,
+  };
+}
+
+async function createStickyWindow() {
+  if (stickyWindow && !stickyWindow.isDestroyed()) {
+    stickyWindow.show();
+    stickyWindow.focus();
+    return;
+  }
+  const bounds = stickyBounds("pack");
+  stickyWindow = new BrowserWindow({
+    ...bounds,
+    frame: false,
+    transparent: true,
+    backgroundColor: "#00000000",
+    alwaysOnTop: true,
+    skipTaskbar: true,
+    resizable: false,
+    maximizable: false,
+    minimizable: false,
+    fullscreenable: false,
+    hasShadow: true,
+    show: true,
+    icon: windowIcon(),
+    webPreferences: webPrefs(),
+  });
+  stickyWindow.setAlwaysOnTop(true, "floating");
+  if (process.platform === "darwin") {
+    stickyWindow.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: true });
+  }
+  stickyWindow.on("closed", () => {
+    stickyWindow = null;
+  });
+  await stickyWindow.loadURL(appUrl("desktop=1&sticky=1"));
+  if (!stickyWindow.isDestroyed()) {
+    stickyWindow.show();
+    stickyWindow.moveTop();
+  }
+}
+
 async function createWindow() {
   if (isDev()) {
     await waitForServer("http://127.0.0.1:5173/");
@@ -115,7 +183,7 @@ async function createWindow() {
       icon: windowIcon(),
       webPreferences: webPrefs(),
     });
-    await mainWindow.loadURL("http://127.0.0.1:5173/?desktop=1");
+    await mainWindow.loadURL(appUrl("desktop=1"));
   } else {
     await startBackend();
     mainWindow = new BrowserWindow({
@@ -124,12 +192,17 @@ async function createWindow() {
       icon: windowIcon(),
       webPreferences: webPrefs(),
     });
-    await mainWindow.loadURL(`${PROD_URL}?desktop=1`);
+    await mainWindow.loadURL(appUrl("desktop=1"));
   }
 
   mainWindow.on("closed", () => {
     mainWindow = null;
+    if (stickyWindow && !stickyWindow.isDestroyed()) {
+      stickyWindow.close();
+    }
   });
+
+  await createStickyWindow();
 }
 
 /** Chromium printToPDF in a hidden window — same engine as Chrome. */
@@ -186,6 +259,20 @@ ipcMain.handle("lumina:export-pdf", async (_event, payload) => {
   } finally {
     if (!win.isDestroyed()) win.destroy();
   }
+});
+
+ipcMain.on("lumina:sticky-mode", (_event, mode) => {
+  if (!stickyWindow || stickyWindow.isDestroyed()) return;
+  const next = STICKY_SIZES[mode] ? mode : "pack";
+  stickyWindow.setBounds(stickyBounds(next));
+});
+
+ipcMain.on("lumina:sticky-open-page", (_event, nav) => {
+  if (!mainWindow || mainWindow.isDestroyed()) return;
+  if (mainWindow.isMinimized()) mainWindow.restore();
+  mainWindow.show();
+  mainWindow.focus();
+  mainWindow.webContents.send("lumina:open-page", nav);
 });
 
 async function boot() {
