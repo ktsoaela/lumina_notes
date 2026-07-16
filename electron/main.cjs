@@ -337,6 +337,16 @@ ipcMain.on("lumina:sticky-target-changed", () => {
   stickyWindow.webContents.send("lumina:sticky-target-changed");
 });
 
+/** Relay live page edits to the other window (main ↔ sticky). */
+ipcMain.on("lumina:page-sync", (event, patch) => {
+  const sender = event.sender;
+  for (const win of [mainWindow, stickyWindow]) {
+    if (win && !win.isDestroyed() && win.webContents !== sender) {
+      win.webContents.send("lumina:page-sync", patch);
+    }
+  }
+});
+
 async function boot() {
   try {
     await createWindow();
