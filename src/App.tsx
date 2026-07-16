@@ -437,6 +437,8 @@ export default function App() {
     }
   }, [secondaryPage, activeNotebook?.title, secondarySection?.title, toast]);
 
+  const localPageEditAtRef = useRef(0);
+
   const updatePageContentById = useCallback(async (pageId: string, content: string) => {
     const contentCheck = validatePageContent(content);
     if (contentCheck.ok === false) {
@@ -445,10 +447,21 @@ export default function App() {
       return;
     }
     let titleForApi = '';
+    let sectionId = '';
+    let notebookId = '';
     setState(prev => {
+      for (const nb of prev.notebooks) {
+        for (const sec of nb.sections) {
+          const page = sec.pages.find((p) => p.id === pageId);
+          if (page) {
+            titleForApi = page.title || '';
+            sectionId = sec.id;
+            notebookId = nb.id;
+          }
+        }
+      }
       const page = findPageInState(prev, pageId);
       if (!page) return prev;
-      titleForApi = page.title || '';
       return {
         ...prev,
         notebooks: prev.notebooks.map(nb => ({
@@ -463,6 +476,15 @@ export default function App() {
           })),
         })),
       };
+    });
+    localPageEditAtRef.current = Date.now();
+    window.luminaDesktop?.publishPageSync?.({
+      pageId,
+      content: contentCheck.value,
+      title: titleForApi,
+      sectionId,
+      notebookId,
+      at: localPageEditAtRef.current,
     });
     try {
       await api.pages.update(pageId, titleForApi, contentCheck.value);
@@ -791,6 +813,67 @@ export default function App() {
         nav.pageId,
         { content: nav.content, title: nav.title }
       );
+    });
+  }, []);
+
+  /** Sticky ↔ main live mirror (IPC each keystroke). */
+  useEffect(() => {
+    const desktop = window.luminaDesktop;
+    if (!desktop?.onPageSync) return;
+    return desktop.onPageSync((patch) => {
+      if ((patch.at ?? 0) <= localPageEditAtRef.current) return;
+      setState((prev) => {
+        const existing = findPageInState(prev, patch.pageId);
+        if (
+          existing &&
+          existing.content === patch.content &&
+          (patch.title === undefined || existing.title === patch.title)
+        ) {
+          return prev;
+        }
+        let found = false;
+        const notebooks = prev.notebooks.map((nb) => ({
+          ...nb,
+          sections: nb.sections.map((sec) => {
+            const hasPage = sec.pages.some((p) => p.id === patch.pageId);
+            if (hasPage) {
+              found = true;
+              return {
+                ...sec,
+                pages: sec.pages.map((p) =>
+                  p.id === patch.pageId
+                    ? {
+                        ...p,
+                        content: patch.content,
+                        ...(patch.title !== undefined ? { title: patch.title } : {}),
+                        updatedAt: Date.now(),
+                      }
+                    : p
+                ),
+              };
+            }
+            // Sticky created a page main hasn't loaded yet — upsert into section.
+            if (patch.sectionId && sec.id === patch.sectionId) {
+              found = true;
+              return {
+                ...sec,
+                pages: [
+                  ...sec.pages,
+                  {
+                    id: patch.pageId,
+                    title: patch.title || 'Note',
+                    content: patch.content,
+                    updatedAt: Date.now(),
+                  },
+                ],
+              };
+            }
+            return sec;
+          }),
+        }));
+        if (!found) return prev;
+        return { ...prev, notebooks };
+      });
     });
   }, []);
 
@@ -1249,7 +1332,7 @@ export default function App() {
             ) : null}
             {activePage && state.activePageId ? (
               <NotePanel
-                key={`${state.activePageId}:${String(activePage.updatedAt)}:${activePage.content.length}`}
+                key={state.activePageId}
                 page={activePage}
                 path={notePath}
                 viewMode={viewMode === 'split' ? 'preview' : viewMode}
@@ -1344,7 +1427,7 @@ export default function App() {
                   <PanelGroup orientation="horizontal" className="h-full">
                     <Panel defaultSize="50%" minSize="22%" className="min-w-0">
                       <NotePanel
-                        key={`${state.activePageId}:${String(activePage.updatedAt)}:${activePage.content.length}`}
+                        key={state.activePageId}
                         page={activePage}
                         path={notePath}
                         paneLabel="Left"
@@ -1416,7 +1499,7 @@ export default function App() {
                   </PanelGroup>
                 ) : (
                   <NotePanel
-                    key={`${state.activePageId}:${String(activePage.updatedAt)}:${activePage.content.length}`}
+                    key={state.activePageId}
                     page={activePage}
                     path={notePath}
                     viewMode={viewMode}
