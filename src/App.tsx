@@ -660,11 +660,12 @@ export default function App() {
     }
   };
 
-  const handleOpenNotebookFromShelf = async (
+  const handleOpenNotebookFromShelf = useCallback(async (
     notebookId: string,
     bookshelfId: string,
     sectionId?: string,
-    pageId?: string
+    pageId?: string,
+    patch?: { content?: string; title?: string }
   ) => {
     setMainView('notes');
     setIsAppLoading(true);
@@ -677,12 +678,78 @@ export default function App() {
         api.notebooks.list(false, bookshelfId),
         api.notebooks.list(true, bookshelfId),
       ]);
-      const notebooks = [...active, ...archived];
+      let notebooks = [...active, ...archived];
+
+      // Sticky save may race the list — apply / inject the content we just wrote.
+      if (pageId && notebookId) {
+        const hasPage = notebooks.some((nb) =>
+          nb.sections.some((s) => s.pages.some((p) => p.id === pageId))
+        );
+        if (!hasPage && sectionId) {
+          const stub: Page = {
+            id: pageId,
+            title: patch?.title || 'Page',
+            content: patch?.content ?? '',
+            updatedAt: Date.now(),
+          };
+          notebooks = notebooks.map((nb) => {
+            if (nb.id !== notebookId) return nb;
+            const hasSec = nb.sections.some((s) => s.id === sectionId);
+            if (!hasSec) {
+              return {
+                ...nb,
+                sections: [
+                  ...nb.sections,
+                  { id: sectionId, title: "stick'n", pages: [stub] },
+                ],
+              };
+            }
+            return {
+              ...nb,
+              sections: nb.sections.map((sec) =>
+                sec.id === sectionId
+                  ? { ...sec, pages: [...sec.pages, stub] }
+                  : sec
+              ),
+            };
+          });
+        } else if (
+          patch?.content !== undefined ||
+          patch?.title !== undefined
+        ) {
+          notebooks = notebooks.map((nb) => ({
+            ...nb,
+            sections: nb.sections.map((sec) => ({
+              ...sec,
+              pages: sec.pages.map((p) =>
+                p.id === pageId
+                  ? {
+                      ...p,
+                      content:
+                        patch.content !== undefined ? patch.content : p.content,
+                      title: patch.title !== undefined ? patch.title : p.title,
+                      updatedAt: Date.now(),
+                    }
+                  : p
+              ),
+            })),
+          }));
+        }
+      }
+
       const nb = notebooks.find((n) => n.id === notebookId);
+      // Prefer pageId across the whole book (sectionId can be wrong/stale).
+      const located = pageId
+        ? nb?.sections
+            .flatMap((s) => s.pages.map((p) => ({ page: p, sectionId: s.id })))
+            .find((x) => x.page.id === pageId)
+        : undefined;
       const section =
+        (located && nb?.sections.find((s) => s.id === located.sectionId)) ||
         (sectionId && nb?.sections.find((s) => s.id === sectionId)) ||
         nb?.sections[0];
       const page =
+        located?.page ||
         (pageId && section?.pages.find((p) => p.id === pageId)) ||
         section?.pages[0];
       setState((prev) => ({
@@ -699,22 +766,26 @@ export default function App() {
     } finally {
       setIsAppLoading(false);
     }
-  };
+  }, [activeBookshelfId, toast]);
 
   const handleOpenShelfForNotes = (shelfId: string) => {
     setActiveBookshelfId(shelfId);
     setMainView('notes');
   };
 
+  const openFromStickyRef = useRef(handleOpenNotebookFromShelf);
+  openFromStickyRef.current = handleOpenNotebookFromShelf;
+
   useEffect(() => {
     const desktop = window.luminaDesktop;
     if (!desktop?.onOpenPage) return;
     return desktop.onOpenPage((nav) => {
-      void handleOpenNotebookFromShelf(
+      void openFromStickyRef.current(
         nav.notebookId,
         nav.bookshelfId,
         nav.sectionId,
-        nav.pageId
+        nav.pageId,
+        { content: nav.content, title: nav.title }
       );
     });
   }, []);
@@ -1174,6 +1245,7 @@ export default function App() {
             ) : null}
             {activePage && state.activePageId ? (
               <NotePanel
+                key={`${state.activePageId}:${String(activePage.updatedAt)}:${activePage.content.length}`}
                 page={activePage}
                 path={notePath}
                 viewMode={viewMode === 'split' ? 'preview' : viewMode}
@@ -1268,6 +1340,7 @@ export default function App() {
                   <PanelGroup orientation="horizontal" className="h-full">
                     <Panel defaultSize="50%" minSize="22%" className="min-w-0">
                       <NotePanel
+                        key={`${state.activePageId}:${String(activePage.updatedAt)}:${activePage.content.length}`}
                         page={activePage}
                         path={notePath}
                         paneLabel="Left"
@@ -1339,6 +1412,7 @@ export default function App() {
                   </PanelGroup>
                 ) : (
                   <NotePanel
+                    key={`${state.activePageId}:${String(activePage.updatedAt)}:${activePage.content.length}`}
                     page={activePage}
                     path={notePath}
                     viewMode={viewMode}

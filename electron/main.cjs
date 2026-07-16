@@ -17,8 +17,8 @@ const API_PORT = process.env.PORT || "58888";
 const PROD_URL = `http://127.0.0.1:${API_PORT}/`;
 const STICKY_PACK_W = 150;
 const STICKY_PACK_H = 280;
-const STICKY_WRITE_W = 280;
-const STICKY_WRITE_H = 420;
+const STICKY_WRITE_W = 360;
+const STICKY_WRITE_H = 520;
 
 const STICKY_SIZES = {
   pack: { width: STICKY_PACK_W, height: STICKY_PACK_H },
