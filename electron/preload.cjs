@@ -13,4 +13,11 @@ contextBridge.exposeInMainWorld("luminaDesktop", {
     ipcRenderer.on("lumina:open-page", handler);
     return () => ipcRenderer.removeListener("lumina:open-page", handler);
   },
+  /** Profile → sticky: `storage` events are unreliable across Electron windows on Windows */
+  notifyStickyTargetChanged: () => ipcRenderer.send("lumina:sticky-target-changed"),
+  onStickyTargetChanged: (cb) => {
+    const handler = () => cb();
+    ipcRenderer.on("lumina:sticky-target-changed", handler);
+    return () => ipcRenderer.removeListener("lumina:sticky-target-changed", handler);
+  },
 });

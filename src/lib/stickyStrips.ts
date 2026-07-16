@@ -42,4 +42,9 @@ export function notifyStickyStripTargetChanged(): void {
   } catch {
     /* ignore */
   }
+  try {
+    window.luminaDesktop?.notifyStickyTargetChanged?.();
+  } catch {
+    /* ignore */
+  }
 }
