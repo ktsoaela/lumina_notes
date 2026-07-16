@@ -1065,6 +1065,9 @@ html.sticky-strip-mode,
 html.sticky-strip-mode body,
 html.sticky-strip-mode #root {
   background: transparent !important;
+  /* Win11 DWM: opaque theme fills must not paint under the neon strips */
+  background-color: transparent !important;
+  background-image: none !important;
   color-scheme: light;
 }
 

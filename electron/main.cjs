@@ -137,6 +137,21 @@ function stickyBounds(mode = "pack") {
   };
 }
 
+function applyStickyAlwaysOnTop(win) {
+  // macOS: floating + all Spaces. Win11: screen-saver level stays above most apps;
+  // hasShadow/roundedCorners with transparent often paint a black box on Windows.
+  if (process.platform === "darwin") {
+    win.setAlwaysOnTop(true, "floating");
+    win.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: true });
+    return;
+  }
+  if (process.platform === "win32") {
+    win.setAlwaysOnTop(true, "screen-saver");
+    return;
+  }
+  win.setAlwaysOnTop(true, "floating");
+}
+
 async function createStickyWindow() {
   if (stickyWindow && !stickyWindow.isDestroyed()) {
     stickyWindow.show();
@@ -144,6 +159,7 @@ async function createStickyWindow() {
     return;
   }
   const bounds = stickyBounds("pack");
+  const isWin = process.platform === "win32";
   stickyWindow = new BrowserWindow({
     ...bounds,
     frame: false,
@@ -155,21 +171,30 @@ async function createStickyWindow() {
     maximizable: false,
     minimizable: false,
     fullscreenable: false,
-    hasShadow: true,
-    show: true,
+    // Shadow + rounded corners break true transparency on Windows DWM.
+    hasShadow: !isWin,
+    roundedCorners: !isWin,
+    thickFrame: false,
+    show: false,
+    focusable: true,
+    autoHideMenuBar: true,
     icon: windowIcon(),
     webPreferences: webPrefs(),
   });
-  stickyWindow.setAlwaysOnTop(true, "floating");
-  if (process.platform === "darwin") {
-    stickyWindow.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: true });
-  }
+  applyStickyAlwaysOnTop(stickyWindow);
   stickyWindow.on("closed", () => {
     stickyWindow = null;
   });
-  await stickyWindow.loadURL(appUrl("desktop=1&sticky=1"));
-  if (!stickyWindow.isDestroyed()) {
+  stickyWindow.once("ready-to-show", () => {
+    if (!stickyWindow || stickyWindow.isDestroyed()) return;
     stickyWindow.show();
+    applyStickyAlwaysOnTop(stickyWindow);
+    stickyWindow.moveTop();
+  });
+  await stickyWindow.loadURL(appUrl("desktop=1&sticky=1"));
+  if (!stickyWindow.isDestroyed() && !stickyWindow.isVisible()) {
+    stickyWindow.show();
+    applyStickyAlwaysOnTop(stickyWindow);
     stickyWindow.moveTop();
   }
 }
@@ -265,6 +290,11 @@ ipcMain.on("lumina:sticky-mode", (_event, mode) => {
   if (!stickyWindow || stickyWindow.isDestroyed()) return;
   const next = STICKY_SIZES[mode] ? mode : "pack";
   stickyWindow.setBounds(stickyBounds(next));
+  // Win11 can drop always-on-top after setBounds — re-assert.
+  if (process.platform === "win32") {
+    applyStickyAlwaysOnTop(stickyWindow);
+    stickyWindow.moveTop();
+  }
 });
 
 ipcMain.on("lumina:sticky-open-page", (_event, nav) => {
@@ -273,6 +303,12 @@ ipcMain.on("lumina:sticky-open-page", (_event, nav) => {
   mainWindow.show();
   mainWindow.focus();
   mainWindow.webContents.send("lumina:open-page", nav);
+});
+
+/** Profile saved sticky book target — forward to sticky window (Win storage events flake). */
+ipcMain.on("lumina:sticky-target-changed", () => {
+  if (!stickyWindow || stickyWindow.isDestroyed()) return;
+  stickyWindow.webContents.send("lumina:sticky-target-changed");
 });
 
 async function boot() {

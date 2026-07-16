@@ -97,9 +97,11 @@ export default function StickyDesktopApp() {
     const refresh = () => setTargetTick((n) => n + 1);
     window.addEventListener(STICKY_TARGET_EVENT, refresh);
     window.addEventListener('storage', refresh);
+    const unsub = window.luminaDesktop?.onStickyTargetChanged?.(refresh);
     return () => {
       window.removeEventListener(STICKY_TARGET_EVENT, refresh);
       window.removeEventListener('storage', refresh);
+      unsub?.();
     };
   }, []);
 
