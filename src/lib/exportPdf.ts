@@ -31,6 +31,25 @@ declare global {
       ) => () => void;
       notifyStickyTargetChanged?: () => void;
       onStickyTargetChanged?: (cb: () => void) => () => void;
+      /** Push page content to the other Electron window after save */
+      publishPageSync?: (patch: {
+        pageId: string;
+        content: string;
+        title?: string;
+        sectionId?: string;
+        notebookId?: string;
+        at?: number;
+      }) => void;
+      onPageSync?: (
+        cb: (patch: {
+          pageId: string;
+          content: string;
+          title?: string;
+          sectionId?: string;
+          notebookId?: string;
+          at?: number;
+        }) => void
+      ) => () => void;
     };
   }
 }

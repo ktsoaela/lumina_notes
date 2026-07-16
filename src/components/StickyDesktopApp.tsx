@@ -54,7 +54,7 @@ function readNeon(): NeonId {
 
 /**
  * Neon strips stand alone. Click → shared page editor (same content as main app).
- * Write/Preview load from API; Save writes the full page back.
+ * Autosaves like Sticky Notes — no need to open the file after typing.
  */
 export default function StickyDesktopApp() {
   const [notebooks, setNotebooks] = useState<Notebook[]>([]);
@@ -67,6 +67,9 @@ export default function StickyDesktopApp() {
   const [neonId, setNeonId] = useState<NeonId>(readNeon);
   const [draft, setDraft] = useState('');
   const [saving, setSaving] = useState(false);
+  const [saveState, setSaveState] = useState<'idle' | 'dirty' | 'saving' | 'saved'>(
+    'idle'
+  );
   const [loadingPage, setLoadingPage] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [writingId, setWritingId] = useState<NeonId | null>(null);
@@ -75,11 +78,15 @@ export default function StickyDesktopApp() {
   const [reloadTick, setReloadTick] = useState(0);
   const [tab, setTab] = useState<EditorTab>('write');
   const lastLoadedRef = useRef('');
+  const draftRef = useRef('');
+  const localEditAtRef = useRef(0);
   const pageMetaRef = useRef<{
     sectionId: string;
     pageId: string;
     title: string;
+    notebookId: string;
   } | null>(null);
+  const AUTOSAVE_MS = 450;
 
   const neon = NEONS.find((n) => n.id === (writingId ?? neonId)) ?? NEONS[0];
   const books = useMemo(
@@ -90,6 +97,7 @@ export default function StickyDesktopApp() {
   const signedIn = Boolean(readToken());
   const writing = writingId !== null;
   const dirty = draft !== lastLoadedRef.current;
+  draftRef.current = draft;
 
   const syncWindow = useCallback((mode: 'pack' | 'writing') => {
     window.luminaDesktop?.setStickyMode?.(mode);
@@ -291,9 +299,11 @@ export default function StickyDesktopApp() {
           sectionId: page.sectionId,
           pageId: page.pageId,
           title: page.title,
+          notebookId: page.notebookId,
         };
         lastLoadedRef.current = page.content;
         setDraft(page.content);
+        setSaveState('saved');
       } catch (err) {
         console.error(err);
         if (!cancelled) setError('Could not load page from app');
@@ -306,20 +316,98 @@ export default function StickyDesktopApp() {
     };
   }, [writingId, reloadTick, signedIn, resolveShelf, ensureNeonPage]);
 
+  const persistDraft = useCallback(async (): Promise<boolean> => {
+    const meta = pageMetaRef.current;
+    if (!meta || !writingId) return false;
+    const content = draftRef.current;
+    if (content === lastLoadedRef.current) {
+      setSaveState('saved');
+      return true;
+    }
+    setSaving(true);
+    setSaveState('saving');
+    setError(null);
+    try {
+      await api.pages.update(meta.pageId, meta.title, content);
+      if (draftRef.current === content) {
+        lastLoadedRef.current = content;
+        setSaveState('saved');
+      }
+      return true;
+    } catch (err) {
+      console.error(err);
+      setError('Could not save note');
+      setSaveState('dirty');
+      return false;
+    } finally {
+      setSaving(false);
+    }
+  }, [writingId]);
+
+  // Live mirror to main window — every keystroke (don't wait for API).
+  useEffect(() => {
+    if (!writingId || loadingPage) return;
+    const meta = pageMetaRef.current;
+    if (!meta) return;
+    localEditAtRef.current = Date.now();
+    window.luminaDesktop?.publishPageSync?.({
+      pageId: meta.pageId,
+      content: draft,
+      title: meta.title,
+      sectionId: meta.sectionId,
+      notebookId: meta.notebookId,
+      at: localEditAtRef.current,
+    });
+  }, [draft, writingId, loadingPage]);
+
+  // Mirror main → sticky (last-write-wins by timestamp).
+  useEffect(() => {
+    const desktop = window.luminaDesktop;
+    if (!desktop?.onPageSync) return;
+    return desktop.onPageSync((patch) => {
+      const meta = pageMetaRef.current;
+      if (!meta || meta.pageId !== patch.pageId) return;
+      if ((patch.at ?? 0) <= localEditAtRef.current) return;
+      if (draftRef.current === patch.content) return;
+      lastLoadedRef.current = patch.content;
+      setDraft(patch.content);
+      if (patch.title !== undefined) {
+        pageMetaRef.current = { ...meta, title: patch.title };
+      }
+      setSaveState('saved');
+    });
+  }, []);
+
+  // Autosave to API in the background
+  useEffect(() => {
+    if (!writingId || loadingPage || !pageMetaRef.current) return;
+    if (draft === lastLoadedRef.current) return;
+    setSaveState('dirty');
+    const t = window.setTimeout(() => {
+      void persistDraft();
+    }, AUTOSAVE_MS);
+    return () => window.clearTimeout(t);
+  }, [draft, writingId, loadingPage, persistDraft]);
+
   const pickFilm = (id: NeonId) => {
     setNeonId(id);
     setDraft('');
     lastLoadedRef.current = '';
     pageMetaRef.current = null;
+    setSaveState('idle');
     setWritingId(id);
     setHoveredId(null);
     setTab('write');
   };
 
   const backToPack = () => {
-    setWritingId(null);
-    setTab('write');
-    setError(null);
+    void (async () => {
+      if (dirty) await persistDraft();
+      setWritingId(null);
+      setTab('write');
+      setError(null);
+      setSaveState('idle');
+    })();
   };
 
   const insertMermaid = () => {
@@ -332,57 +420,25 @@ export default function StickyDesktopApp() {
     setTab('write');
   };
 
-  const openInLumina = async (save: boolean) => {
+  /** Optional — open in main app (autosave first). */
+  const openInApp = async () => {
     const shelf = resolveShelf();
-    if (!shelf || !activeBook || saving || !writingId) return;
-    setSaving(true);
-    setError(null);
-    try {
-      const page = await ensureNeonPage(shelf, writingId);
-      const savedTitle = page.title || coerceEntityTitle(neon.label, 'page');
-      // Shared document: textarea IS the page (continue writing on both sides)
-      const savedContent = draft;
-
-      // New pages always persist current editor text so Open doesn't lose work.
-      if (page.isNew) {
-        await api.pages.create(
-          page.pageId,
-          page.sectionId,
-          savedTitle,
-          savedContent
-        );
-        lastLoadedRef.current = savedContent;
-      } else if (save) {
-        await api.pages.update(page.pageId, savedTitle, savedContent);
-        lastLoadedRef.current = savedContent;
-      }
-
-      const contentForMain = save || page.isNew ? savedContent : page.content;
-      writeStore(PAGE_PREFIX + writingId, page.pageId);
-      pageMetaRef.current = {
-        sectionId: page.sectionId,
-        pageId: page.pageId,
-        title: savedTitle,
-      };
-
-      if (!window.luminaDesktop?.openPageInMain) {
-        setError('Desktop bridge missing — restart the app');
-        return;
-      }
-      window.luminaDesktop.openPageInMain({
-        bookshelfId: shelf,
-        notebookId: page.notebookId,
-        sectionId: page.sectionId,
-        pageId: page.pageId,
-        content: contentForMain,
-        title: savedTitle,
-      });
-    } catch (err) {
-      console.error(err);
-      setError('Could not save / open page');
-    } finally {
-      setSaving(false);
+    const meta = pageMetaRef.current;
+    if (!shelf || !meta || !writingId) return;
+    const ok = await persistDraft();
+    if (!ok) return;
+    if (!window.luminaDesktop?.openPageInMain) {
+      setError('Desktop bridge missing — restart the app');
+      return;
     }
+    window.luminaDesktop.openPageInMain({
+      bookshelfId: shelf,
+      notebookId: meta.notebookId,
+      sectionId: meta.sectionId,
+      pageId: meta.pageId,
+      content: draftRef.current,
+      title: meta.title,
+    });
   };
 
   return (
@@ -444,18 +500,27 @@ export default function StickyDesktopApp() {
                 <span className="font-display text-sm font-medium tracking-tight text-[var(--app-fg)]">
                   {neon.label}
                 </span>
-                {dirty ? (
-                  <span className="text-[10px] text-[var(--app-muted)]">
-                    unsaved
-                  </span>
-                ) : null}
+                <span
+                  className="text-[10px] text-[var(--app-muted)]"
+                  aria-live="polite"
+                >
+                  {loadingPage
+                    ? ''
+                    : saveState === 'saving' || saving
+                      ? 'Saving…'
+                      : saveState === 'dirty'
+                        ? 'Editing…'
+                        : saveState === 'saved'
+                          ? 'Saved'
+                          : ''}
+                </span>
                 <button
                   type="button"
                   className="studio-btn ml-auto"
-                  disabled={loadingPage || dirty}
+                  disabled={loadingPage || dirty || saving}
                   title={
                     dirty
-                      ? 'Save or discard edits before refresh'
+                      ? 'Wait for autosave before refresh'
                       : 'Reload from app'
                   }
                   onClick={() => setReloadTick((n) => n + 1)}
@@ -473,7 +538,7 @@ export default function StickyDesktopApp() {
                 <span aria-hidden className="opacity-30">
                   ·
                 </span>
-                <span>same page as app</span>
+                <span>autosaves to the same page</span>
               </nav>
             </div>
 
@@ -527,11 +592,8 @@ export default function StickyDesktopApp() {
                   value={draft}
                   autoFocus
                   onChange={(e) => setDraft(e.target.value)}
-                  onKeyDown={(e) => {
-                    if ((e.metaKey || e.ctrlKey) && e.key === 'Enter') {
-                      e.preventDefault();
-                      void openInLumina(true);
-                    }
+                  onBlur={() => {
+                    if (dirty) void persistDraft();
                   }}
                 />
               ) : draft.trim() ? (
@@ -549,19 +611,11 @@ export default function StickyDesktopApp() {
             <div className="strip-actions">
               <button
                 type="button"
-                className="studio-btn-primary flex-1"
+                className="studio-btn flex-1"
                 disabled={saving || loadingPage || !activeBook}
-                onClick={() => void openInLumina(true)}
+                onClick={() => void openInApp()}
               >
-                {saving ? 'Saving…' : 'Save & open'}
-              </button>
-              <button
-                type="button"
-                className="studio-btn"
-                disabled={saving || loadingPage || !activeBook}
-                onClick={() => void openInLumina(false)}
-              >
-                Open page
+                Open in app
               </button>
             </div>
           </div>

@@ -13,6 +13,13 @@ contextBridge.exposeInMainWorld("luminaDesktop", {
     ipcRenderer.on("lumina:open-page", handler);
     return () => ipcRenderer.removeListener("lumina:open-page", handler);
   },
+  /** Live sync page content between main ↔ sticky (no queues — just IPC) */
+  publishPageSync: (patch) => ipcRenderer.send("lumina:page-sync", patch),
+  onPageSync: (cb) => {
+    const handler = (_event, patch) => cb(patch);
+    ipcRenderer.on("lumina:page-sync", handler);
+    return () => ipcRenderer.removeListener("lumina:page-sync", handler);
+  },
   /** Profile → sticky: `storage` events are unreliable across Electron windows on Windows */
   notifyStickyTargetChanged: () => ipcRenderer.send("lumina:sticky-target-changed"),
   onStickyTargetChanged: (cb) => {
