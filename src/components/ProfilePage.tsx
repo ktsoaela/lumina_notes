@@ -11,6 +11,7 @@ import {
   Loader2,
   Moon,
   Palette,
+  StickyNote,
   Sun,
   Trash2,
   User as UserIcon,
@@ -31,11 +32,18 @@ import {
   probeSyncServer,
   setSyncServerUrl,
 } from '../lib/syncServer';
+import {
+  getStickyStripTarget,
+  notifyStickyStripTargetChanged,
+  setStickyStripTarget,
+} from '../lib/stickyStrips';
+import { isElectronApp } from '../lib/platform';
 
 type ProfileSection =
   | 'account'
   | 'sync'
   | 'appearance'
+  | 'sticky'
   | 'accessibility'
   | 'storage'
   | 'danger';
@@ -45,10 +53,17 @@ const NAV: {
   label: string;
   icon: React.ReactNode;
   danger?: boolean;
+  desktopOnly?: boolean;
 }[] = [
   { id: 'account', label: 'Account', icon: <UserIcon className="w-4 h-4" /> },
   { id: 'sync', label: 'Devices & sync', icon: <Cloud className="w-4 h-4" /> },
   { id: 'appearance', label: 'Appearance', icon: <Palette className="w-4 h-4" /> },
+  {
+    id: 'sticky',
+    label: 'Sticky note strips',
+    icon: <StickyNote className="w-4 h-4" />,
+    desktopOnly: true,
+  },
   {
     id: 'accessibility',
     label: 'Accessibility',
@@ -162,6 +177,16 @@ export default function ProfilePage({
   const [syncBusy, setSyncBusy] = useState(false);
   const [syncMsg, setSyncMsg] = useState<string | null>(null);
   const [syncOk, setSyncOk] = useState<boolean | null>(null);
+  const [stickyOptions, setStickyOptions] = useState<
+    { bookshelfId: string; bookshelfTitle: string; notebookId: string; notebookTitle: string }[]
+  >([]);
+  const [stickyValue, setStickyValue] = useState(() => {
+    const t = getStickyStripTarget();
+    return t ? `${t.bookshelfId}::${t.notebookId}` : '';
+  });
+  const [stickyMsg, setStickyMsg] = useState<string | null>(null);
+  const desktopShell = isElectronApp();
+  const navItems = NAV.filter((item) => !item.desktopOnly || desktopShell);
 
   const refreshStats = async () => {
     try {
@@ -188,6 +213,34 @@ export default function ProfilePage({
       c = true;
     };
   }, []);
+
+  useEffect(() => {
+    if (!desktopShell) return;
+    let cancelled = false;
+    (async () => {
+      try {
+        const shelves = await api.bookshelves.list();
+        const rows: typeof stickyOptions = [];
+        for (const shelf of shelves) {
+          const nbs = await api.notebooks.list(false, shelf.id);
+          for (const nb of nbs) {
+            rows.push({
+              bookshelfId: shelf.id,
+              bookshelfTitle: shelf.title,
+              notebookId: nb.id,
+              notebookTitle: nb.title,
+            });
+          }
+        }
+        if (!cancelled) setStickyOptions(rows);
+      } catch {
+        if (!cancelled) setStickyOptions([]);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [desktopShell]);
 
   useEffect(() => {
     setName(user.name);
@@ -497,7 +550,7 @@ export default function ProfilePage({
                   <p className="text-xs font-medium text-[var(--app-muted)]">Settings</p>
                 </div>
                 <nav className="flex flex-row gap-1 overflow-x-auto lg:flex-col" aria-label="Settings">
-                  {NAV.map((item) => {
+                  {navItems.map((item) => {
                     const active = section === item.id;
                     return (
                       <button
@@ -797,6 +850,72 @@ export default function ProfilePage({
                           Dark
                         </button>
                       </div>
+                    </div>
+                  </div>
+                </section>
+              ) : null}
+
+              {section === 'sticky' && desktopShell ? (
+                <section className={sectionClass}>
+                  <h2 className="mb-1 font-display text-base font-medium text-[var(--app-fg)]">
+                    Sticky note strips
+                  </h2>
+                  <p className={cn(mutedText, 'mb-6')}>
+                    Choose which book the desktop neon strips write into. Each film (Pink, Orange,
+                    …) becomes a page in that book.
+                  </p>
+                  <div className="grid grid-cols-1 gap-5 sm:grid-cols-12 sm:items-start">
+                    <label className={cn(labelClass, 'sm:col-span-4 sm:pt-2')} htmlFor="sticky-book">
+                      Book
+                    </label>
+                    <div className="sm:col-span-8">
+                      <select
+                        id="sticky-book"
+                        className={fieldClass}
+                        value={stickyValue}
+                        onChange={(e) => {
+                          const v = e.target.value;
+                          setStickyValue(v);
+                          setStickyMsg(null);
+                          if (!v) {
+                            setStickyStripTarget(null);
+                            notifyStickyStripTargetChanged();
+                            setStickyMsg('Cleared — strips use the active Notes book.');
+                            return;
+                          }
+                          const [bookshelfId, notebookId] = v.split('::');
+                          if (!bookshelfId || !notebookId) return;
+                          setStickyStripTarget({ bookshelfId, notebookId });
+                          notifyStickyStripTargetChanged();
+                          const opt = stickyOptions.find(
+                            (o) =>
+                              o.bookshelfId === bookshelfId && o.notebookId === notebookId
+                          );
+                          setStickyMsg(
+                            opt
+                              ? `Neon strips → ${opt.notebookTitle} (${opt.bookshelfTitle})`
+                              : 'Saved.'
+                          );
+                        }}
+                      >
+                        <option value="">Use active Notes book</option>
+                        {stickyOptions.map((o) => (
+                          <option
+                            key={`${o.bookshelfId}::${o.notebookId}`}
+                            value={`${o.bookshelfId}::${o.notebookId}`}
+                          >
+                            {o.notebookTitle} — {o.bookshelfTitle}
+                          </option>
+                        ))}
+                      </select>
+                      {stickyOptions.length === 0 ? (
+                        <p className="mt-1.5 text-xs text-[var(--app-muted)]">
+                          No books yet — add one in Library first.
+                        </p>
+                      ) : null}
+                      {stickyMsg ? (
+                        <p className="mt-1.5 text-xs text-[var(--spine)]">{stickyMsg}</p>
+                      ) : null}
                     </div>
                   </div>
                 </section>

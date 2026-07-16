@@ -9,6 +9,21 @@ declare global {
         html: string,
         filename: string
       ) => Promise<{ ok: boolean; path?: string; canceled?: boolean; error?: string }>;
+      setStickyMode?: (mode: 'pack' | 'writing') => void;
+      openPageInMain?: (nav: {
+        bookshelfId: string;
+        notebookId: string;
+        sectionId: string;
+        pageId: string;
+      }) => void;
+      onOpenPage?: (
+        cb: (nav: {
+          bookshelfId: string;
+          notebookId: string;
+          sectionId: string;
+          pageId: string;
+        }) => void
+      ) => () => void;
     };
   }
 }

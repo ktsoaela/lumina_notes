@@ -706,6 +706,19 @@ export default function App() {
     setMainView('notes');
   };
 
+  useEffect(() => {
+    const desktop = window.luminaDesktop;
+    if (!desktop?.onOpenPage) return;
+    return desktop.onOpenPage((nav) => {
+      void handleOpenNotebookFromShelf(
+        nav.notebookId,
+        nav.bookshelfId,
+        nav.sectionId,
+        nav.pageId
+      );
+    });
+  }, []);
+
   const handleExportMarkdownPage = useCallback(
     (parts: { book?: string | null; chapter?: string | null; page: string }, content: string) => {
       const stem = buildExportFilename(parts);
