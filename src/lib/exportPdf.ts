@@ -15,6 +15,9 @@ declare global {
         notebookId: string;
         sectionId: string;
         pageId: string;
+        /** Fresh content after sticky save — main applies this so the editor doesn't show a stale page */
+        content?: string;
+        title?: string;
       }) => void;
       onOpenPage?: (
         cb: (nav: {
@@ -22,6 +25,8 @@ declare global {
           notebookId: string;
           sectionId: string;
           pageId: string;
+          content?: string;
+          title?: string;
         }) => void
       ) => () => void;
       notifyStickyTargetChanged?: () => void;
