@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { Notebook } from '../types';
 import { api } from '../lib/api';
 import { readActiveBookshelfId, readToken } from '../lib/authCache';
@@ -12,7 +12,6 @@ import { cn } from '../lib/utils';
 import Preview from './Preview';
 
 const NEON_KEY = 'lumina_sticky_neon';
-const DRAFT_PREFIX = 'lumina_sticky_draft_';
 const PAGE_PREFIX = 'lumina_sticky_page_';
 
 type NeonId = 'pink' | 'orange' | 'yellow' | 'green' | 'blue';
@@ -54,9 +53,8 @@ function readNeon(): NeonId {
 }
 
 /**
- * Neon strips stand alone at ~30% width (no labels).
- * Hover one → full width + name. Click → write / preview MD+mermaid / save & open.
- * Book target: Profile → Sticky note strips.
+ * Neon strips stand alone. Click → shared page editor (same content as main app).
+ * Write/Preview load from API; Save writes the full page back.
  */
 export default function StickyDesktopApp() {
   const [notebooks, setNotebooks] = useState<Notebook[]>([]);
@@ -67,13 +65,21 @@ export default function StickyDesktopApp() {
     () => getStickyStripTarget()?.notebookId ?? ''
   );
   const [neonId, setNeonId] = useState<NeonId>(readNeon);
-  const [draft, setDraft] = useState(() => readStore(DRAFT_PREFIX + readNeon()));
+  const [draft, setDraft] = useState('');
   const [saving, setSaving] = useState(false);
+  const [loadingPage, setLoadingPage] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [writingId, setWritingId] = useState<NeonId | null>(null);
   const [hoveredId, setHoveredId] = useState<NeonId | null>(null);
   const [targetTick, setTargetTick] = useState(0);
+  const [reloadTick, setReloadTick] = useState(0);
   const [tab, setTab] = useState<EditorTab>('write');
+  const lastLoadedRef = useRef('');
+  const pageMetaRef = useRef<{
+    sectionId: string;
+    pageId: string;
+    title: string;
+  } | null>(null);
 
   const neon = NEONS.find((n) => n.id === (writingId ?? neonId)) ?? NEONS[0];
   const books = useMemo(
@@ -83,10 +89,17 @@ export default function StickyDesktopApp() {
   const activeBook = books.find((b) => b.id === bookId) ?? books[0];
   const signedIn = Boolean(readToken());
   const writing = writingId !== null;
+  const dirty = draft !== lastLoadedRef.current;
 
   const syncWindow = useCallback((mode: 'pack' | 'writing') => {
     window.luminaDesktop?.setStickyMode?.(mode);
   }, []);
+
+  const resolveShelf = useCallback(
+    () =>
+      getStickyStripTarget()?.bookshelfId ?? shelfId ?? readActiveBookshelfId(),
+    [shelfId]
+  );
 
   useEffect(() => {
     document.title = "stick'n";
@@ -106,21 +119,28 @@ export default function StickyDesktopApp() {
   useEffect(() => {
     const refresh = () => setTargetTick((n) => n + 1);
     const syncTheme = () => applyTheme(getStoredTheme());
+    const onFocus = () => {
+      syncTheme();
+      // Reload shared page if widget has no unsaved edits
+      if (writingId && draft === lastLoadedRef.current) {
+        setReloadTick((n) => n + 1);
+      }
+    };
     const onStorage = (e: StorageEvent) => {
       if (e.key === 'lumina_theme' || e.key === null) syncTheme();
       refresh();
     };
     window.addEventListener(STICKY_TARGET_EVENT, refresh);
     window.addEventListener('storage', onStorage);
-    window.addEventListener('focus', syncTheme);
+    window.addEventListener('focus', onFocus);
     const unsub = window.luminaDesktop?.onStickyTargetChanged?.(refresh);
     return () => {
       window.removeEventListener(STICKY_TARGET_EVENT, refresh);
       window.removeEventListener('storage', onStorage);
-      window.removeEventListener('focus', syncTheme);
+      window.removeEventListener('focus', onFocus);
       unsub?.();
     };
-  }, []);
+  }, [writingId, draft]);
 
   useEffect(() => {
     const target = getStickyStripTarget();
@@ -152,28 +172,154 @@ export default function StickyDesktopApp() {
     return () => {
       cancelled = true;
     };
-    // bookId intentionally omitted — only re-fetch on shelf/target change
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [signedIn, shelfId, targetTick]);
 
   useEffect(() => {
     writeStore(NEON_KEY, neonId);
-    writeStore(DRAFT_PREFIX + neonId, draft);
-  }, [neonId, draft]);
+  }, [neonId]);
+
+  const ensureSticknSectionId = async (book: Notebook): Promise<string> => {
+    const existing = book.sections.find(
+      (s) => s.title.trim().toLowerCase() === "stick'n"
+    );
+    if (existing) return existing.id;
+    const sectionId = `sec-stickn-${book.id}`;
+    try {
+      await api.sections.create(sectionId, book.id, "stick'n");
+    } catch {
+      /* may already exist */
+    }
+    return sectionId;
+  };
+
+  /** Resolve film page from API (shared with main app). */
+  const ensureNeonPage = useCallback(
+    async (
+      bookshelfId: string,
+      filmId: NeonId
+    ): Promise<{
+      sectionId: string;
+      pageId: string;
+      title: string;
+      content: string;
+      isNew: boolean;
+      notebookId: string;
+    }> => {
+      const film = NEONS.find((n) => n.id === filmId) ?? NEONS[0];
+      const [active, archived] = await Promise.all([
+        api.notebooks.list(false, bookshelfId),
+        api.notebooks.list(true, bookshelfId),
+      ]);
+      const preferredId =
+        getStickyStripTarget()?.notebookId || bookId || active[0]?.id;
+      const book =
+        active.find((n) => n.id === preferredId) ??
+        archived.find((n) => n.id === preferredId) ??
+        active[0];
+      if (!book) throw new Error('No book');
+      setNotebooks(active);
+      setBookId(book.id);
+
+      const index = book.sections.flatMap((sec) =>
+        sec.pages.map((p) => ({
+          id: p.id,
+          title: p.title,
+          content: p.content ?? '',
+          sectionId: sec.id,
+        }))
+      );
+      const storedId = readStore(PAGE_PREFIX + filmId);
+      let hit = storedId ? index.find((p) => p.id === storedId) : undefined;
+      if (!hit) {
+        hit = index.find(
+          (p) => p.title.trim().toLowerCase() === film.label.toLowerCase()
+        );
+      }
+
+      if (hit) {
+        const live = await api.pages.list(hit.sectionId);
+        const page = live.find((p) => p.id === hit!.id);
+        writeStore(PAGE_PREFIX + filmId, hit.id);
+        return {
+          sectionId: hit.sectionId,
+          pageId: hit.id,
+          title: page?.title || hit.title,
+          content: page?.content ?? hit.content ?? '',
+          isNew: false,
+          notebookId: book.id,
+        };
+      }
+
+      const sectionId = await ensureSticknSectionId(book);
+      const pageId = `page-${Date.now()}`;
+      const title = coerceEntityTitle(film.label, 'page');
+      writeStore(PAGE_PREFIX + filmId, pageId);
+      return {
+        sectionId,
+        pageId,
+        title,
+        content: '',
+        isNew: true,
+        notebookId: book.id,
+      };
+    },
+    [bookId]
+  );
+
+  // Load shared page into Write/Preview whenever a film opens (or clean focus reload)
+  useEffect(() => {
+    if (!writingId) return;
+    const shelf = resolveShelf();
+    if (!shelf || !signedIn) return;
+    let cancelled = false;
+    (async () => {
+      setLoadingPage(true);
+      setError(null);
+      try {
+        const page = await ensureNeonPage(shelf, writingId);
+        if (cancelled) return;
+        if (page.isNew) {
+          await api.pages.create(
+            page.pageId,
+            page.sectionId,
+            page.title,
+            ''
+          );
+        }
+        pageMetaRef.current = {
+          sectionId: page.sectionId,
+          pageId: page.pageId,
+          title: page.title,
+        };
+        lastLoadedRef.current = page.content;
+        setDraft(page.content);
+      } catch (err) {
+        console.error(err);
+        if (!cancelled) setError('Could not load page from app');
+      } finally {
+        if (!cancelled) setLoadingPage(false);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [writingId, reloadTick, signedIn, resolveShelf, ensureNeonPage]);
 
   const pickFilm = (id: NeonId) => {
-    writeStore(DRAFT_PREFIX + neonId, draft);
     setNeonId(id);
-    setDraft(readStore(DRAFT_PREFIX + id));
+    setDraft('');
+    lastLoadedRef.current = '';
+    pageMetaRef.current = null;
     setWritingId(id);
     setHoveredId(null);
     setTab('write');
   };
 
   const backToPack = () => {
-    writeStore(DRAFT_PREFIX + neonId, draft);
     setWritingId(null);
     setTab('write');
+    setError(null);
   };
 
   const insertMermaid = () => {
@@ -186,111 +332,54 @@ export default function StickyDesktopApp() {
     setTab('write');
   };
 
-  const ensureSticknSectionId = async (book: Notebook): Promise<string> => {
-    const existing = book.sections.find(
-      (s) => s.title.trim().toLowerCase() === "stick'n"
-    );
-    if (existing) return existing.id;
-    const sectionId = `sec-stickn-${book.id}`;
-    try {
-      await api.sections.create(sectionId, book.id, "stick'n");
-    } catch {
-      /* may already exist from a prior run */
-    }
-    return sectionId;
-  };
-
-  /** Resolve film page; always re-read content from API so Save appends, not overwrites. */
-  const ensureNeonPage = async (
-    bookshelfId: string
-  ): Promise<{
-    sectionId: string;
-    pageId: string;
-    title: string;
-    content: string;
-  }> => {
-    if (!activeBook) throw new Error('No book');
-
-    // Fresh book tree from API (sticky's in-memory notebooks go stale after first save)
-    const [active, archived] = await Promise.all([
-      api.notebooks.list(false, bookshelfId),
-      api.notebooks.list(true, bookshelfId),
-    ]);
-    const book =
-      active.find((n) => n.id === activeBook.id) ??
-      archived.find((n) => n.id === activeBook.id);
-    if (!book) throw new Error('No book');
-    setNotebooks(active);
-
-    const index = book.sections.flatMap((sec) =>
-      sec.pages.map((p) => ({
-        id: p.id,
-        title: p.title,
-        content: p.content ?? '',
-        sectionId: sec.id,
-      }))
-    );
-    const storedId = readStore(PAGE_PREFIX + neonId);
-    let hit = storedId ? index.find((p) => p.id === storedId) : undefined;
-    if (!hit) {
-      hit = index.find(
-        (p) => p.title.trim().toLowerCase() === neon.label.toLowerCase()
-      );
-    }
-
-    if (hit) {
-      // Re-fetch that section's pages for absolute latest content
-      const live = await api.pages.list(hit.sectionId);
-      const page = live.find((p) => p.id === hit!.id);
-      return {
-        sectionId: hit.sectionId,
-        pageId: hit.id,
-        title: page?.title || hit.title,
-        content: page?.content ?? hit.content ?? '',
-      };
-    }
-
-    const sectionId = await ensureSticknSectionId(book);
-    const pageId = `page-${Date.now()}`;
-    const title = coerceEntityTitle(neon.label, 'page');
-    await api.pages.create(pageId, sectionId, title, '');
-    writeStore(PAGE_PREFIX + neonId, pageId);
-    return { sectionId, pageId, title, content: '' };
-  };
-
-  const openInLumina = async (withDraft: boolean) => {
-    const shelf =
-      getStickyStripTarget()?.bookshelfId ?? shelfId ?? readActiveBookshelfId();
-    if (!shelf || !activeBook || saving) return;
+  const openInLumina = async (save: boolean) => {
+    const shelf = resolveShelf();
+    if (!shelf || !activeBook || saving || !writingId) return;
     setSaving(true);
     setError(null);
     try {
-      const { sectionId, pageId, title, content } = await ensureNeonPage(shelf);
-      const text = draft.trim();
-      let savedContent = content;
-      let savedTitle = title;
-      if (withDraft && text) {
-        savedContent = content.trim()
-          ? `${content.trimEnd()}\n\n${text}`
-          : text;
-        savedTitle = title || coerceEntityTitle(neon.label, 'page');
-        await api.pages.update(pageId, savedTitle, savedContent);
-        setDraft('');
-        writeStore(DRAFT_PREFIX + neonId, '');
+      const page = await ensureNeonPage(shelf, writingId);
+      const savedTitle = page.title || coerceEntityTitle(neon.label, 'page');
+      // Shared document: textarea IS the page (continue writing on both sides)
+      const savedContent = draft;
+
+      // New pages always persist current editor text so Open doesn't lose work.
+      if (page.isNew) {
+        await api.pages.create(
+          page.pageId,
+          page.sectionId,
+          savedTitle,
+          savedContent
+        );
+        lastLoadedRef.current = savedContent;
+      } else if (save) {
+        await api.pages.update(page.pageId, savedTitle, savedContent);
+        lastLoadedRef.current = savedContent;
       }
-      writeStore(PAGE_PREFIX + neonId, pageId);
-      window.luminaDesktop?.openPageInMain?.({
+
+      const contentForMain = save || page.isNew ? savedContent : page.content;
+      writeStore(PAGE_PREFIX + writingId, page.pageId);
+      pageMetaRef.current = {
+        sectionId: page.sectionId,
+        pageId: page.pageId,
+        title: savedTitle,
+      };
+
+      if (!window.luminaDesktop?.openPageInMain) {
+        setError('Desktop bridge missing — restart the app');
+        return;
+      }
+      window.luminaDesktop.openPageInMain({
         bookshelfId: shelf,
-        notebookId: activeBook.id,
-        sectionId,
-        pageId,
-        content: savedContent,
+        notebookId: page.notebookId,
+        sectionId: page.sectionId,
+        pageId: page.pageId,
+        content: contentForMain,
         title: savedTitle,
       });
-      setWritingId(null);
-      setTab('write');
-    } catch {
-      setError('Could not open page');
+    } catch (err) {
+      console.error(err);
+      setError('Could not save / open page');
     } finally {
       setSaving(false);
     }
@@ -335,7 +424,8 @@ export default function StickyDesktopApp() {
           ) : null}
         </div>
       ) : (
-        <div className="studio-shell film-writer-shell app-region-drag">
+        <div className="studio-shell film-writer-shell">
+          <div className="film-writer-drag app-region-drag" title="Drag" />
           <div className="acoustic-pillar film-writer app-region-no-drag">
             <div className="film-writer-top">
               <div className="film-writer-toolbar">
@@ -354,6 +444,24 @@ export default function StickyDesktopApp() {
                 <span className="font-display text-sm font-medium tracking-tight text-[var(--app-fg)]">
                   {neon.label}
                 </span>
+                {dirty ? (
+                  <span className="text-[10px] text-[var(--app-muted)]">
+                    unsaved
+                  </span>
+                ) : null}
+                <button
+                  type="button"
+                  className="studio-btn ml-auto"
+                  disabled={loadingPage || dirty}
+                  title={
+                    dirty
+                      ? 'Save or discard edits before refresh'
+                      : 'Reload from app'
+                  }
+                  onClick={() => setReloadTick((n) => n + 1)}
+                >
+                  Refresh
+                </button>
               </div>
               <nav
                 className="film-writer-path text-[11px] tracking-[0.04em] text-[var(--app-muted)]"
@@ -365,7 +473,7 @@ export default function StickyDesktopApp() {
                 <span aria-hidden className="opacity-30">
                   ·
                 </span>
-                <span>stick&apos;n</span>
+                <span>same page as app</span>
               </nav>
             </div>
 
@@ -406,11 +514,15 @@ export default function StickyDesktopApp() {
             </div>
 
             <div className="paper-page film-writer-paper">
-              {tab === 'write' ? (
+              {loadingPage ? (
+                <p className="px-6 py-8 text-center text-sm text-[var(--app-muted)]">
+                  Loading page…
+                </p>
+              ) : tab === 'write' ? (
                 <textarea
                   className="strip-textarea"
                   placeholder={
-                    'Untitled thought — plain text or Markdown…\n\n# Heading\n- list\n\n```mermaid\nflowchart LR\n  A --> B\n```'
+                    'Continue this note — same page as the main app…\n\n# Heading\n- list\n\n```mermaid\nflowchart LR\n  A --> B\n```'
                   }
                   value={draft}
                   autoFocus
@@ -438,15 +550,15 @@ export default function StickyDesktopApp() {
               <button
                 type="button"
                 className="studio-btn-primary flex-1"
-                disabled={saving || !activeBook}
+                disabled={saving || loadingPage || !activeBook}
                 onClick={() => void openInLumina(true)}
               >
-                {saving ? 'Opening…' : 'Save & open'}
+                {saving ? 'Saving…' : 'Save & open'}
               </button>
               <button
                 type="button"
                 className="studio-btn"
-                disabled={saving || !activeBook}
+                disabled={saving || loadingPage || !activeBook}
                 onClick={() => void openInLumina(false)}
               >
                 Open page

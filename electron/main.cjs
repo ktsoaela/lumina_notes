@@ -4,9 +4,15 @@ const fs = require("fs");
 const { spawn } = require("child_process");
 const http = require("http");
 
-/** Same file as `src/assets` `defaultLogo` (book_colour_outline.png) */
+/** Taskbar / window icon — colour mark without outline */
 function windowIcon() {
-  const p = path.join(__dirname, "..", "src", "assets", "book_colour_outline.png");
+  const p = path.join(
+    __dirname,
+    "..",
+    "src",
+    "assets",
+    "book_colour_no_outline.png"
+  );
   if (fs.existsSync(p)) {
     return nativeImage.createFromPath(p);
   }
@@ -297,12 +303,32 @@ ipcMain.on("lumina:sticky-mode", (_event, mode) => {
   }
 });
 
-ipcMain.on("lumina:sticky-open-page", (_event, nav) => {
-  if (!mainWindow || mainWindow.isDestroyed()) return;
-  if (mainWindow.isMinimized()) mainWindow.restore();
-  mainWindow.show();
-  mainWindow.focus();
-  mainWindow.webContents.send("lumina:open-page", nav);
+ipcMain.on("lumina:sticky-open-page", async (_event, nav) => {
+  try {
+    let recreated = false;
+    if (!mainWindow || mainWindow.isDestroyed()) {
+      await createWindow();
+      recreated = true;
+    }
+    if (!mainWindow || mainWindow.isDestroyed()) return;
+    if (mainWindow.isMinimized()) mainWindow.restore();
+    mainWindow.show();
+    mainWindow.focus();
+    if (recreated || mainWindow.webContents.isLoading()) {
+      await new Promise((resolve) => {
+        const done = () => resolve();
+        mainWindow.webContents.once("did-finish-load", done);
+        setTimeout(done, 4000);
+      });
+    } else {
+      await new Promise((r) => setTimeout(r, 30));
+    }
+    if (!mainWindow.isDestroyed()) {
+      mainWindow.webContents.send("lumina:open-page", nav);
+    }
+  } catch (err) {
+    console.error("sticky-open-page failed", err);
+  }
 });
 
 /** Profile saved sticky book target — forward to sticky window (Win storage events flake). */

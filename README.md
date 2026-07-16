@@ -1,5 +1,5 @@
 <div align="center">
-  <img src="src/assets/book_black_and_white.png" alt="Lumina Notes logo" width="128" style="background:#ffffff;padding:16px;border-radius:12px" />
+  <img src="src/assets/book_colour_outline.png" alt="Lumina Notes logo" width="128" style="background:#ffffff;padding:16px;border-radius:12px" />
 </div>
 
 # Lumina Notes

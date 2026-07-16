@@ -1201,6 +1201,13 @@ html.sticky-strip-mode #root {
   box-shadow: var(--shadow-micro);
 }
 
+.film-writer-drag {
+  height: 14px;
+  flex-shrink: 0;
+  cursor: grab;
+  background: color-mix(in srgb, var(--app-fg) 6%, transparent);
+}
+
 .film-writer {
   position: relative;
   display: flex;
@@ -1273,27 +1280,64 @@ html.sticky-strip-mode #root {
   resize: none;
   border: none;
   outline: none;
-  background: transparent;
-  /* Match main Editor.tsx */
+  background: var(--paper);
   font-family: var(--font-serif);
-  font-size: 16px;
-  line-height: 1.8;
+  font-size: 12px;
+  line-height: 1.55;
   letter-spacing: 0.01em;
   color: var(--app-fg);
-  padding: 1rem 1.1rem;
+  caret-color: var(--app-fg);
+  -webkit-text-fill-color: var(--app-fg);
+  padding: 0.75rem 0.85rem;
 }
 
 .strip-textarea::placeholder {
   color: color-mix(in srgb, var(--app-muted) 45%, transparent);
   font-style: italic;
+  font-size: 12px;
 }
 
 .strip-preview-inner {
   flex: 1;
   min-height: 0;
   overflow: auto;
-  padding: 1rem 1.1rem !important;
-  font-size: 16px;
+  padding: 0.75rem 0.85rem !important;
+  font-size: 12px !important;
+  line-height: 1.55;
+}
+
+.strip-preview-inner.prose {
+  font-size: 12px;
+}
+
+.strip-preview-inner.prose :where(p, li, h1, h2, h3, code, pre) {
+  font-size: inherit;
+}
+
+.strip-preview-inner.prose :where(h1) {
+  font-size: 1.15em;
+}
+
+.strip-preview-inner.prose :where(h2) {
+  font-size: 1.08em;
+}
+
+.strip-preview-inner.prose :where(h3) {
+  font-size: 1.02em;
+}
+
+/* Mermaid diagrams in the sticky widget */
+.strip-preview-inner .mermaid,
+.strip-preview-inner [id^='mermaid'],
+.strip-preview-inner svg {
+  max-width: 100%;
+  height: auto;
+  font-size: 11px;
+}
+
+.strip-preview-inner svg {
+  transform: scale(0.85);
+  transform-origin: top left;
 }
 
 .strip-actions {

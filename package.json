@@ -99,7 +99,7 @@
     "directories": {
       "output": "release/electron"
     },
-    "icon": "src/assets/book_colour_outline.png",
+    "icon": "src/assets/book_colour_no_outline.png",
     "files": [
       "electron/**/*",
       "src/assets/**/*"
