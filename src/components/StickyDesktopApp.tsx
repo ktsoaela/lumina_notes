@@ -497,48 +497,6 @@ export default function StickyDesktopApp() {
     });
   };
 
-  const packStand = (
-    <div
-      className={cn(
-        'film-stand app-region-no-drag',
-        edge === 'left' && 'film-stand--from-left',
-        edge === 'top' && 'film-stand--from-top',
-        edge === 'bottom' && 'film-stand--from-bottom'
-      )}
-    >
-      <div className="film-stand-drag app-region-drag" title="Drag" />
-      <div className="tabs-dispenser-grid">
-        {NEONS.map((n) => (
-          <button
-            key={n.id}
-            type="button"
-            className={cn(
-              'neon-film-stack',
-              hoveredId === n.id && 'is-expanded'
-            )}
-            style={{ backgroundColor: n.color }}
-            aria-label={n.label}
-            onMouseEnter={() => setHoveredId(n.id)}
-            onMouseLeave={() => setHoveredId(null)}
-            onFocus={() => setHoveredId(n.id)}
-            onBlur={() => setHoveredId(null)}
-            onClick={() => pickFilm(n.id)}
-          >
-            <span className="neon-film-shine" />
-            <span className="neon-film-name">{n.label}</span>
-          </button>
-        ))}
-      </div>
-      {!signedIn ? (
-        <p className="stand-hint">Sign in first</p>
-      ) : !activeBook ? (
-        <p className="stand-hint">
-          Set a book in Profile → Sticky note strips
-        </p>
-      ) : null}
-    </div>
-  );
-
   return (
     <div
       className={cn('stickn-root', writing && 'is-writing')}
@@ -546,19 +504,45 @@ export default function StickyDesktopApp() {
       data-edge={edge}
     >
       {!writing ? (
-        edge === 'top' || edge === 'bottom' ? (
-          <div
-            className={cn(
-              'film-stand-mount',
-              edge === 'top' && 'film-stand-mount--top app-region-drag',
-              edge === 'bottom' && 'film-stand-mount--bottom app-region-drag'
-            )}
-          >
-            {packStand}
+        <div
+          className={cn(
+            'film-stand app-region-no-drag',
+            edge === 'left' && 'film-stand--from-left',
+            edge === 'top' && 'film-stand--from-top',
+            edge === 'bottom' && 'film-stand--from-bottom'
+          )}
+        >
+          <div className="film-stand-drag app-region-drag" title="Drag" />
+          <div className="tabs-dispenser-grid">
+            {NEONS.map((n) => (
+              <button
+                key={n.id}
+                type="button"
+                className={cn(
+                  'neon-film-stack',
+                  hoveredId === n.id && 'is-expanded'
+                )}
+                style={{ backgroundColor: n.color }}
+                aria-label={n.label}
+                onMouseEnter={() => setHoveredId(n.id)}
+                onMouseLeave={() => setHoveredId(null)}
+                onFocus={() => setHoveredId(n.id)}
+                onBlur={() => setHoveredId(null)}
+                onClick={() => pickFilm(n.id)}
+              >
+                <span className="neon-film-shine" />
+                <span className="neon-film-name">{n.label}</span>
+              </button>
+            ))}
           </div>
-        ) : (
-          packStand
-        )
+          {!signedIn ? (
+            <p className="stand-hint">Sign in first</p>
+          ) : !activeBook ? (
+            <p className="stand-hint">
+              Set a book in Profile → Sticky note strips
+            </p>
+          ) : null}
+        </div>
       ) : (
         <div className="studio-shell film-writer-shell">
           <div className="film-writer-drag app-region-drag" title="Drag" />
