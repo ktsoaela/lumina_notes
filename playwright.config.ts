@@ -22,7 +22,7 @@ export default defineConfig({
         ...process.env,
         LUMINA_ENV: 'development',
         JWT_SECRET: 'e2e-test-secret',
-        SEED_DEMO_USER: '0',
+        SEED_DEMO_USER: '1',
         ENABLE_DOCS: '0',
         PORT: API_PORT,
       },
