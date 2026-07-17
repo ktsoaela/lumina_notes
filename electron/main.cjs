@@ -137,6 +137,11 @@ function stickyEdgeFromBounds(bounds, area) {
   const dRight = area.x + area.width - (bounds.x + bounds.width);
   const dTop = bounds.y - area.y;
   const dBottom = area.y + area.height - (bounds.y + bounds.height);
+
+  if (bounds.width > bounds.height) {
+    return dTop <= dBottom ? "top" : "bottom";
+  }
+
   const min = Math.min(dLeft, dRight, dTop, dBottom);
   if (min === dLeft) return "left";
   if (min === dRight) return "right";
