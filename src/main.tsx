@@ -29,7 +29,7 @@ if (!link) {
 }
 link.type = 'image/png';
 link.href = defaultLogo;
-document.title = stickyWindow ? 'Sticky' : 'Lumina Notes';
+document.title = stickyWindow ? '\u200b' : 'Lumina Notes';
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>

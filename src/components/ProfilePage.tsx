@@ -33,9 +33,13 @@ import {
   setSyncServerUrl,
 } from '../lib/syncServer';
 import {
+  getStickyStripEdge,
   getStickyStripTarget,
+  notifyStickyEdgeChanged,
   notifyStickyStripTargetChanged,
+  setStickyStripEdge,
   setStickyStripTarget,
+  type StickyStripEdge,
 } from '../lib/stickyStrips';
 import { isElectronApp } from '../lib/platform';
 
@@ -185,6 +189,9 @@ export default function ProfilePage({
     return t ? `${t.bookshelfId}::${t.notebookId}` : '';
   });
   const [stickyMsg, setStickyMsg] = useState<string | null>(null);
+  const [stickyEdge, setStickyEdge] = useState<StickyStripEdge>(() =>
+    getStickyStripEdge()
+  );
   const desktopShell = isElectronApp();
   const navItems = NAV.filter((item) => !item.desktopOnly || desktopShell);
 
@@ -861,8 +868,8 @@ export default function ProfilePage({
                     Sticky note strips
                   </h2>
                   <p className={cn(mutedText, 'mb-6')}>
-                    Choose which book the desktop neon strips write into. Each film (Pink, Orange,
-                    …) becomes a page in that book.
+                    Choose which book the desktop neon strips write into and which screen edge
+                    they dock to. Each film (Pink, Orange, …) becomes a page in that book.
                   </p>
                   <div className="grid grid-cols-1 gap-5 sm:grid-cols-12 sm:items-start">
                     <label className={cn(labelClass, 'sm:col-span-4 sm:pt-2')} htmlFor="sticky-book">
@@ -916,6 +923,44 @@ export default function ProfilePage({
                       {stickyMsg ? (
                         <p className="mt-1.5 text-xs text-[var(--spine)]">{stickyMsg}</p>
                       ) : null}
+                    </div>
+                  </div>
+                  <div className="mt-6 grid grid-cols-1 gap-5 sm:grid-cols-12 sm:items-start">
+                    <p className={cn(labelClass, 'sm:col-span-4 sm:pt-2')}>Screen edge</p>
+                    <div className="sm:col-span-8">
+                      <div className="inline-flex flex-wrap rounded-lg border border-[var(--app-border)] bg-[var(--gutter)] p-0.5">
+                        {(
+                          [
+                            ['right', 'Right'],
+                            ['left', 'Left'],
+                            ['top', 'Top'],
+                            ['bottom', 'Bottom'],
+                          ] as const
+                        ).map(([id, label]) => (
+                          <button
+                            key={id}
+                            type="button"
+                            onClick={() => {
+                              setStickyEdge(id);
+                              setStickyStripEdge(id);
+                              notifyStickyEdgeChanged(id);
+                              setStickyMsg(`Strips docked to the ${label.toLowerCase()} edge.`);
+                            }}
+                            className={cn(
+                              'rounded-md px-3 py-1.5 text-xs font-medium transition-colors',
+                              stickyEdge === id
+                                ? 'bg-[var(--paper)] text-[var(--spine)] shadow-sm'
+                                : 'text-[var(--app-muted)]'
+                            )}
+                          >
+                            {label}
+                          </button>
+                        ))}
+                      </div>
+                      <p className="mt-2 text-xs text-[var(--app-muted)]">
+                        Strips protrude from the screen edge like tabs on a book spine. You can
+                        still drag them to another edge anytime.
+                      </p>
                     </div>
                   </div>
                 </section>

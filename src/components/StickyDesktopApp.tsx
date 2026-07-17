@@ -3,7 +3,9 @@ import type { Notebook } from '../types';
 import { api } from '../lib/api';
 import { readActiveBookshelfId, readToken } from '../lib/authCache';
 import {
+  getStickyStripEdge,
   getStickyStripTarget,
+  STICKY_EDGE_EVENT,
   STICKY_TARGET_EVENT,
 } from '../lib/stickyStrips';
 import { coerceEntityTitle } from '../lib/validation';
@@ -54,20 +56,22 @@ function readNeon(): NeonId {
 }
 
 function readStickyEdge(): StickyEdge {
-  const cx = window.screenX + window.outerWidth / 2;
-  const cy = window.screenY + window.outerHeight / 2;
+  const x = window.screenX;
+  const y = window.screenY;
+  const w = window.outerWidth;
+  const h = window.outerHeight;
   const left = window.screen.availLeft;
   const top = window.screen.availTop;
   const right = left + window.screen.availWidth;
   const bottom = top + window.screen.availHeight;
-  const distLeft = cx - left;
-  const distRight = right - cx;
-  const distTop = cy - top;
-  const distBottom = bottom - cy;
-  const min = Math.min(distLeft, distRight, distTop, distBottom);
-  if (min === distLeft) return 'left';
-  if (min === distRight) return 'right';
-  if (min === distTop) return 'top';
+  const dLeft = x - left;
+  const dRight = right - (x + w);
+  const dTop = y - top;
+  const dBottom = bottom - (y + h);
+  const min = Math.min(dLeft, dRight, dTop, dBottom);
+  if (min === dLeft) return 'left';
+  if (min === dRight) return 'right';
+  if (min === dTop) return 'top';
   return 'bottom';
 }
 
@@ -108,9 +112,6 @@ export default function StickyDesktopApp() {
   } | null>(null);
   const AUTOSAVE_MS = 450;
 
-  const layoutEdge: 'left' | 'right' =
-    edge === 'top' ? 'left' : 'right';
-
   const neon = NEONS.find((n) => n.id === (writingId ?? neonId)) ?? NEONS[0];
   const books = useMemo(
     () => notebooks.filter((nb) => !nb.archived),
@@ -133,24 +134,39 @@ export default function StickyDesktopApp() {
   );
 
   useEffect(() => {
-    document.title = "stick'n";
+    document.title = '\u200b';
     applyTheme(getStoredTheme());
     document.documentElement.classList.add('sticky-strip-mode');
     document.body.style.background = 'transparent';
     document.body.style.margin = '0';
     document.body.style.overflow = 'hidden';
     syncWindow('pack');
+    window.luminaDesktop?.setStickyEdge?.(getStickyStripEdge());
     return () => document.documentElement.classList.remove('sticky-strip-mode');
   }, [syncWindow]);
+
+  useEffect(() => {
+    const onEdgePref = () => {
+      window.luminaDesktop?.setStickyEdge?.(getStickyStripEdge());
+    };
+    window.addEventListener(STICKY_EDGE_EVENT, onEdgePref);
+    return () => window.removeEventListener(STICKY_EDGE_EVENT, onEdgePref);
+  }, []);
 
   useEffect(() => {
     const syncEdge = () => setEdge(readStickyEdge());
     syncEdge();
     window.addEventListener('resize', syncEdge);
     const timer = window.setInterval(syncEdge, 240);
+    const unsubEdge = window.luminaDesktop?.onStickyEdge?.((next) => {
+      if (next === 'left' || next === 'right' || next === 'top' || next === 'bottom') {
+        setEdge(next);
+      }
+    });
     return () => {
       window.removeEventListener('resize', syncEdge);
       window.clearInterval(timer);
+      unsubEdge?.();
     };
   }, []);
 
@@ -475,6 +491,48 @@ export default function StickyDesktopApp() {
     });
   };
 
+  const packStand = (
+    <div
+      className={cn(
+        'film-stand app-region-no-drag',
+        edge === 'left' && 'film-stand--from-left',
+        edge === 'top' && 'film-stand--from-top',
+        edge === 'bottom' && 'film-stand--from-bottom'
+      )}
+    >
+      <div className="film-stand-drag app-region-drag" title="Drag" />
+      <div className="tabs-dispenser-grid">
+        {NEONS.map((n) => (
+          <button
+            key={n.id}
+            type="button"
+            className={cn(
+              'neon-film-stack',
+              hoveredId === n.id && 'is-expanded'
+            )}
+            style={{ backgroundColor: n.color }}
+            aria-label={n.label}
+            onMouseEnter={() => setHoveredId(n.id)}
+            onMouseLeave={() => setHoveredId(null)}
+            onFocus={() => setHoveredId(n.id)}
+            onBlur={() => setHoveredId(null)}
+            onClick={() => pickFilm(n.id)}
+          >
+            <span className="neon-film-shine" />
+            <span className="neon-film-name">{n.label}</span>
+          </button>
+        ))}
+      </div>
+      {!signedIn ? (
+        <p className="stand-hint">Sign in first</p>
+      ) : !activeBook ? (
+        <p className="stand-hint">
+          Set a book in Profile → Sticky note strips
+        </p>
+      ) : null}
+    </div>
+  );
+
   return (
     <div
       className={cn('stickn-root', writing && 'is-writing')}
@@ -482,54 +540,19 @@ export default function StickyDesktopApp() {
       data-edge={edge}
     >
       {!writing ? (
-        <div
-          className={cn(
-            'film-stand-mount',
-            edge === 'top' && 'film-stand-mount--top app-region-drag',
-            edge === 'bottom' && 'film-stand-mount--bottom app-region-drag'
-          )}
-        >
+        edge === 'top' || edge === 'bottom' ? (
           <div
             className={cn(
-              'film-stand app-region-no-drag',
-              edge === 'left' && 'film-stand--from-left',
-              edge === 'top' && 'film-stand--from-top film-stand--from-left',
-              edge === 'bottom' && 'film-stand--from-bottom'
+              'film-stand-mount',
+              edge === 'top' && 'film-stand-mount--top app-region-drag',
+              edge === 'bottom' && 'film-stand-mount--bottom app-region-drag'
             )}
-            data-layout={layoutEdge}
           >
-            <div className="film-stand-drag app-region-drag" title="Drag" />
-            <div className="tabs-dispenser-grid">
-              {NEONS.map((n) => (
-                <button
-                  key={n.id}
-                  type="button"
-                  className={cn(
-                    'neon-film-stack',
-                    hoveredId === n.id && 'is-expanded'
-                  )}
-                  style={{ backgroundColor: n.color }}
-                  aria-label={n.label}
-                  onMouseEnter={() => setHoveredId(n.id)}
-                  onMouseLeave={() => setHoveredId(null)}
-                  onFocus={() => setHoveredId(n.id)}
-                  onBlur={() => setHoveredId(null)}
-                  onClick={() => pickFilm(n.id)}
-                >
-                  <span className="neon-film-shine" />
-                  <span className="neon-film-name">{n.label}</span>
-                </button>
-              ))}
-            </div>
-            {!signedIn ? (
-              <p className="stand-hint">Sign in first</p>
-            ) : !activeBook ? (
-              <p className="stand-hint">
-                Set a book in Profile → Sticky note strips
-              </p>
-            ) : null}
+            {packStand}
           </div>
-        </div>
+        ) : (
+          packStand
+        )
       ) : (
         <div className="studio-shell film-writer-shell">
           <div className="film-writer-drag app-region-drag" title="Drag" />

@@ -133,16 +133,14 @@ function appUrl(query) {
 }
 
 function stickyEdgeFromBounds(bounds, area) {
-  const cx = bounds.x + bounds.width / 2;
-  const cy = bounds.y + bounds.height / 2;
-  const distLeft = cx - area.x;
-  const distRight = area.x + area.width - cx;
-  const distTop = cy - area.y;
-  const distBottom = area.y + area.height - cy;
-  const min = Math.min(distLeft, distRight, distTop, distBottom);
-  if (min === distLeft) return "left";
-  if (min === distRight) return "right";
-  if (min === distTop) return "top";
+  const dLeft = bounds.x - area.x;
+  const dRight = area.x + area.width - (bounds.x + bounds.width);
+  const dTop = bounds.y - area.y;
+  const dBottom = area.y + area.height - (bounds.y + bounds.height);
+  const min = Math.min(dLeft, dRight, dTop, dBottom);
+  if (min === dLeft) return "left";
+  if (min === dRight) return "right";
+  if (min === dTop) return "top";
   return "bottom";
 }
 
@@ -152,47 +150,56 @@ function stickyPackSize(edge, mode = "pack") {
   return STICKY_SIZES.pack;
 }
 
-function snapStickyBounds(bounds, area, mode = "pack") {
-  const edge = stickyEdgeFromBounds(bounds, area);
+let lastStickyEdge = "right";
+let stickyMode = "pack";
+let stickyMoveFromSnap = false;
+
+function snapStickyBounds(bounds, area, mode = "pack", forcedEdge = null) {
+  const edge = forcedEdge || stickyEdgeFromBounds(bounds, area);
   const size = stickyPackSize(edge, mode);
   let x = bounds.x;
   let y = bounds.y;
 
   if (edge === "right") {
     x = area.x + area.width - size.width;
-    y = Math.max(area.y, Math.min(bounds.y, area.y + area.height - size.height));
+    y = forcedEdge
+      ? area.y + Math.round((area.height - size.height) / 2)
+      : Math.max(area.y, Math.min(bounds.y, area.y + area.height - size.height));
   } else if (edge === "left") {
     x = area.x;
-    y = Math.max(area.y, Math.min(bounds.y, area.y + area.height - size.height));
+    y = forcedEdge
+      ? area.y + Math.round((area.height - size.height) / 2)
+      : Math.max(area.y, Math.min(bounds.y, area.y + area.height - size.height));
   } else if (edge === "top") {
     y = area.y;
-    x = Math.max(area.x, Math.min(bounds.x, area.x + area.width - size.width));
+    x = forcedEdge
+      ? area.x + Math.round((area.width - size.width) / 2)
+      : Math.max(area.x, Math.min(bounds.x, area.x + area.width - size.width));
   } else {
     y = area.y + area.height - size.height;
-    x = Math.max(area.x, Math.min(bounds.x, area.x + area.width - size.width));
+    x = forcedEdge
+      ? area.x + Math.round((area.width - size.width) / 2)
+      : Math.max(area.x, Math.min(bounds.x, area.x + area.width - size.width));
   }
 
   return { x, y, width: size.width, height: size.height, edge };
 }
 
-let lastStickyEdge = "right";
-let stickyMode = "pack";
-
-function snapStickyWindow() {
+function snapStickyWindow(forcedEdge = null) {
   if (!stickyWindow || stickyWindow.isDestroyed() || stickyClamping) return;
   const current = stickyWindow.getBounds();
   const area = screen.getDisplayMatching(current).workArea;
-  const next = snapStickyBounds(current, area, stickyMode);
+  const next = snapStickyBounds(current, area, stickyMode, forcedEdge);
   lastStickyEdge = next.edge;
-  if (
+  const unchanged =
     next.x === current.x &&
     next.y === current.y &&
     next.width === current.width &&
-    next.height === current.height
-  ) {
-    return;
-  }
+    next.height === current.height;
+  if (unchanged && !forcedEdge) return;
+
   stickyClamping = true;
+  stickyMoveFromSnap = true;
   stickyWindow.setBounds({
     x: next.x,
     y: next.y,
@@ -200,6 +207,10 @@ function snapStickyWindow() {
     height: next.height,
   });
   stickyClamping = false;
+  setTimeout(() => {
+    stickyMoveFromSnap = false;
+  }, 50);
+  stickyWindow.webContents.send("lumina:sticky-edge", lastStickyEdge);
 }
 
 function stickyBounds(mode = "pack") {
@@ -252,6 +263,7 @@ async function createStickyWindow() {
   const isWin = process.platform === "win32";
   stickyWindow = new BrowserWindow({
     ...bounds,
+    title: "",
     frame: false,
     transparent: true,
     backgroundColor: "#00000000",
@@ -272,8 +284,11 @@ async function createStickyWindow() {
     webPreferences: webPrefs(),
   });
   applyStickyAlwaysOnTop(stickyWindow);
-  stickyWindow.on("move", () => {
+  stickyWindow.on("moved", () => {
+    if (stickyMoveFromSnap) return;
     snapStickyWindow();
+    if (!stickyWindow || stickyWindow.isDestroyed()) return;
+    stickyWindow.webContents.send("lumina:sticky-edge", lastStickyEdge);
   });
   stickyWindow.on("closed", () => {
     stickyWindow = null;
@@ -283,6 +298,7 @@ async function createStickyWindow() {
     stickyWindow.show();
     applyStickyAlwaysOnTop(stickyWindow);
     stickyWindow.moveTop();
+    stickyWindow.webContents.send("lumina:sticky-edge", lastStickyEdge);
   });
   await stickyWindow.loadURL(appUrl("desktop=1&sticky=1"));
   if (!stickyWindow.isDestroyed() && !stickyWindow.isVisible()) {
@@ -384,6 +400,20 @@ ipcMain.on("lumina:sticky-mode", (_event, mode) => {
   stickyMode = STICKY_SIZES[mode] ? mode : "pack";
   snapStickyWindow();
   // Win11 can drop always-on-top after setBounds — re-assert.
+  if (process.platform === "win32") {
+    applyStickyAlwaysOnTop(stickyWindow);
+    stickyWindow.moveTop();
+  }
+});
+
+ipcMain.on("lumina:sticky-set-edge", async (_event, edge) => {
+  if (!["left", "right", "top", "bottom"].includes(edge)) return;
+  if (!stickyWindow || stickyWindow.isDestroyed()) {
+    await createStickyWindow();
+  }
+  if (!stickyWindow || stickyWindow.isDestroyed()) return;
+  stickyWindow.show();
+  snapStickyWindow(edge);
   if (process.platform === "win32") {
     applyStickyAlwaysOnTop(stickyWindow);
     stickyWindow.moveTop();

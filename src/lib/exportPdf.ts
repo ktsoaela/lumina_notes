@@ -10,6 +10,7 @@ declare global {
         filename: string
       ) => Promise<{ ok: boolean; path?: string; canceled?: boolean; error?: string }>;
       setStickyMode?: (mode: 'pack' | 'writing') => void;
+      setStickyEdge?: (edge: 'left' | 'right' | 'top' | 'bottom') => void;
       openPageInMain?: (nav: {
         bookshelfId: string;
         notebookId: string;
@@ -31,6 +32,7 @@ declare global {
       ) => () => void;
       notifyStickyTargetChanged?: () => void;
       onStickyTargetChanged?: (cb: () => void) => () => void;
+      onStickyEdge?: (cb: (edge: 'left' | 'right' | 'top' | 'bottom') => void) => () => void;
       /** Push page content to the other Electron window after save */
       publishPageSync?: (patch: {
         pageId: string;
