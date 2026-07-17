@@ -1,6 +1,8 @@
 # stick'n neon sticky strips
 
-![Sticky strips settings](./screenshots/sticky-strips.png)
+![Sticky strips on the desktop edge](./screenshots/sticky-strips.png)
+
+![Writing in a sticky strip](./screenshots/sticky-strips-writing.png)
 
 ## What it is
 
