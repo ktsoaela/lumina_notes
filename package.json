@@ -36,6 +36,7 @@
     "test:django": "python manage.py test core.tests",
     "test:api": "python -m unittest tests.test_api -v",
     "test:e2e": "playwright test",
+    "test:e2e:docs": "playwright test e2e/docs-screenshots.spec.ts --workers=1",
     "compose:charlie": "docker compose -p charlie -f docker-compose.yml -f docker-compose.charlie.yml",
     "compose:bravo": "docker compose -p bravo -f docker-compose.yml -f docker-compose.bravo.yml",
     "compose:alpha": "docker compose -p alpha -f docker-compose.yml -f docker-compose.alpha.yml"
