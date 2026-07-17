@@ -69,6 +69,7 @@ Each feature has a short how-to (with Playwright screenshots):
 
 | Feature | Guide |
 |---------|--------|
+| Edit · Read · Two pages | [docs/features/editor-views.md](docs/features/editor-views.md) |
 | Markdown & live preview | [docs/features/markdown.md](docs/features/markdown.md) |
 | Mermaid diagrams | [docs/features/mermaid.md](docs/features/mermaid.md) |
 | Plotly charts | [docs/features/plotly.md](docs/features/plotly.md) |

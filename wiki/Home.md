@@ -10,6 +10,7 @@ Detailed how-tos (with screenshots) live in the repo under `docs/features/`:
 
 | Feature | Doc |
 |---------|-----|
+| Edit · Read · Two pages | [editor-views](../docs/features/editor-views.md) |
 | Markdown & live preview | [markdown](../docs/features/markdown.md) |
 | Mermaid diagrams | [mermaid](../docs/features/mermaid.md) |
 | Plotly charts | [plotly](../docs/features/plotly.md) |

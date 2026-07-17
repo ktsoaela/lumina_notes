@@ -4,6 +4,7 @@ User guides for everything Lumina Notes ships today. Screenshots were captured w
 
 | Feature | Guide | Screenshot |
 |---------|--------|------------|
+| Edit · Read · Two pages | [editor-views.md](./editor-views.md) | [screenshots/read-mode.png](./screenshots/read-mode.png) · [dual-page](./screenshots/dual-page.png) |
 | Markdown editing & preview | [markdown.md](./markdown.md) | [screenshots/markdown.png](./screenshots/markdown.png) |
 | Mermaid diagrams | [mermaid.md](./mermaid.md) | [screenshots/mermaid.png](./screenshots/mermaid.png) |
 | Plotly charts | [plotly.md](./plotly.md) | [screenshots/plotly.png](./screenshots/plotly.png) |
@@ -11,7 +12,7 @@ User guides for everything Lumina Notes ships today. Screenshots were captured w
 | stick'n sticky strips | [sticky-strips.md](./sticky-strips.md) | [screenshots/sticky-strips.png](./screenshots/sticky-strips.png) · [writing](./screenshots/sticky-strips-writing.png) |
 | Desktop app (Electron) | [desktop.md](./desktop.md) | [screenshots/notes-overview.png](./screenshots/notes-overview.png) |
 | Phone & tablet (PWA) | [mobile-pwa.md](./mobile-pwa.md) | [screenshots/mobile-pwa.png](./screenshots/mobile-pwa.png) |
-| Print · Markdown · PDF | [export.md](./export.md) | [screenshots/export.png](./screenshots/export.png) |
+| Print · Markdown · PDF | [export.md](./export.md) | [screenshots/export-actions.png](./screenshots/export-actions.png) |
 | Quick search | [search.md](./search.md) | [screenshots/search.png](./screenshots/search.png) |
 | Devices & sync | [sync.md](./sync.md) | [screenshots/profile-sync.png](./screenshots/profile-sync.png) |
 
