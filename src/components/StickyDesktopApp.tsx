@@ -68,6 +68,12 @@ function readStickyEdge(): StickyEdge {
   const dRight = right - (x + w);
   const dTop = y - top;
   const dBottom = bottom - (y + h);
+
+  // Horizontal pack (280×150) → top or bottom; vertical pack → left or right
+  if (w > h) {
+    return dTop <= dBottom ? 'top' : 'bottom';
+  }
+
   const min = Math.min(dLeft, dRight, dTop, dBottom);
   if (min === dLeft) return 'left';
   if (min === dRight) return 'right';
