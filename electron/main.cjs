@@ -192,9 +192,12 @@ function snapStickyBounds(bounds, area, mode = "pack", forcedEdge = null) {
 
 function snapStickyWindow(forcedEdge = null) {
   if (!stickyWindow || stickyWindow.isDestroyed() || stickyClamping) return;
+  // Profile/orientation snaps always use pack size (not writing editor size)
+  const mode = forcedEdge ? "pack" : stickyMode;
+  if (forcedEdge) stickyMode = "pack";
   const current = stickyWindow.getBounds();
   const area = screen.getDisplayMatching(current).workArea;
-  const next = snapStickyBounds(current, area, stickyMode, forcedEdge);
+  const next = snapStickyBounds(current, area, mode, forcedEdge);
   lastStickyEdge = next.edge;
   const unchanged =
     next.x === current.x &&

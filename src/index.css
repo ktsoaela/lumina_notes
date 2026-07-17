@@ -1089,11 +1089,6 @@ html.sticky-strip-mode #root {
   overflow: hidden;
 }
 
-.stickn-root:not(.is-writing)[data-edge='top'],
-.stickn-root:not(.is-writing)[data-edge='bottom'] {
-  overflow: visible;
-}
-
 .stickn-root[data-edge='left'] {
   justify-content: flex-start;
 }
@@ -1104,28 +1099,6 @@ html.sticky-strip-mode #root {
 }
 
 .stickn-root[data-edge='bottom'] {
-  align-items: flex-end;
-  justify-content: center;
-}
-
-/* Mount pins rotated pack to the book edge on top/bottom */
-.film-stand-mount--top,
-.film-stand-mount--bottom {
-  position: relative;
-  width: 100%;
-  height: 100%;
-  flex-shrink: 0;
-  overflow: visible;
-}
-
-.film-stand-mount--top {
-  display: flex;
-  align-items: flex-start;
-  justify-content: center;
-}
-
-.film-stand-mount--bottom {
-  display: flex;
   align-items: flex-end;
   justify-content: center;
 }
@@ -1141,47 +1114,38 @@ html.sticky-strip-mode #root {
   height: 100%;
 }
 
+/* Left edge: exact mirror of the right template */
+.film-stand--from-left {
+  transform: scaleX(-1);
+}
+
+.film-stand--from-left .neon-film-name,
+.film-stand--from-left .stand-hint,
+.film-stand--from-left .film-stand-drag {
+  transform: scaleX(-1);
+}
+
+/* Top/bottom: same tabs as sides, laid out as a row (no CSS rotate — Win11 transparent) */
 .film-stand--from-top,
 .film-stand--from-bottom {
-  width: 150px;
-  height: 280px;
+  position: relative;
+  transform: none;
+  flex-direction: row;
+  align-items: stretch;
+  justify-content: center;
+  gap: 10px;
+  width: 100%;
+  height: 100%;
+  padding: 0 8px;
+  box-sizing: border-box;
 }
 
-/* Left edge: exact mirror of the right template */
-.film-stand--from-left:not(.film-stand--from-top):not(.film-stand--from-bottom) {
-  transform: scaleX(-1);
-}
-
-.film-stand--from-left:not(.film-stand--from-top):not(.film-stand--from-bottom) .neon-film-name,
-.film-stand--from-left:not(.film-stand--from-top):not(.film-stand--from-bottom) .stand-hint,
-.film-stand--from-left:not(.film-stand--from-top):not(.film-stand--from-bottom) .film-stand-drag {
-  transform: scaleX(-1);
-}
-
-/* Bottom: right template rotated — strips poke up from the book edge */
-.film-stand--from-bottom {
-  width: 150px;
-  height: 280px;
-  flex-shrink: 0;
-  transform: rotate(90deg);
-  transform-origin: 50% 100%;
-}
-
-.film-stand--from-bottom .neon-film-name {
-  transform: rotate(-90deg);
-}
-
-/* Top: mirrored-right template rotated — strips poke down from the book edge */
 .film-stand--from-top {
-  width: 150px;
-  height: 280px;
-  flex-shrink: 0;
-  transform: scaleX(-1) rotate(-90deg);
-  transform-origin: 50% 0%;
+  align-items: flex-start;
 }
 
-.film-stand--from-top .neon-film-name {
-  transform: scaleX(-1) rotate(90deg);
+.film-stand--from-bottom {
+  align-items: flex-end;
 }
 
 .film-stand-drag {
@@ -1191,6 +1155,25 @@ html.sticky-strip-mode #root {
   background: transparent;
   margin-bottom: 4px;
   cursor: grab;
+  flex-shrink: 0;
+}
+
+.film-stand--from-top .film-stand-drag,
+.film-stand--from-bottom .film-stand-drag {
+  position: absolute;
+  width: 48px;
+  height: 12px;
+  left: 50%;
+  margin: 0 0 0 -24px;
+  z-index: 2;
+}
+
+.film-stand--from-top .film-stand-drag {
+  top: 0;
+}
+
+.film-stand--from-bottom .film-stand-drag {
+  bottom: 0;
 }
 
 .tabs-dispenser-grid {
@@ -1199,6 +1182,15 @@ html.sticky-strip-mode #root {
   gap: 10px;
   align-items: flex-end;
   width: 100%;
+}
+
+.film-stand--from-top .tabs-dispenser-grid,
+.film-stand--from-bottom .tabs-dispenser-grid {
+  flex-direction: row;
+  align-items: inherit;
+  justify-content: center;
+  width: auto;
+  height: 100%;
 }
 
 /* Collapsed ~30% of full film; expands inward from the book edge */
@@ -1225,6 +1217,7 @@ html.sticky-strip-mode #root {
   user-select: none;
   transition:
     width 0.28s cubic-bezier(0.34, 1.56, 0.64, 1),
+    height 0.28s cubic-bezier(0.34, 1.56, 0.64, 1),
     box-shadow 0.2s ease;
 }
 
@@ -1235,6 +1228,73 @@ html.sticky-strip-mode #root {
   border-radius: 3px;
   box-shadow: 0 4px 10px rgba(0, 0, 0, 0.18);
   justify-content: center;
+}
+
+/* Top: tabs poke down from the book edge */
+.film-stand--from-top .neon-film-stack {
+  width: 36px;
+  height: var(--film-peek);
+  border-radius: 0 0 3px 3px;
+  align-items: center;
+  justify-content: center;
+}
+
+.film-stand--from-top .neon-film-stack.is-expanded,
+.film-stand--from-top .neon-film-stack:hover,
+.film-stand--from-top .neon-film-stack:focus-visible {
+  width: 72px;
+  height: var(--film-full);
+  border-radius: 3px;
+  align-items: center;
+  justify-content: center;
+}
+
+.film-stand--from-top .neon-film-shine {
+  left: 0;
+  top: 0;
+  width: 100%;
+  height: 40%;
+  border-right: none;
+  border-bottom: 1px dashed rgba(0, 0, 0, 0.1);
+  border-radius: 0 0 3px 3px;
+}
+
+/* Bottom: tabs poke up from the book edge */
+.film-stand--from-bottom .neon-film-stack {
+  width: 36px;
+  height: var(--film-peek);
+  border-radius: 3px 3px 0 0;
+  align-items: center;
+  justify-content: center;
+}
+
+.film-stand--from-bottom .neon-film-stack.is-expanded,
+.film-stand--from-bottom .neon-film-stack:hover,
+.film-stand--from-bottom .neon-film-stack:focus-visible {
+  width: 72px;
+  height: var(--film-full);
+  border-radius: 3px;
+  align-items: center;
+  justify-content: center;
+}
+
+.film-stand--from-bottom .neon-film-shine {
+  left: 0;
+  top: auto;
+  bottom: 0;
+  width: 100%;
+  height: 40%;
+  border-right: none;
+  border-top: 1px dashed rgba(0, 0, 0, 0.1);
+  border-radius: 3px 3px 0 0;
+}
+
+/* Same label presentation as left/right: upright, centered, fade in on expand */
+.film-stand--from-top .neon-film-name,
+.film-stand--from-bottom .neon-film-name {
+  writing-mode: horizontal-tb;
+  text-orientation: mixed;
+  transform: none;
 }
 
 .neon-film-shine {
@@ -1271,9 +1331,7 @@ html.sticky-strip-mode #root {
 }
 
 .film-stand--from-top .stand-hint,
-.film-stand--from-bottom .stand-hint,
-.film-stand--from-top .film-stand-drag,
-.film-stand--from-bottom .film-stand-drag {
+.film-stand--from-bottom .stand-hint {
   display: none;
 }
 
