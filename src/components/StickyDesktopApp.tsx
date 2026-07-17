@@ -60,8 +60,9 @@ function readStickyEdge(): StickyEdge {
   const y = window.screenY;
   const w = window.outerWidth;
   const h = window.outerHeight;
-  const left = window.screen.availLeft;
-  const top = window.screen.availTop;
+  const screen = window.screen as Screen & { availLeft?: number; availTop?: number };
+  const left = screen.availLeft ?? 0;
+  const top = screen.availTop ?? 0;
   const right = left + window.screen.availWidth;
   const bottom = top + window.screen.availHeight;
   const dLeft = x - left;
