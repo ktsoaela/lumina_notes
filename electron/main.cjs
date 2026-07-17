@@ -23,17 +23,21 @@ const API_PORT = process.env.PORT || "58888";
 const PROD_URL = `http://127.0.0.1:${API_PORT}/`;
 const STICKY_PACK_W = 150;
 const STICKY_PACK_H = 280;
+const STICKY_PACK_H_HORIZ = 150;
+const STICKY_PACK_W_HORIZ = 280;
 const STICKY_WRITE_W = 360;
 const STICKY_WRITE_H = 520;
 
 const STICKY_SIZES = {
   pack: { width: STICKY_PACK_W, height: STICKY_PACK_H },
+  "pack-horizontal": { width: STICKY_PACK_W_HORIZ, height: STICKY_PACK_H_HORIZ },
   writing: { width: STICKY_WRITE_W, height: STICKY_WRITE_H },
 };
 
 let mainWindow = null;
 let stickyWindow = null;
 let backendProc = null;
+let stickyClamping = false;
 
 function isDev() {
   return process.env.ELECTRON_DEV === "1";
@@ -128,18 +132,98 @@ function appUrl(query) {
   return `${PROD_URL}${q}`;
 }
 
+function stickyEdgeFromBounds(bounds, area) {
+  const cx = bounds.x + bounds.width / 2;
+  const cy = bounds.y + bounds.height / 2;
+  const distLeft = cx - area.x;
+  const distRight = area.x + area.width - cx;
+  const distTop = cy - area.y;
+  const distBottom = area.y + area.height - cy;
+  const min = Math.min(distLeft, distRight, distTop, distBottom);
+  if (min === distLeft) return "left";
+  if (min === distRight) return "right";
+  if (min === distTop) return "top";
+  return "bottom";
+}
+
+function stickyPackSize(edge, mode = "pack") {
+  if (mode === "writing") return STICKY_SIZES.writing;
+  if (edge === "top" || edge === "bottom") return STICKY_SIZES["pack-horizontal"];
+  return STICKY_SIZES.pack;
+}
+
+function snapStickyBounds(bounds, area, mode = "pack") {
+  const edge = stickyEdgeFromBounds(bounds, area);
+  const size = stickyPackSize(edge, mode);
+  let x = bounds.x;
+  let y = bounds.y;
+
+  if (edge === "right") {
+    x = area.x + area.width - size.width;
+    y = Math.max(area.y, Math.min(bounds.y, area.y + area.height - size.height));
+  } else if (edge === "left") {
+    x = area.x;
+    y = Math.max(area.y, Math.min(bounds.y, area.y + area.height - size.height));
+  } else if (edge === "top") {
+    y = area.y;
+    x = Math.max(area.x, Math.min(bounds.x, area.x + area.width - size.width));
+  } else {
+    y = area.y + area.height - size.height;
+    x = Math.max(area.x, Math.min(bounds.x, area.x + area.width - size.width));
+  }
+
+  return { x, y, width: size.width, height: size.height, edge };
+}
+
+let lastStickyEdge = "right";
+let stickyMode = "pack";
+
+function snapStickyWindow() {
+  if (!stickyWindow || stickyWindow.isDestroyed() || stickyClamping) return;
+  const current = stickyWindow.getBounds();
+  const area = screen.getDisplayMatching(current).workArea;
+  const next = snapStickyBounds(current, area, stickyMode);
+  lastStickyEdge = next.edge;
+  if (
+    next.x === current.x &&
+    next.y === current.y &&
+    next.width === current.width &&
+    next.height === current.height
+  ) {
+    return;
+  }
+  stickyClamping = true;
+  stickyWindow.setBounds({
+    x: next.x,
+    y: next.y,
+    width: next.width,
+    height: next.height,
+  });
+  stickyClamping = false;
+}
+
 function stickyBounds(mode = "pack") {
-  const area = screen.getPrimaryDisplay().workArea;
-  const size = STICKY_SIZES[mode] || STICKY_SIZES.pack;
-  const y =
+  stickyMode = mode;
+  const area =
     stickyWindow && !stickyWindow.isDestroyed()
-      ? stickyWindow.getBounds().y
-      : area.y + Math.round((area.height - size.height) / 2);
+      ? screen.getDisplayMatching(stickyWindow.getBounds()).workArea
+      : screen.getPrimaryDisplay().workArea;
+  const seed =
+    stickyWindow && !stickyWindow.isDestroyed()
+      ? stickyWindow.getBounds()
+      : {
+          x: area.x + area.width - STICKY_PACK_W,
+          y: area.y + Math.round((area.height - STICKY_PACK_H) / 2),
+          width: STICKY_PACK_W,
+          height: STICKY_PACK_H,
+        };
+  const snapped = snapStickyBounds(seed, area, mode);
+  lastStickyEdge = snapped.edge;
   return {
-    width: size.width,
-    height: size.height,
-    x: area.x + area.width - size.width - 12,
-    y,
+    x: snapped.x,
+    y: snapped.y,
+    width: snapped.width,
+    height: snapped.height,
   };
 }
 
@@ -188,6 +272,9 @@ async function createStickyWindow() {
     webPreferences: webPrefs(),
   });
   applyStickyAlwaysOnTop(stickyWindow);
+  stickyWindow.on("move", () => {
+    snapStickyWindow();
+  });
   stickyWindow.on("closed", () => {
     stickyWindow = null;
   });
@@ -294,8 +381,8 @@ ipcMain.handle("lumina:export-pdf", async (_event, payload) => {
 
 ipcMain.on("lumina:sticky-mode", (_event, mode) => {
   if (!stickyWindow || stickyWindow.isDestroyed()) return;
-  const next = STICKY_SIZES[mode] ? mode : "pack";
-  stickyWindow.setBounds(stickyBounds(next));
+  stickyMode = STICKY_SIZES[mode] ? mode : "pack";
+  snapStickyWindow();
   // Win11 can drop always-on-top after setBounds — re-assert.
   if (process.platform === "win32") {
     applyStickyAlwaysOnTop(stickyWindow);
