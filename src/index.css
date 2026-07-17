@@ -1089,6 +1089,11 @@ html.sticky-strip-mode #root {
   overflow: hidden;
 }
 
+.stickn-root:not(.is-writing)[data-edge='top'],
+.stickn-root:not(.is-writing)[data-edge='bottom'] {
+  overflow: visible;
+}
+
 .stickn-root[data-edge='left'] {
   justify-content: flex-start;
 }
@@ -1107,10 +1112,10 @@ html.sticky-strip-mode #root {
 .film-stand-mount--top,
 .film-stand-mount--bottom {
   position: relative;
-  width: 280px;
-  height: 150px;
+  width: 100%;
+  height: 100%;
   flex-shrink: 0;
-  overflow: hidden;
+  overflow: visible;
 }
 
 .film-stand-mount--top {
@@ -1136,6 +1141,12 @@ html.sticky-strip-mode #root {
   height: 100%;
 }
 
+.film-stand--from-top,
+.film-stand--from-bottom {
+  width: 150px;
+  height: 280px;
+}
+
 /* Left edge: exact mirror of the right template */
 .film-stand--from-left:not(.film-stand--from-top):not(.film-stand--from-bottom) {
   transform: scaleX(-1);
@@ -1149,12 +1160,8 @@ html.sticky-strip-mode #root {
 
 /* Bottom: right template rotated — strips poke up from the book edge */
 .film-stand--from-bottom {
-  position: absolute;
-  left: 50%;
-  bottom: 0;
   width: 150px;
   height: 280px;
-  margin-left: -75px;
   flex-shrink: 0;
   transform: rotate(90deg);
   transform-origin: 50% 100%;
@@ -1166,12 +1173,8 @@ html.sticky-strip-mode #root {
 
 /* Top: mirrored-right template rotated — strips poke down from the book edge */
 .film-stand--from-top {
-  position: absolute;
-  left: 50%;
-  top: 0;
   width: 150px;
   height: 280px;
-  margin-left: -75px;
   flex-shrink: 0;
   transform: scaleX(-1) rotate(-90deg);
   transform-origin: 50% 0%;
