@@ -8,7 +8,7 @@ User guides for everything Lumina Notes ships today. Screenshots were captured w
 | Mermaid diagrams | [mermaid.md](./mermaid.md) | [screenshots/mermaid.png](./screenshots/mermaid.png) |
 | Plotly charts | [plotly.md](./plotly.md) | [screenshots/plotly.png](./screenshots/plotly.png) |
 | Books · chapters · pages | [hierarchy.md](./hierarchy.md) | [screenshots/hierarchy.png](./screenshots/hierarchy.png) · [library.png](./screenshots/library.png) |
-| stick'n sticky strips | [sticky-strips.md](./sticky-strips.md) | [screenshots/sticky-strips.png](./screenshots/sticky-strips.png) |
+| stick'n sticky strips | [sticky-strips.md](./sticky-strips.md) | [screenshots/sticky-strips.png](./screenshots/sticky-strips.png) · [writing](./screenshots/sticky-strips-writing.png) |
 | Desktop app (Electron) | [desktop.md](./desktop.md) | [screenshots/notes-overview.png](./screenshots/notes-overview.png) |
 | Phone & tablet (PWA) | [mobile-pwa.md](./mobile-pwa.md) | [screenshots/mobile-pwa.png](./screenshots/mobile-pwa.png) |
 | Print · Markdown · PDF | [export.md](./export.md) | [screenshots/export.png](./screenshots/export.png) |
