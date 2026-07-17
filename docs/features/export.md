@@ -1,10 +1,10 @@
 # Print · Markdown · PDF export
 
-![Export actions on a note](./screenshots/export.png)
+![Print, Markdown, and PDF on a note](./screenshots/export-actions.png)
 
 ## What it is
 
-From any open page you can:
+Every open page has three export actions in the note header (below the title and timestamp):
 
 | Action | Result |
 |--------|--------|
@@ -12,10 +12,12 @@ From any open page you can:
 | **Markdown** | Downloads the page as a `.md` file |
 | **PDF** | Downloads an A4 PDF from the rendered preview |
 
+In **Two pages** mode, each pane has its own **Print**, **Markdown**, and **PDF** row (see [editor-views.md](./editor-views.md)).
+
 ## How to use
 
 1. Open a page in **Notes**.
-2. In the note header, click **Print**, **Markdown**, or **PDF**.
+2. Under the page title, click **Print**, **Markdown**, or **PDF**.
 3. For PDF, wait for generation; save the file when prompted.
 
 ## How it works

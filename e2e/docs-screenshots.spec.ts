@@ -116,6 +116,65 @@ test('docs screenshots — landing + all features', async ({ page }) => {
     fullPage: true,
   });
 
+  // 4b. Read mode + top bar view controls
+  const readBtn = page.getByRole('button', { name: /^(read|preview)$/i });
+  if (await readBtn.isVisible()) {
+    await readBtn.click();
+    await page.waitForTimeout(500);
+    const topbar = page.locator('header.app-topbar');
+    const noteHeader = page.locator('.acoustic-pillar > .relative.z-\\[1\\].shrink-0').first();
+    const headerBox = await noteHeader.boundingBox();
+    const topBox = await topbar.boundingBox();
+    if (headerBox && topBox) {
+      await page.screenshot({
+        path: path.join(outDir, 'read-mode.png'),
+        clip: {
+          x: Math.max(0, topBox.x),
+          y: topBox.y,
+          width: page.viewportSize()?.width ?? 1280,
+          height: headerBox.y + headerBox.height - topBox.y + 8,
+        },
+      });
+      await page.screenshot({
+        path: path.join(outDir, 'export-actions.png'),
+        clip: {
+          x: Math.max(0, headerBox.x + headerBox.width * 0.15),
+          y: headerBox.y,
+          width: Math.min(headerBox.width * 0.7, (page.viewportSize()?.width ?? 1280) - headerBox.x),
+          height: headerBox.height,
+        },
+      });
+    }
+    const tb = await topbar.boundingBox();
+    if (tb) {
+      await page.screenshot({
+        path: path.join(outDir, 'view-modes.png'),
+        clip: { x: tb.x + tb.width * 0.35, y: tb.y, width: tb.width * 0.45, height: tb.height },
+      });
+    }
+  }
+
+  // 4c. Two pages side by side
+  const dualBtn = page.getByRole('button', { name: /^two pages$/i });
+  if (await dualBtn.isVisible()) {
+    await dualBtn.click();
+    await page.waitForTimeout(400);
+    const secondPage = page.getByRole('button', { name: /yellow|getting started/i }).nth(1);
+    if (await secondPage.isVisible()) {
+      await secondPage.click({ modifiers: ['Shift'] });
+      await page.waitForTimeout(600);
+    }
+    await page.screenshot({
+      path: path.join(outDir, 'dual-page.png'),
+      fullPage: true,
+    });
+    await dualBtn.click();
+    await page.waitForTimeout(300);
+    const editBtn = page.getByRole('button', { name: /^edit$/i });
+    if (await editBtn.isVisible()) await editBtn.click();
+    await page.waitForTimeout(300);
+  }
+
   // 5. Mermaid
   await setEditorContent(page, MERMAID_SAMPLE);
   await page.waitForTimeout(1500);
@@ -136,6 +195,19 @@ test('docs screenshots — landing + all features', async ({ page }) => {
   await expect(page.getByRole('button', { name: /^print$/i })).toBeVisible({
     timeout: 10_000,
   });
+  const exportHeader = page.locator('.acoustic-pillar > .relative.z-\\[1\\].shrink-0').first();
+  const exportBox = await exportHeader.boundingBox();
+  if (exportBox) {
+    await page.screenshot({
+      path: path.join(outDir, 'export-actions.png'),
+      clip: {
+        x: Math.max(0, exportBox.x + exportBox.width * 0.15),
+        y: exportBox.y,
+        width: Math.min(exportBox.width * 0.7, (page.viewportSize()?.width ?? 1280) - exportBox.x),
+        height: exportBox.height,
+      },
+    });
+  }
   await page.screenshot({
     path: path.join(outDir, 'export.png'),
     fullPage: true,

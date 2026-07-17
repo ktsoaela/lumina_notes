@@ -4,18 +4,16 @@
 
 ## What it is
 
-Lumina is Markdown-first. Each page is a Markdown document with:
+Lumina is Markdown-first. Each page is a Markdown document you edit in **Notes**.
 
-- **Edit** — write source in the left pane
-- **Split** — edit and live preview side by side (default)
-- **Read** — preview only
+Use the top bar to switch views — **Edit**, **Split**, or **Read** — or open **Two pages** to compare two notes side by side. See [editor-views.md](./editor-views.md) for screenshots and details.
 
 GitHub Flavored Markdown (GFM) is supported via `remark-gfm` (tables, strikethrough, task lists, autolinks).
 
 ## How to use
 
 1. Open **Notes** and select a page in the sidebar.
-2. Use the toolbar icons: **Edit**, **Split**, or **Read**.
+2. Pick **Edit**, **Split**, or **Read** in the top bar (default is **Split** on desktop).
 3. Type Markdown in the editor. The preview updates as you type.
 4. Title the page in the header field above the editor.
 
