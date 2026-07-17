@@ -7,6 +7,7 @@ contextBridge.exposeInMainWorld("luminaDesktop", {
     ipcRenderer.invoke("lumina:export-pdf", { html, filename }),
   /** Resize sticky window: closed (tab) | peek | open */
   setStickyMode: (mode) => ipcRenderer.send("lumina:sticky-mode", mode),
+  setStickyEdge: (edge) => ipcRenderer.send("lumina:sticky-set-edge", edge),
   openPageInMain: (nav) => ipcRenderer.send("lumina:sticky-open-page", nav),
   onOpenPage: (cb) => {
     const handler = (_event, nav) => cb(nav);
@@ -26,5 +27,10 @@ contextBridge.exposeInMainWorld("luminaDesktop", {
     const handler = () => cb();
     ipcRenderer.on("lumina:sticky-target-changed", handler);
     return () => ipcRenderer.removeListener("lumina:sticky-target-changed", handler);
+  },
+  onStickyEdge: (cb) => {
+    const handler = (_event, edge) => cb(edge);
+    ipcRenderer.on("lumina:sticky-edge", handler);
+    return () => ipcRenderer.removeListener("lumina:sticky-edge", handler);
   },
 });
