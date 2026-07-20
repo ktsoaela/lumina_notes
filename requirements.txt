@@ -5,7 +5,7 @@ bcrypt>=4.0.0
 python-multipart>=0.0.9
 django>=5.0,<6
 httpx>=0.27.0
-psycopg[binary]>=3.2.0
+psycopg[binary]>=3.3.4
 # Optional: pip install sentry-sdk when SENTRY_DSN is set
 # Python 3.9: needed for pydantic to evaluate `str | None` annotations
 eval_type_backport>=0.2.0
