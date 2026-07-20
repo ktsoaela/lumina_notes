@@ -51,7 +51,7 @@ importers:
         specifier: ^19.0.0
         version: 19.2.7
       react-dom:
-        specifier: ^19.0.0
+        specifier: ^19.2.7
         version: 19.2.7(react@19.2.7)
       react-markdown:
         specifier: ^10.1.0
