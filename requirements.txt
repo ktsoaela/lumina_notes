@@ -10,6 +10,6 @@ psycopg[binary]>=3.2.0
 # Python 3.9: needed for pydantic to evaluate `str | None` annotations
 eval_type_backport>=0.2.0
 
-markdown>=3.5
+markdown>=3.10.2
 # PDF: uses Chrome/Edge --print-to-pdf; optional: pip install playwright && playwright install chromium
 
