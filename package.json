@@ -71,7 +71,7 @@
     "@types/plotly.js": "^3.0.10",
     "@types/react-plotly.js": "^2.6.4",
     "autoprefixer": "^10.4.21",
-    "concurrently": "^9.1.2",
+    "concurrently": "^10.0.6",
     "cross-env": "^7.0.3",
     "electron": "35.7.5",
     "electron-builder": "^26.0.0",
