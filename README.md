@@ -19,7 +19,7 @@
   <img src="docs/features/screenshots/notes-overview.png" alt="Notes workspace" width="900" />
 </p>
 
-The page is [`docs/index.html`](docs/index.html). It is published from the `dev` branch by GitHub Actions.
+The page is [`docs/index.html`](docs/index.html). Turn on GitHub Pages for the `docs` folder on the `dev` branch.
 
 **Author:** [Khotso Tsoaela](https://github.com/ktsoaela) (`@ktsoaela`)
 
