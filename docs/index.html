@@ -1,0 +1,82 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Lumina Notes — markdown notebooks, on your server</title>
+  <meta name="description" content="Lumina Notes is a markdown notebook with Mermaid, Plotly, desktop stickies, and self-hosted sync." />
+  <link rel="icon" href="logo.png" />
+  <style>
+    :root { --sage:#375348; --sage-deep:#24382f; --ink:#1c1917; --muted:#5c6560; --line:#e4ebe6; --paper:#f7faf8; }
+    * { box-sizing:border-box; }
+    body { margin:0; color:var(--ink); background:#fff; font:17px/1.55 "Segoe UI", system-ui, sans-serif; }
+    a { color:inherit; }
+    img { max-width:100%; display:block; }
+    .wrap { width:min(1080px, calc(100% - 40px)); margin:0 auto; }
+    header { position:sticky; top:0; background:rgba(255,255,255,.92); backdrop-filter:blur(10px); border-bottom:1px solid var(--line); }
+    .nav { min-height:68px; display:flex; align-items:center; gap:16px; }
+    .brand { display:flex; align-items:center; gap:10px; text-decoration:none; font-weight:750; }
+    .brand img { width:36px; height:36px; }
+    nav a { color:#3d4742; text-decoration:none; font-size:15px; }
+    .end { margin-left:auto; }
+    .btn { display:inline-flex; align-items:center; min-height:42px; padding:0 16px; border-radius:999px; background:var(--sage); color:#fff; text-decoration:none; font-weight:700; }
+    .hero { padding:72px 0 20px; text-align:center; background:linear-gradient(#fff, var(--paper)); }
+    h1 { margin:0; font-size:clamp(40px, 6vw, 68px); line-height:1; letter-spacing:-.04em; }
+    h1 span { display:block; color:var(--sage); }
+    .sub { max-width:40em; margin:18px auto 0; color:var(--muted); font-size:19px; }
+    .shot { width:min(980px, calc(100% - 32px)); margin:36px auto 0; background:#fff; border:1px solid var(--line); border-radius:18px; padding:8px; box-shadow:0 24px 60px rgba(36,56,47,.12); }
+    .shot img { border-radius:12px; width:100%; }
+    section { padding:64px 0; }
+    section.wash { background:var(--paper); }
+    h2 { margin:0 0 8px; font-size:34px; letter-spacing:-.03em; text-align:center; }
+    .lead { text-align:center; color:var(--muted); margin:0 auto 26px; max-width:38em; }
+    .grid { display:grid; grid-template-columns:repeat(3,1fr); gap:12px; }
+    article { background:#fff; border:1px solid var(--line); border-radius:16px; padding:16px; }
+    article b { display:block; margin-bottom:4px; }
+    article span { color:var(--muted); font-size:15px; }
+    footer { padding:28px 0 42px; text-align:center; color:var(--muted); font-size:14px; }
+    @media (max-width:800px) { .grid { grid-template-columns:1fr; } nav a.hide { display:none; } }
+  </style>
+</head>
+<body>
+  <header>
+    <div class="wrap nav">
+      <a class="brand" href="#top"><img src="logo.png" alt="" /> Lumina Notes</a>
+      <nav>
+        <a class="hide" href="#features">Features</a>
+        <a class="hide" href="features/README.md">Guides</a>
+      </nav>
+      <span class="end"><a class="btn" href="https://github.com/ktsoaela/lumina_notes">View on GitHub</a></span>
+    </div>
+  </header>
+  <main id="top">
+    <div class="hero">
+      <div class="wrap">
+        <h1>Organize your thoughts.<span>Keep them on your server.</span></h1>
+        <p class="sub">Markdown notebooks with Mermaid, Plotly, desktop stickies, and sync you host yourself. Shelves, books, chapters, and pages — not one long scratch file.</p>
+      </div>
+      <div class="shot">
+        <img src="features/screenshots/notes-overview.png" alt="Lumina Notes open on a notebook, with the page list and a split markdown preview" />
+      </div>
+    </div>
+    <section class="wash" id="features">
+      <div class="wrap">
+        <h2>In the notebook</h2>
+        <p class="lead">The same tools as the app, without signing in to someone else's cloud.</p>
+        <div class="grid">
+          <article><b>Markdown first</b><span>Write, read, or split the preview. Task lists included.</span></article>
+          <article><b>Mermaid</b><span>Flowcharts, sequence diagrams, and Gantt charts from a text block.</span></article>
+          <article><b>Plotly</b><span>Interactive charts inside a note.</span></article>
+          <article><b>Books, chapters, pages</b><span>A shelf you can find your way around.</span></article>
+          <article><b>stick'n</b><span>Neon sticky strips on the desktop that write the same pages.</span></article>
+          <article><b>Desktop and phone</b><span>Electron on Windows and macOS. A PWA on the phone and tablet.</span></article>
+          <article><b>Export</b><span>Print, Markdown, or PDF from a page.</span></article>
+          <article><b>Search</b><span>Ctrl+K jumps across books, chapters, and pages.</span></article>
+          <article><b>Self-hosted sync</b><span>SQLite on one machine, or Postgres when several devices share a server you run.</span></article>
+        </div>
+      </div>
+    </section>
+  </main>
+  <footer>Lumina Notes. MIT license. Khotso Tsoaela.</footer>
+</body>
+</html>
