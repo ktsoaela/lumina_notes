@@ -9,9 +9,7 @@ coverage/
 *.log
 .env*
 !.env.example
-!.env.charlie.example
-!.env.bravo.example
-!.env.alpha.example
+docs/features/screenshots/landing.png
 
 # Local app data — never commit (contains accounts / notes)
 *.sqlite

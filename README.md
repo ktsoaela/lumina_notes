@@ -7,18 +7,19 @@
 
   <p>
     <a href="LICENSE"><img alt="License: MIT" src="https://img.shields.io/badge/License-MIT-375348?style=flat-square" /></a>
+    <a href="https://ktsoaela.github.io/lumina_notes/"><img alt="Site" src="https://img.shields.io/badge/site-open-375348?style=flat-square" /></a>
     <a href="docs/features/README.md"><img alt="Docs" src="https://img.shields.io/badge/docs-features-547f72?style=flat-square" /></a>
     <img alt="Stack" src="https://img.shields.io/badge/React_19-FastAPI-436659?style=flat-square" />
   </p>
 </div>
 
-<p align="center">
-  <img src="docs/features/screenshots/landing.png" alt="Lumina Notes landing page" width="900" />
-</p>
+**[Open Lumina Notes →](https://ktsoaela.github.io/lumina_notes/)**
 
 <p align="center">
   <img src="docs/features/screenshots/notes-overview.png" alt="Notes workspace" width="900" />
 </p>
+
+The page is [`docs/index.html`](docs/index.html). It is published from the `dev` branch by GitHub Actions.
 
 **Author:** [Khotso Tsoaela](https://github.com/ktsoaela) (`@ktsoaela`)
 
@@ -134,7 +135,7 @@ Three Compose projects (can run side by side):
 | **alpha** | production | 58888 |
 
 ```bash
-cp .env.alpha.example .env.alpha   # set JWT_SECRET + CORS_ORIGINS
+# create .env.alpha locally from .env.example — do not commit it
 npm run compose:alpha -- up --build -d
 ```
 
