@@ -116,10 +116,11 @@
     ],
     "win": {
       "target": [
-        "nsis",
         "portable"
-      ],
-      "artifactName": "LuminaNotes-${version}-Windows-${arch}.${ext}"
+      ]
+    },
+    "portable": {
+      "artifactName": "Lumina-Notes.${ext}"
     },
     "mac": {
       "target": [
