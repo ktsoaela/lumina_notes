@@ -1,7 +1,7 @@
 {
   "name": "lumina-notes",
   "private": true,
-  "version": "1.0.0",
+  "version": "1.1.0",
   "description": "simple_markdown_notebook_application",
   "author": "Khotso Tsoaela <https://github.com/ktsoaela>",
   "license": "MIT",

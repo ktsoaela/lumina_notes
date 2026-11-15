@@ -7,14 +7,24 @@ dist/
 coverage/
 .DS_Store
 *.log
+
+# Secrets — commit only *.example templates
 .env*
 !.env.example
-docs/features/screenshots/landing.png
+!.env.charlie.example
+!.env.bravo.example
+!.env.alpha.example
 
-# Local app data — never commit (contains accounts / notes)
+# Local app data — never commit (accounts / notes)
 *.sqlite
 *.sqlite3
 *.sqlite-journal
 *.sqlite-wal
 *.sqlite-shm
 database.sqlite
+
+# Test / Playwright artifacts
+test-results/
+playwright-report/
+blob-report/
+playwright/.cache/

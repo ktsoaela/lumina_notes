@@ -7,34 +7,26 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [1.1.0] - 2026-11-16
+
 ### Added
 
-- Playwright e2e + axe a11y gate; ops runbooks; tag-based GitHub Releases workflow
-- Security headers / CSP; optional `SENTRY_DSN`; Electron sandbox + backend start dialogs
-- Sidebar virtual window + lazy-loaded Landing/Profile/Bookshelf routes
-- Project skill: `.cursor/skills/ponytail` ([ponytail](https://github.com/DietrichGebert/ponytail))
-- `/health` (+ `/ready`) DB-ready probes; Swagger/OpenAPI gated by `ENABLE_DOCS`
-- Auth rate limiting; Pydantic size/password limits aligned with the client
-- Toast notifications + React error boundary for save/UI failures
-- API integration tests (`tests/test_api.py` / `npm run test:api`)
-- DOMPurify sanitization for print/PDF HTML and Mermaid SVG
+- Public GitHub Pages site (`docs/index.html`) with Windows portable download
+- Windows portable artifact `Lumina-Notes.exe` (Electron + bundled API)
+
+### Fixed
+
+- Electron startup races (`ERR_ABORTED` on Vite load); sticky window failures no longer quit the app
+- Require Pydantic v2 (`pydantic>=2,<3`) so FastAPI validators import correctly
+
+### Security
+
+- `.gitignore` hardened: ignore real `.env*` (keep `*.example` templates), SQLite DBs, and Playwright artifacts
+- Restored compose env templates (`.env.alpha|bravo|charlie.example`) with placeholder secrets only
 
 ### Changed
 
-- JWT tokens expire (`JWT_EXPIRE_HOURS`, default 24); production requires real `JWT_SECRET`
-- Demo account seeding off by default in production (`SEED_DEMO_USER`)
-- Docker runs as non-root with `HEALTHCHECK`; k8s probes use `/health`, CORS is origin-explicit
-- Django honors `DATABASE_PATH` and refuses weak secrets / debug in production
-- Removed Gemini API key from the Vite client bundle
-
-### Added (docs / tooling)
-
-- Project documentation suite: README, LICENSE, CHANGELOG, CONTRIBUTING
-- GitHub Actions CI/CD workflow
-- Dependabot configuration for npm and GitHub Actions
-- Dockerfile for containerized API + static UI
-- Kubernetes manifests under `k8s/`
-- Wiki starter pages under `wiki/`
+- App version bumped to 1.1.0
 
 ## [1.0.0] - 2026-07-14
 
@@ -47,5 +39,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 - Optional Django admin over the shared database
 - Electron desktop shell and Windows NSIS installer
 
-[Unreleased]: https://github.com/fullyoperational/lumina_notes/compare/v1.0.0...HEAD
-[1.0.0]: https://github.com/fullyoperational/lumina_notes/releases/tag/v1.0.0
+[Unreleased]: https://github.com/ktsoaela/lumina_notes/compare/v1.1.0...HEAD
+[1.1.0]: https://github.com/ktsoaela/lumina_notes/releases/tag/v1.1.0
+[1.0.0]: https://github.com/ktsoaela/lumina_notes/releases/tag/v1.0.0
