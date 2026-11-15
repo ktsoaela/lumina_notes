@@ -132,6 +132,24 @@ function appUrl(query) {
   return `${PROD_URL}${q}`;
 }
 
+/** Vite/HMR and Win GPU races often surface as ERR_ABORTED on first load. */
+async function loadAppUrl(win, query, attempts = 5) {
+  const url = appUrl(query);
+  let lastErr;
+  for (let i = 0; i < attempts; i++) {
+    try {
+      await win.loadURL(url);
+      return;
+    } catch (err) {
+      lastErr = err;
+      const code = err && err.code;
+      if (code !== "ERR_ABORTED" && code !== "ERR_FAILED") throw err;
+      await new Promise((r) => setTimeout(r, 400 * (i + 1)));
+    }
+  }
+  throw lastErr;
+}
+
 function stickyEdgeFromBounds(bounds, area) {
   const dLeft = bounds.x - area.x;
   const dRight = area.x + area.width - (bounds.x + bounds.width);
@@ -308,7 +326,7 @@ async function createStickyWindow() {
     stickyWindow.moveTop();
     stickyWindow.webContents.send("lumina:sticky-edge", lastStickyEdge);
   });
-  await stickyWindow.loadURL(appUrl("desktop=1&sticky=1"));
+  await loadAppUrl(stickyWindow, "desktop=1&sticky=1");
   if (!stickyWindow.isDestroyed() && !stickyWindow.isVisible()) {
     stickyWindow.show();
     applyStickyAlwaysOnTop(stickyWindow);
@@ -325,7 +343,7 @@ async function createWindow() {
       icon: windowIcon(),
       webPreferences: webPrefs(),
     });
-    await mainWindow.loadURL(appUrl("desktop=1"));
+    await loadAppUrl(mainWindow, "desktop=1");
   } else {
     await startBackend();
     mainWindow = new BrowserWindow({
@@ -334,7 +352,7 @@ async function createWindow() {
       icon: windowIcon(),
       webPreferences: webPrefs(),
     });
-    await mainWindow.loadURL(appUrl("desktop=1"));
+    await loadAppUrl(mainWindow, "desktop=1");
   }
 
   mainWindow.on("closed", () => {
@@ -344,7 +362,12 @@ async function createWindow() {
     }
   });
 
-  await createStickyWindow();
+  // Sticky is nice-to-have; don't kill the main app if Win transparency/GPU flakes.
+  try {
+    await createStickyWindow();
+  } catch (err) {
+    console.error("Sticky window failed to start:", err);
+  }
 }
 
 /** Chromium printToPDF in a hidden window — same engine as Chrome. */
