@@ -81,18 +81,18 @@
           <article class="dl-card">
             <b>Windows desktop</b>
             <span>Electron app with bundled local API and stick'n strips.</span>
-            <a class="btn" href="https://github.com/ktsoaela/lumina_notes/releases/download/v1.2.0/Lumina-Notes.exe">Download Windows (.exe)</a>
-            <p class="ver">v1.2.0 · portable</p>
+            <a class="btn" id="dl-win" href="https://github.com/ktsoaela/lumina_notes/releases/latest/download/Lumina-Notes.exe">Download Windows (.exe)</a>
+            <p class="ver" id="ver-win">Latest · portable</p>
           </article>
           <article class="dl-card">
             <b>Android (Flutter)</b>
             <span>Offline-first notes; scan the desktop QR to connect.</span>
-            <a class="btn" href="https://github.com/ktsoaela/lumina_notes/releases/download/v1.2.0/Lumina-Notes-android.apk">Download Android (.apk)</a>
-            <p class="ver">v1.2.0 · release APK</p>
+            <a class="btn" id="dl-apk" href="https://github.com/ktsoaela/lumina_notes/releases/latest/download/Lumina-Notes-android.apk">Download Android (.apk)</a>
+            <p class="ver" id="ver-apk">Latest · release APK</p>
           </article>
         </div>
         <p class="lead" style="margin-top:28px">
-          All assets: <a href="https://github.com/ktsoaela/lumina_notes/releases/tag/v1.2.0">github.com/ktsoaela/lumina_notes/releases/tag/v1.2.0</a>
+          All assets: <a id="dl-all" href="https://github.com/ktsoaela/lumina_notes/releases/latest">github.com/ktsoaela/lumina_notes/releases/latest</a>
         </p>
       </div>
     </section>
@@ -116,5 +116,41 @@
     </section>
   </main>
   <footer>Lumina Notes. MIT license. Khotso Tsoaela.</footer>
+  <script>
+    (function () {
+      var api = 'https://api.github.com/repos/ktsoaela/lumina_notes/releases/latest';
+      fetch(api, { headers: { Accept: 'application/vnd.github+json' } })
+        .then(function (r) { return r.ok ? r.json() : Promise.reject(); })
+        .then(function (data) {
+          var tag = String(data.tag_name || '').replace(/^v/i, '');
+          if (!tag) return;
+          var label = 'v' + tag;
+          var win = document.getElementById('ver-win');
+          var apk = document.getElementById('ver-apk');
+          var all = document.getElementById('dl-all');
+          if (win) win.textContent = label + ' · portable';
+          if (apk) apk.textContent = label + ' · release APK';
+          if (all) {
+            all.href = data.html_url || all.href;
+            all.textContent = 'github.com/ktsoaela/lumina_notes/releases/tag/v' + tag;
+          }
+          var assets = data.assets || [];
+          for (var i = 0; i < assets.length; i++) {
+            var n = String(assets[i].name || '').toLowerCase();
+            var url = assets[i].browser_download_url;
+            if (!url) continue;
+            if (n.endsWith('.exe')) {
+              var aWin = document.getElementById('dl-win');
+              if (aWin) aWin.href = url;
+            }
+            if (n.endsWith('.apk')) {
+              var aApk = document.getElementById('dl-apk');
+              if (aApk) aApk.href = url;
+            }
+          }
+        })
+        .catch(function () { /* keep /releases/latest/download fallbacks */ });
+    })();
+  </script>
 </body>
 </html>

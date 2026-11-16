@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { motion } from 'motion/react';
 import {
   StickyNote,
@@ -16,6 +16,12 @@ import {
 } from 'lucide-react';
 import { Logo } from './Logo';
 import appPreviewNotes from '../assets/app-preview-notes.png';
+import {
+  fetchLatestRelease,
+  LATEST_DOWNLOAD,
+  RELEASES_LATEST_PAGE,
+  pickAsset,
+} from '../lib/version';
 
 /** SaaS marketing page — sage green brand (`brand-700` / #375348). */
 interface LandingPageProps {
@@ -30,6 +36,28 @@ export default function LandingPage({
   onViewDemo,
   viewDemoLoading = false,
 }: LandingPageProps) {
+  const [latestLabel, setLatestLabel] = useState('Latest');
+  const [winUrl, setWinUrl] = useState(LATEST_DOWNLOAD.windows);
+  const [apkUrl, setApkUrl] = useState(LATEST_DOWNLOAD.android);
+  const [releasePage, setReleasePage] = useState(RELEASES_LATEST_PAGE);
+
+  useEffect(() => {
+    const ac = new AbortController();
+    fetchLatestRelease(ac.signal)
+      .then((r) => {
+        setLatestLabel(`v${r.version}`);
+        setReleasePage(r.htmlUrl || RELEASES_LATEST_PAGE);
+        const win = pickAsset(r.assets, 'windows');
+        const apk = pickAsset(r.assets, 'android');
+        if (win?.url) setWinUrl(win.url);
+        if (apk?.url) setApkUrl(apk.url);
+      })
+      .catch(() => {
+        /* keep latest/download redirects */
+      });
+    return () => ac.abort();
+  }, []);
+
   return (
     <div className="min-h-screen bg-[var(--app-bg)] font-sans text-[var(--app-fg)] selection:bg-brand-100 dark:selection:bg-brand-900/50">
       {/* Navigation */}
@@ -217,12 +245,12 @@ export default function LandingPage({
               Download Lumina Notes
             </h2>
             <p className="text-gray-600 dark:text-[var(--app-muted)]">
-              v1.2.0 from GitHub Releases — desktop for Windows, Flutter APK for Android.
+              {latestLabel} from GitHub Releases — desktop for Windows, Flutter APK for Android.
             </p>
           </div>
           <div className="mx-auto grid max-w-3xl gap-6 md:grid-cols-2">
             <a
-              href="https://github.com/ktsoaela/lumina_notes/releases/download/v1.2.0/Lumina-Notes.exe"
+              href={winUrl}
               className="rounded-2xl border border-[var(--app-border)] bg-[var(--app-surface)] p-8 shadow-sm transition-all hover:shadow-md dark:bg-[var(--app-bg)]/80"
             >
               <Monitor className="mb-4 h-8 w-8 text-brand-700" />
@@ -233,7 +261,7 @@ export default function LandingPage({
               <span className="font-semibold text-brand-700 dark:text-brand-300">Lumina-Notes.exe →</span>
             </a>
             <a
-              href="https://github.com/ktsoaela/lumina_notes/releases/download/v1.2.0/Lumina-Notes-android.apk"
+              href={apkUrl}
               className="rounded-2xl border border-[var(--app-border)] bg-[var(--app-surface)] p-8 shadow-sm transition-all hover:shadow-md dark:bg-[var(--app-bg)]/80"
             >
               <Smartphone className="mb-4 h-8 w-8 text-brand-600" />
@@ -245,10 +273,7 @@ export default function LandingPage({
             </a>
           </div>
           <p className="mt-8 text-center text-sm text-gray-500 dark:text-[var(--app-muted)]">
-            <a
-              className="underline hover:text-brand-700"
-              href="https://github.com/ktsoaela/lumina_notes/releases/tag/v1.2.0"
-            >
+            <a className="underline hover:text-brand-700" href={releasePage}>
               All release assets
             </a>
           </p>

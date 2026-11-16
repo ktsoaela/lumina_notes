@@ -7,7 +7,15 @@ export const APP_VERSION: string =
 
 export const RELEASES_REPO = 'ktsoaela/lumina_notes';
 export const RELEASES_PAGE = `https://github.com/${RELEASES_REPO}/releases`;
+/** Always points at the newest release page (no hardcoded tag). */
+export const RELEASES_LATEST_PAGE = `${RELEASES_PAGE}/latest`;
 const LATEST_API = `https://api.github.com/repos/${RELEASES_REPO}/releases/latest`;
+
+/** GitHub redirects these to the current latest asset with that filename. */
+export const LATEST_DOWNLOAD = {
+  windows: `${RELEASES_PAGE}/latest/download/Lumina-Notes.exe`,
+  android: `${RELEASES_PAGE}/latest/download/Lumina-Notes-android.apk`,
+} as const;
 
 export type ReleaseAsset = { name: string; url: string; size: number };
 
