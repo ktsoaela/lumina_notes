@@ -22,6 +22,7 @@ hiddenimports = [
     "app",
     "db",
     "export_document",
+    "sync_api",
     "uvicorn.logging",
     "uvicorn.loops",
     "uvicorn.loops.auto",

@@ -64,6 +64,7 @@ CREATE TABLE IF NOT EXISTS bookshelves (
   userId INTEGER NOT NULL,
   name TEXT NOT NULL,
   createdAt DATETIME DEFAULT CURRENT_TIMESTAMP,
+  updatedAt DATETIME,
   FOREIGN KEY(userId) REFERENCES users(id)
 );
 
@@ -152,6 +153,7 @@ def _quote_idents_pg(sql: str) -> str:
         "sectionId",
         "createdAt",
         "updatedAt",
+        "deletedAt",
     ):
         sql = re.sub(rf'\b{name}\b', f'"{name}"', sql)
     return sql
@@ -316,3 +318,175 @@ def init_schema(conn: Connection) -> None:
             )
         except OperationalError:
             pass
+    init_sync_schema(conn)
+
+
+# ---------------------------------------------------------------------------
+# Sync support (additive): every hierarchy row carries updatedAt, and deletes
+# leave a tombstone, so clients can pull "what changed since <cursor>".
+# Triggers keep this true for every write path (legacy routes, backup import,
+# data wipe) without touching those queries.
+# ---------------------------------------------------------------------------
+
+SYNC_TABLES = ("bookshelves", "notebooks", "sections", "pages")
+SYNC_ENTITY = {
+    "bookshelves": "bookshelf",
+    "notebooks": "notebook",
+    "sections": "section",
+    "pages": "page",
+}
+_TOUCH_COLS = {
+    "bookshelves": "name",
+    "notebooks": "name, archived, bookshelfId",
+    "sections": "name, notebookId",
+    "pages": "title, content, sectionId",
+}
+# SQL giving the owning user id of OLD in a delete trigger.
+_OWNER_SQL = {
+    "bookshelves": "SELECT OLD.userId",
+    "notebooks": "SELECT OLD.userId",
+    "sections": "SELECT n.userId FROM notebooks n WHERE n.id = OLD.notebookId",
+    "pages": (
+        "SELECT n.userId FROM sections s JOIN notebooks n ON n.id = s.notebookId "
+        "WHERE s.id = OLD.sectionId"
+    ),
+}
+
+# Millisecond UTC text, sorts correctly next to legacy CURRENT_TIMESTAMP values.
+SQLITE_NOW_MS = "strftime('%Y-%m-%d %H:%M:%f', 'now')"
+
+
+def _init_sync_sqlite(conn: Connection) -> None:
+    for table in ("bookshelves", "notebooks", "sections"):
+        try:
+            # SQLite rejects non-constant defaults on ALTER; triggers stamp instead.
+            conn.execute(f"ALTER TABLE {table} ADD COLUMN updatedAt DATETIME")
+        except OperationalError:
+            pass
+    for table in SYNC_TABLES:
+        conn.execute(
+            f"UPDATE {table} SET updatedAt = "
+            f"COALESCE({'createdAt' if table != 'pages' else 'NULL'}, CURRENT_TIMESTAMP) "
+            "WHERE updatedAt IS NULL"
+        )
+    conn.execute(
+        """
+        CREATE TABLE IF NOT EXISTS sync_tombstones (
+          entity TEXT NOT NULL,
+          id TEXT NOT NULL,
+          userId INTEGER,
+          deletedAt DATETIME NOT NULL,
+          PRIMARY KEY (entity, id)
+        )
+        """
+    )
+    conn.execute(
+        "CREATE INDEX IF NOT EXISTS idx_tombstones_user ON sync_tombstones(userId, deletedAt)"
+    )
+    for table in SYNC_TABLES:
+        entity = SYNC_ENTITY[table]
+        for name in ("ins", "upd", "del"):
+            conn.execute(f"DROP TRIGGER IF EXISTS lumina_sync_{table}_{name}")
+        conn.execute(
+            f"""
+            CREATE TRIGGER lumina_sync_{table}_ins AFTER INSERT ON {table}
+            BEGIN
+              UPDATE {table} SET updatedAt = {SQLITE_NOW_MS} WHERE id = NEW.id;
+              DELETE FROM sync_tombstones WHERE entity = '{entity}' AND id = NEW.id;
+            END
+            """
+        )
+        conn.execute(
+            f"""
+            CREATE TRIGGER lumina_sync_{table}_upd AFTER UPDATE OF {_TOUCH_COLS[table]} ON {table}
+            BEGIN
+              UPDATE {table} SET updatedAt = {SQLITE_NOW_MS} WHERE id = NEW.id;
+            END
+            """
+        )
+        conn.execute(
+            f"""
+            CREATE TRIGGER lumina_sync_{table}_del AFTER DELETE ON {table}
+            BEGIN
+              INSERT OR REPLACE INTO sync_tombstones (entity, id, userId, deletedAt)
+              SELECT '{entity}', OLD.id, ({_OWNER_SQL[table]}), {SQLITE_NOW_MS};
+            END
+            """
+        )
+
+
+def _init_sync_postgres(conn: Connection) -> None:
+    for table in ("bookshelves", "notebooks", "sections"):
+        conn.execute(
+            f"ALTER TABLE {table} ADD COLUMN IF NOT EXISTS updatedAt TIMESTAMPTZ DEFAULT NOW()"
+        )
+    conn.execute(
+        """
+        CREATE TABLE IF NOT EXISTS sync_tombstones (
+          entity TEXT NOT NULL,
+          id TEXT NOT NULL,
+          userId INTEGER,
+          deletedAt TIMESTAMPTZ NOT NULL,
+          PRIMARY KEY (entity, id)
+        )
+        """
+    )
+    conn.execute(
+        "CREATE INDEX IF NOT EXISTS idx_tombstones_user ON sync_tombstones (userId, deletedAt)"
+    )
+    conn.execute(
+        """
+        CREATE OR REPLACE FUNCTION lumina_sync_touch() RETURNS trigger AS $$
+        BEGIN
+          NEW.updatedAt := clock_timestamp();
+          RETURN NEW;
+        END
+        $$ LANGUAGE plpgsql
+        """
+    )
+    conn.execute(
+        """
+        CREATE OR REPLACE FUNCTION lumina_sync_untomb() RETURNS trigger AS $$
+        BEGIN
+          DELETE FROM sync_tombstones WHERE entity = TG_ARGV[0] AND id = NEW.id;
+          RETURN NULL;
+        END
+        $$ LANGUAGE plpgsql
+        """
+    )
+    for table in SYNC_TABLES:
+        entity = SYNC_ENTITY[table]
+        conn.execute(
+            f"""
+            CREATE OR REPLACE FUNCTION lumina_sync_tomb_{table}() RETURNS trigger AS $$
+            BEGIN
+              INSERT INTO sync_tombstones (entity, id, userId, deletedAt)
+              VALUES ('{entity}', OLD.id, ({_OWNER_SQL[table]}), clock_timestamp())
+              ON CONFLICT (entity, id) DO UPDATE
+                SET userId = EXCLUDED.userId, deletedAt = EXCLUDED.deletedAt;
+              RETURN NULL;
+            END
+            $$ LANGUAGE plpgsql
+            """
+        )
+        for name in ("touch", "untomb", "tomb"):
+            conn.execute(f"DROP TRIGGER IF EXISTS lumina_sync_{table}_{name} ON {table}")
+        conn.execute(
+            f"CREATE TRIGGER lumina_sync_{table}_touch BEFORE INSERT OR UPDATE ON {table} "
+            "FOR EACH ROW EXECUTE FUNCTION lumina_sync_touch()"
+        )
+        conn.execute(
+            f"CREATE TRIGGER lumina_sync_{table}_untomb AFTER INSERT ON {table} "
+            f"FOR EACH ROW EXECUTE FUNCTION lumina_sync_untomb('{entity}')"
+        )
+        conn.execute(
+            f"CREATE TRIGGER lumina_sync_{table}_tomb AFTER DELETE ON {table} "
+            f"FOR EACH ROW EXECUTE FUNCTION lumina_sync_tomb_{table}()"
+        )
+
+
+def init_sync_schema(conn: Connection) -> None:
+    if conn.dialect == "postgres":
+        _init_sync_postgres(conn)
+    else:
+        _init_sync_sqlite(conn)

@@ -22,6 +22,7 @@ from pydantic import BaseModel, Field, field_validator, model_validator
 import db as database
 from db import Connection, IntegrityError, OperationalError, SQLITE_PATH, USE_POSTGRES
 from export_document import render_pdf_bytes
+import sync_api
 
 
 def _paths() -> tuple[Path, Path]:
@@ -117,7 +118,7 @@ ENABLE_DOCS = os.environ.get(
 AUTH_RATE_LIMIT = int(os.environ.get("AUTH_RATE_LIMIT", "20"))
 AUTH_RATE_WINDOW_SEC = int(os.environ.get("AUTH_RATE_WINDOW_SEC", "60"))
 
-SCHEMA_VERSION = "2"
+SCHEMA_VERSION = "3"
 
 security = HTTPBearer(auto_error=False)
 
@@ -1560,6 +1561,32 @@ def delete_page(page_id: str, user: CurrentUser, db: Db):
         raise HTTPException(status.HTTP_404_NOT_FOUND, detail="Page not found")
     db.execute("DELETE FROM pages WHERE id = ?", (page_id,))
     return None
+
+
+# ---- offline sync (mobile). Additive: legacy routes above are unchanged. ----
+
+_SYNC_VALIDATORS: dict[str, type[BaseModel]] = {
+    "bookshelf": BookshelfCreate,
+    "notebook": NotebookCreate,
+    "section": SectionCreate,
+    "page": PageCreate,
+}
+
+
+@app.get("/api/sync/changes")
+def sync_changes(user: CurrentUser, db: Db, since: str = ""):
+    try:
+        return sync_api.changes(db, user["id"], since.strip() or None)
+    except ValueError:
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, detail="Invalid since cursor")
+
+
+@app.post("/api/sync/push")
+def sync_push(user: CurrentUser, body: sync_api.PushBody, db: Db):
+    return {
+        "results": sync_api.push(db, user["id"], body.ops, _SYNC_VALIDATORS),
+        "serverTime": sync_api.iso(sync_api.utc_now()),
+    }
 
 
 class ExportPdfBody(BaseModel):
