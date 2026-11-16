@@ -19,6 +19,9 @@ if not (vite_dist / "index.html").is_file():
 datas = [(str(vite_dist), "dist")]
 binaries = []
 hiddenimports = [
+    "app",
+    "db",
+    "export_document",
     "uvicorn.logging",
     "uvicorn.loops",
     "uvicorn.loops.auto",
@@ -29,6 +32,8 @@ hiddenimports = [
     "uvicorn.protocols.websockets.auto",
     "uvicorn.lifespan",
     "uvicorn.lifespan.on",
+    "fastapi",
+    "pydantic",
     "bcrypt",
     "jose.backends",
     "jose.backends.cryptography_backend",

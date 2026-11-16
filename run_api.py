@@ -5,7 +5,10 @@ import os
 
 import uvicorn
 
+# Import the app object so PyInstaller collects `app` and its deps.
+from app import app
+
 PORT = int(os.environ.get("PORT", "58888"))
 
 if __name__ == "__main__":
-    uvicorn.run("app:app", host="127.0.0.1", port=PORT, log_level="info")
+    uvicorn.run(app, host="127.0.0.1", port=PORT, log_level="info")
