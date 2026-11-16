@@ -79,6 +79,50 @@ export function setStoredReading(prefs: ReadingPrefs): void {
   }
 }
 
+/* ---------- contrast guard (WCAG relative luminance) ---------- */
+
+function parseHex(c: string): [number, number, number] | null {
+  const m = /^#?([0-9a-f]{3}|[0-9a-f]{6})$/i.exec(c.trim());
+  if (!m) return null;
+  const h = m[1].length === 3 ? m[1].replace(/./g, (x) => x + x) : m[1];
+  return [0, 2, 4].map((i) => parseInt(h.slice(i, i + 2), 16)) as [number, number, number];
+}
+
+function luminance([r, g, b]: [number, number, number]): number {
+  const lin = (v: number) => {
+    const s = v / 255;
+    return s <= 0.03928 ? s / 12.92 : ((s + 0.055) / 1.055) ** 2.4;
+  };
+  return 0.2126 * lin(r) + 0.7152 * lin(g) + 0.0722 * lin(b);
+}
+
+/** WCAG contrast ratio (1–21), or null when a colour can't be parsed. */
+export function contrastRatio(a: string, b: string): number | null {
+  const ca = parseHex(a);
+  const cb = parseHex(b);
+  if (!ca || !cb) return null;
+  const [hi, lo] = [luminance(ca), luminance(cb)].sort((x, y) => y - x);
+  return (hi + 0.05) / (lo + 0.05);
+}
+
+/** Minimum ratio for a custom text colour; below this we fall back to the theme colour. */
+export const MIN_READER_CONTRAST = 3;
+
+/** The current theme's page colour (`--paper`). */
+export function currentPaperColor(): string {
+  try {
+    return getComputedStyle(document.documentElement).getPropertyValue('--paper').trim();
+  } catch {
+    return '';
+  }
+}
+
+/** True when the custom colour is readable on [paper] (or can't be judged). */
+export function isReadableOn(color: string, paper: string): boolean {
+  const r = contrastRatio(color, paper);
+  return r === null || r >= MIN_READER_CONTRAST;
+}
+
 export function applyReading(prefs: ReadingPrefs): void {
   const root = document.documentElement.style;
   const font = READER_FONTS.find((f) => f.id === prefs.font) ?? READER_FONTS[0];
@@ -90,6 +134,10 @@ export function applyReading(prefs: ReadingPrefs): void {
     font.id === 'lumina' ? 'var(--font-display)' : font.stack
   );
   root.setProperty('--reader-size', `${prefs.size}px`);
-  if (prefs.color) root.setProperty('--reader-color', prefs.color);
-  else root.removeProperty('--reader-color');
+  // Respect theme contrast: a colour that vanishes on this theme's paper is ignored.
+  if (prefs.color && isReadableOn(prefs.color, currentPaperColor())) {
+    root.setProperty('--reader-color', prefs.color);
+  } else {
+    root.removeProperty('--reader-color');
+  }
 }

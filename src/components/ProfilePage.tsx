@@ -55,6 +55,7 @@ import {
   READER_SIZE_MAX,
   READER_SIZE_MIN,
   getStoredReading,
+  isReadableOn,
   setStoredReading,
   type ReaderFontId,
   type ReadingPrefs,
@@ -1034,6 +1035,16 @@ export default function ProfilePage({
                         <span className="text-xs text-[var(--app-muted)]">
                           {reading.color ? reading.color : 'Follows light / dark theme'}
                         </span>
+                        {reading.color &&
+                        !isReadableOn(
+                          reading.color,
+                          theme === 'light' ? '#ffffff' : theme === 'dark' ? '#161916' : '#000000'
+                        ) ? (
+                          <p className="w-full text-xs text-[var(--danger-fg)]" role="status">
+                            Too faint on this theme — using the theme colour instead. Pick a
+                            {theme === 'light' ? ' darker' : ' lighter'} colour.
+                          </p>
+                        ) : null}
                       </div>
                     </div>
 

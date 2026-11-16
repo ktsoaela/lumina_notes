@@ -48,6 +48,9 @@ declare global {
         size?: number;
       }) => Promise<{ ok: boolean; path?: string; error?: string }>;
       showUpdateFile?: (filePath: string) => Promise<{ ok: boolean }>;
+      installUpdate?: (
+        filePath: string
+      ) => Promise<{ ok: boolean; quitting?: boolean; error?: string }>;
       onUpdateProgress?: (
         cb: (p: {
           received?: number;

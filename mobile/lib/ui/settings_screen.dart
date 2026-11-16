@@ -4,6 +4,7 @@ import 'package:url_launcher/url_launcher.dart';
 
 import '../app_scope.dart';
 import '../settings.dart';
+import '../updates.dart';
 import '../version.dart';
 import 'library_screen.dart';
 import 'lumina_theme.dart';
@@ -88,7 +89,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   const SizedBox(height: 16),
                   _ReadingPanel(settings: settings),
                   const SizedBox(height: 16),
-                  _AboutPanel(key: _aboutKey, settings: settings),
+                  _AboutPanel(key: _aboutKey, settings: settings, updates: services.updates),
                   const SizedBox(height: 16),
                   _Panel(title: 'Account', children: [
                     Text(user?.email ?? '', style: TextStyle(color: Theme.of(context).colorScheme.onSurfaceVariant)),
@@ -151,7 +152,7 @@ class _ProfileHeader extends StatelessWidget {
           Chip(
             key: const Key('appVersion'),
             avatar: const Icon(Icons.info_outline, size: 16),
-            label: const Text('Lumina Notes v$appVersion'),
+            label: const Text('Lumina Notes $appVersionLabel'),
           ),
         ]),
       ),
@@ -229,6 +230,15 @@ class _ReadingPanel extends StatelessWidget {
               ),
             ),
         ]),
+        if (!settings.fontColorReadableOn(theme.colorScheme.surface))
+          Padding(
+            padding: const EdgeInsets.only(top: 8),
+            child: Text(
+              'Too faint on this theme — using the theme colour instead.',
+              key: const Key('contrastWarning'),
+              style: TextStyle(color: theme.colorScheme.error),
+            ),
+          ),
         const SizedBox(height: 16),
         const _Label('Preview'),
         Container(
@@ -250,34 +260,16 @@ class _ReadingPanel extends StatelessWidget {
 }
 
 class _AboutPanel extends StatefulWidget {
-  const _AboutPanel({super.key, required this.settings});
+  const _AboutPanel({super.key, required this.settings, required this.updates});
 
   final AppSettings settings;
+  final UpdateService updates;
 
   @override
   State<_AboutPanel> createState() => _AboutPanelState();
 }
 
 class _AboutPanelState extends State<_AboutPanel> {
-  ReleaseInfo? _latest;
-  String? _error;
-  bool _checking = false;
-
-  Future<void> _check() async {
-    setState(() {
-      _checking = true;
-      _error = null;
-    });
-    try {
-      final r = await fetchLatestRelease();
-      if (mounted) setState(() => _latest = r);
-    } catch (e) {
-      if (mounted) setState(() => _error = 'Could not check for updates');
-    } finally {
-      if (mounted) setState(() => _checking = false);
-    }
-  }
-
   Future<void> _open(String url) async {
     final ok = await launchUrl(Uri.parse(url), mode: LaunchMode.externalApplication);
     if (!ok && mounted) {
@@ -288,85 +280,121 @@ class _AboutPanelState extends State<_AboutPanel> {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final latest = _latest;
     final muted = TextStyle(color: theme.colorScheme.onSurfaceVariant);
-    return _Panel(
-      title: 'About & updates',
-      children: [
-        Row(children: [
-          Expanded(child: _Stat(label: 'Installed', value: 'v$appVersion')),
-          const SizedBox(width: 12),
-          Expanded(
-            child: _Stat(
-              label: 'Latest release',
-              value: _checking ? '…' : latest != null ? 'v${latest.version}' : '—',
-            ),
-          ),
-        ]),
-        const SizedBox(height: 12),
-        if (_error != null) Text(_error!, style: TextStyle(color: theme.colorScheme.error)),
-        if (latest != null && !_checking)
-          if (latest.isNewer)
-            Container(
-              padding: const EdgeInsets.all(14),
-              decoration: BoxDecoration(
-                color: theme.colorScheme.secondaryContainer,
-                borderRadius: BorderRadius.circular(12),
-              ),
-              child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                Text('Lumina Notes v${latest.version} is available.', style: theme.textTheme.titleSmall),
-                const SizedBox(height: 4),
-                Text(
-                  latest.apkUrl != null
-                      ? 'The Android app downloads in your browser; open it to install.'
-                      : 'No Android build in this release — see the release notes.',
-                  style: muted,
-                ),
-                const SizedBox(height: 10),
-                Wrap(spacing: 8, runSpacing: 8, children: [
-                  if (latest.apkUrl != null)
-                    FilledButton.icon(
-                      icon: const Icon(Icons.download),
-                      label: const Text('Download update'),
-                      onPressed: () => _open(latest.apkUrl!),
-                    ),
-                  OutlinedButton.icon(
-                    icon: const Icon(Icons.open_in_new),
-                    label: const Text('Release notes'),
-                    onPressed: () => _open(latest.pageUrl),
-                  ),
-                ]),
-              ]),
-            )
-          else
+    final u = widget.updates;
+    return ListenableBuilder(
+      listenable: u,
+      builder: (context, _) {
+        final latest = u.latest;
+        return _Panel(
+          title: 'About & updates',
+          children: [
             Row(children: [
-              Icon(Icons.check_circle_outline, color: theme.colorScheme.primary, size: 18),
-              const SizedBox(width: 6),
-              const Text("You're on the latest version."),
+              Expanded(child: _Stat(label: 'Installed', value: 'v$appVersion', sub: 'build $appBuild')),
+              const SizedBox(width: 12),
+              Expanded(
+                child: _Stat(
+                  label: 'Latest release',
+                  value: u.checking ? '…' : latest != null ? 'v${latest.version}' : '—',
+                ),
+              ),
             ]),
-        const SizedBox(height: 12),
-        Wrap(spacing: 8, runSpacing: 8, children: [
-          OutlinedButton.icon(
-            key: const Key('checkUpdates'),
-            icon: const Icon(Icons.refresh),
-            label: const Text('Check for updates'),
-            onPressed: _checking ? null : _check,
-          ),
-          OutlinedButton.icon(
-            icon: const Icon(Icons.open_in_new),
-            label: const Text('All releases'),
-            onPressed: () => _open(releasesPage),
-          ),
-        ]),
-        const SizedBox(height: 8),
-        SwitchListTile(
-          contentPadding: EdgeInsets.zero,
-          title: const Text('Tell me about new versions'),
-          subtitle: const Text('Check for a newer release when Lumina opens.'),
-          value: widget.settings.notifyUpdates,
-          onChanged: (v) => widget.settings.update(notifyUpdates: v),
-        ),
-      ],
+            const SizedBox(height: 12),
+            if (u.error != null) Text(u.error!, style: TextStyle(color: theme.colorScheme.error)),
+            if (latest != null && !u.checking)
+              if (latest.isNewer)
+                Container(
+                  key: const Key('updateAvailable'),
+                  padding: const EdgeInsets.all(14),
+                  decoration: BoxDecoration(
+                    color: theme.colorScheme.secondaryContainer,
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                    Text('Lumina Notes v${latest.version} is available.', style: theme.textTheme.titleSmall),
+                    const SizedBox(height: 4),
+                    Text(
+                      latest.apkUrl == null
+                          ? 'No Android build in this release — see the release notes.'
+                          : u.isDownloaded
+                              ? 'Downloaded. Install now — Android will ask you to confirm.'
+                              : 'Download inside Lumina, then install. Android asks you to confirm.',
+                      style: muted,
+                    ),
+                    if (u.downloading) ...[
+                      const SizedBox(height: 10),
+                      LinearProgressIndicator(value: u.progress == 0 ? null : u.progress),
+                      const SizedBox(height: 4),
+                      Text('Downloading… ${((u.progress ?? 0) * 100).round()}%', style: muted),
+                    ],
+                    const SizedBox(height: 10),
+                    Wrap(spacing: 8, runSpacing: 8, children: [
+                      if (latest.apkUrl != null && u.isDownloaded)
+                        FilledButton.icon(
+                          key: const Key('installUpdate'),
+                          icon: const Icon(Icons.system_update),
+                          label: const Text('Install now'),
+                          onPressed: u.install,
+                        )
+                      else if (latest.apkUrl != null)
+                        FilledButton.icon(
+                          key: const Key('downloadUpdate'),
+                          icon: const Icon(Icons.download),
+                          label: const Text('Download update'),
+                          onPressed: u.downloading ? null : u.download,
+                        ),
+                      OutlinedButton.icon(
+                        icon: const Icon(Icons.open_in_new),
+                        label: const Text('Release notes'),
+                        onPressed: () => _open(latest.pageUrl),
+                      ),
+                      if (latest.apkUrl != null && !u.isDownloaded)
+                        TextButton(
+                          onPressed: () => _open(latest.apkUrl!),
+                          child: const Text('Use browser instead'),
+                        ),
+                    ]),
+                  ]),
+                )
+              else
+                Row(children: [
+                  Icon(Icons.check_circle_outline, color: theme.colorScheme.primary, size: 18),
+                  const SizedBox(width: 6),
+                  const Text("You're on the latest version."),
+                ]),
+            const SizedBox(height: 12),
+            Wrap(spacing: 8, runSpacing: 8, children: [
+              OutlinedButton.icon(
+                key: const Key('checkUpdates'),
+                icon: const Icon(Icons.refresh),
+                label: const Text('Check for updates'),
+                onPressed: u.checking ? null : u.check,
+              ),
+              OutlinedButton.icon(
+                icon: const Icon(Icons.open_in_new),
+                label: const Text('All releases'),
+                onPressed: () => _open(releasesPage),
+              ),
+            ]),
+            const SizedBox(height: 8),
+            SwitchListTile(
+              contentPadding: EdgeInsets.zero,
+              title: const Text('Tell me about new versions'),
+              subtitle: const Text('Check for a newer release when Lumina opens.'),
+              value: widget.settings.notifyUpdates,
+              onChanged: (v) => widget.settings.update(notifyUpdates: v),
+            ),
+            SwitchListTile(
+              key: const Key('autoDownloadSwitch'),
+              contentPadding: EdgeInsets.zero,
+              title: const Text('Download updates automatically'),
+              subtitle: const Text('Fetch the new APK in the background. Installing always asks first.'),
+              value: widget.settings.autoDownloadUpdates,
+              onChanged: (v) => widget.settings.update(autoDownloadUpdates: v),
+            ),
+          ],
+        );
+      },
     );
   }
 }
@@ -410,10 +438,11 @@ class _Label extends StatelessWidget {
 }
 
 class _Stat extends StatelessWidget {
-  const _Stat({required this.label, required this.value});
+  const _Stat({required this.label, required this.value, this.sub});
 
   final String label;
   final String value;
+  final String? sub;
 
   @override
   Widget build(BuildContext context) {
@@ -429,6 +458,8 @@ class _Stat extends StatelessWidget {
         Eyebrow(label),
         const SizedBox(height: 4),
         Text(value, style: theme.textTheme.titleLarge),
+        if (sub != null)
+          Text(sub!, style: theme.textTheme.bodySmall?.copyWith(color: theme.colorScheme.onSurfaceVariant)),
       ]),
     );
   }

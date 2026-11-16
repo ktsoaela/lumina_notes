@@ -36,6 +36,8 @@ contextBridge.exposeInMainWorld("luminaDesktop", {
   /** Download a GitHub release asset into Downloads/Lumina Notes updates */
   downloadUpdate: (asset) => ipcRenderer.invoke("lumina:download-update", asset),
   showUpdateFile: (filePath) => ipcRenderer.invoke("lumina:show-update", filePath),
+  /** Start the downloaded installer (quits Lumina on Windows/Linux) */
+  installUpdate: (filePath) => ipcRenderer.invoke("lumina:install-update", filePath),
   onUpdateProgress: (cb) => {
     const handler = (_event, p) => cb(p);
     ipcRenderer.on("lumina:update-progress", handler);

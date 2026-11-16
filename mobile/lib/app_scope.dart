@@ -8,6 +8,7 @@ import 'data/notes_repository.dart';
 import 'data/pair_link.dart';
 import 'data/session_store.dart';
 import 'settings.dart';
+import 'updates.dart';
 import 'sync/sync_engine.dart';
 import 'sync/sync_scheduler.dart';
 
@@ -25,8 +26,10 @@ class AppServices extends ChangeNotifier {
     LocalRepository? local,
     RepoFactory? repoFactory,
     AppSettings? settings,
+    UpdateService? updates,
     this.autoSync = true,
   })  : settings = settings ?? AppSettings.inMemory(),
+        updates = updates ?? UpdateService(),
         _apiFactory = apiFactory ?? ((url, token) => ApiClient(baseUrl: url, token: token)),
         _local = local, // ignore: prefer_initializing_formals
         _repoFactory = repoFactory { // ignore: prefer_initializing_formals
@@ -37,6 +40,9 @@ class AppServices extends ChangeNotifier {
 
   /// Theme, reading typography and update preferences (device-local).
   final AppSettings settings;
+
+  /// Release check + in-app APK download (Settings → About & updates).
+  final UpdateService updates;
   final ApiFactory _apiFactory;
   final RepoFactory? _repoFactory; // tests: bypass the local DB
   LocalRepository? _local;

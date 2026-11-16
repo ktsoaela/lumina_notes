@@ -7,6 +7,7 @@ import 'lumina_theme.dart';
 import 'move_sheet.dart';
 import 'page_editor_screen.dart';
 import 'repo_list.dart';
+import '../version.dart';
 
 /// Drag payload: a page being moved onto a chapter tab.
 class _PageDrag {
@@ -522,6 +523,14 @@ class BookTreeDrawer extends StatelessWidget {
                     ),
                 ],
               ),
+            ),
+          ),
+          const Divider(),
+          Padding(
+            padding: const EdgeInsets.fromLTRB(20, 8, 20, 12),
+            child: Text(
+              'Lumina Notes $appVersionLabel',
+              style: theme.textTheme.bodySmall?.copyWith(color: theme.colorScheme.onSurfaceVariant),
             ),
           ),
         ]),

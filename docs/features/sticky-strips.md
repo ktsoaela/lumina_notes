@@ -11,10 +11,14 @@ Desktop-only (Electron) always-on-top neon film strips. Each colour maps to a sh
 ## How to use
 
 1. Run the desktop app: `npm run dev:electron` or install from `release/electron/`.
-2. Open **Profile → Sticky note strips** and pick the target book.
-3. Use the neon tabs on the desktop edge — hover to peek, click to write.
-4. Type in the strip editor; content autosaves and mirrors to the main app when that page is open.
-5. Optional: **Open in app** focuses the page in the main window.
+2. Open **Profile → Sticky note strips** and pick the target book (and screen edge). Turn **Show sticky note strips** off to hide them completely.
+3. Use the neon tabs on the desktop edge — hover to peek, **click to pull the note out** of the edge.
+4. Type — the grey hint shows the Markdown you can use. The bar at the bottom adds bold, italic, strikethrough, lists, to-dos and Mermaid. Content autosaves and mirrors to the main app.
+5. Switch colour with the dots in the note's header; **↗** opens the page in Lumina; **×** or **Esc** saves and tucks the note back into the strip.
+
+### Tray (hidden icons)
+
+Lumina adds an icon to the system tray (Windows: the **^ hidden icons** area). Left-click brings the strips back; right-click for **Sticky notes ▸ Pink…Blue**, **Show sticky note strips**, **Open Lumina Notes** and **Quit**. While strips are switched off the tray only offers to turn them back on.
 
 ### Colours
 
@@ -25,6 +29,11 @@ Pink, Orange, Yellow, Green, Blue — each can bind to its own page (by title or
 - Sticky UI loads at `?desktop=1&sticky=1`.
 - Saves go through the same FastAPI `pages.update` as the main editor.
 - Live mirror uses Electron IPC (`lumina:page-sync`) between the sticky window and the main window — no Kafka or external queue.
+
+## Decisions
+
+- [ADR 0005 — stick'n toggle](../adr/0005-sticky-toggle-and-move-hierarchy.md)
+- [ADR 0007 — Pull-out animation, close, tray](../adr/0007-stickn-strip-interaction-and-tray.md)
 
 ## Requirements
 

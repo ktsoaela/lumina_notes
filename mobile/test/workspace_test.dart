@@ -133,7 +133,7 @@ void main() {
   testWidgets('settings shows the version and changes reading font size', (tester) async {
     await _pump(tester, const Size(400, 900));
     await _tap(tester, find.byTooltip('Settings'));
-    expect(find.text('Lumina Notes v$appVersion'), findsOneWidget);
+    expect(find.text('Lumina Notes $appVersionLabel'), findsOneWidget);
     final slider = find.byKey(const Key('readerSize'));
     await tester.ensureVisible(slider);
     await tester.pumpAndSettle();

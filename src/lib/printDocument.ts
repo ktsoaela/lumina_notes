@@ -1,5 +1,6 @@
 import { marked } from 'marked';
 import { sanitizeHtml } from './sanitize';
+import { READER_FONTS, getStoredReading } from './readingPrefs';
 
 /**
  * Print / PDF styles. Scoped to `.lumina-print-inner` for in-app PDF export
@@ -49,76 +50,67 @@ export const PRINT_DOCUMENT_CSS = `
     margin: 4px 0;
     color: #555 !important;
   }
+  /* Body follows the on-screen reader (index.css .md-reader): VS Code-like rhythm,
+     the user's font + size, always dark-on-white for paper. */
   .lumina-print-inner .markdown-content {
-    font-size: 14px;
+    font-family: var(--print-font, 'Source Serif 4', Georgia, serif);
+    font-size: var(--print-size, 14px);
+    line-height: 1.6;
+    color: #1a1a1a !important;
+    overflow-wrap: break-word;
+  }
+  .lumina-print-inner .markdown-content :where(p, ul, ol, blockquote, pre, table) {
+    margin: 0 0 1em;
+  }
+  .lumina-print-inner .markdown-content :where(h1, h2, h3, h4, h5, h6) {
+    font-family: var(--print-heading-font, var(--print-font, Georgia, serif));
+    font-weight: 600;
+    line-height: 1.25;
+    margin: 1.5em 0 0.65em;
     color: #1a1a1a !important;
   }
-  .lumina-print-inner .markdown-content p {
-    margin-bottom: 12px;
-    color: #1a1a1a !important;
-  }
-  .lumina-print-inner .markdown-content ul,
-  .lumina-print-inner .markdown-content ol {
-    margin-bottom: 12px;
-    padding-left: 20px;
-  }
-  .lumina-print-inner .markdown-content li {
-    margin-bottom: 4px;
-  }
+  .lumina-print-inner .markdown-content h1 { font-size: 2em; padding-bottom: 0.3em; border-bottom: 1px solid #ddd; }
+  .lumina-print-inner .markdown-content h2 { font-size: 1.5em; padding-bottom: 0.3em; border-bottom: 1px solid #ddd; }
+  .lumina-print-inner .markdown-content h3 { font-size: 1.25em; }
+  .lumina-print-inner .markdown-content h4 { font-size: 1em; }
+  .lumina-print-inner .markdown-content :where(ul, ol) { padding-left: 2em; }
+  .lumina-print-inner .markdown-content li + li { margin-top: 0.25em; }
   .lumina-print-inner .markdown-content blockquote {
-    border-left: 4px solid #547f72;
-    padding-left: 15px;
-    margin: 15px 0;
+    padding: 0 1em;
+    border-left: 0.25em solid #c9d6d1;
     color: #5c6b66 !important;
-    font-style: italic;
   }
+  .lumina-print-inner .markdown-content hr { height: 2px; border: 0; background: #e3e3e3; margin: 1.75em 0; }
+  .lumina-print-inner .markdown-content img { max-width: 100%; }
   .lumina-print-inner .markdown-content code {
+    font-family: 'JetBrains Mono', Consolas, 'Courier New', monospace;
+    font-size: 0.875em;
+    padding: 0.15em 0.4em;
+    border-radius: 4px;
     background-color: #f4f1ea;
-    padding: 2px 4px;
-    border-radius: 3px;
-    font-family: 'Courier New', monospace;
-    font-size: 13px;
     color: #1a1a1a !important;
   }
   .lumina-print-inner .markdown-content pre {
+    font-size: 0.875em;
+    line-height: 1.5;
+    padding: 1em;
+    border-radius: 6px;
     background-color: #f4f1ea;
-    padding: 15px;
-    border-radius: 5px;
-    overflow-x: auto;
     border: 1px solid #e9ecef;
-    color: #1a1a1a !important;
+    overflow-x: auto;
+    white-space: pre-wrap;
   }
-  .lumina-print-inner .markdown-content pre code {
-    background: none;
-    padding: 0;
-  }
-  .lumina-print-inner .markdown-content strong {
-    font-weight: bold;
-    color: #2c3e50 !important;
-  }
-  .lumina-print-inner .markdown-content em {
-    font-style: italic;
-  }
-  .lumina-print-inner .markdown-content a {
-    color: #547f72 !important;
-    text-decoration: underline;
-  }
-  .lumina-print-inner .markdown-content table {
-    border-collapse: collapse;
-    width: 100%;
-    margin: 15px 0;
-  }
-  .lumina-print-inner .markdown-content th,
-  .lumina-print-inner .markdown-content td {
+  .lumina-print-inner .markdown-content pre code { font-size: 1em; padding: 0; background: none; }
+  .lumina-print-inner .markdown-content strong { font-weight: 600; }
+  .lumina-print-inner .markdown-content a { color: #375348 !important; text-decoration: underline; }
+  .lumina-print-inner .markdown-content table { border-collapse: collapse; margin: 0 0 1em; }
+  .lumina-print-inner .markdown-content :where(th, td) {
     border: 1px solid #ddd;
-    padding: 8px 12px;
+    padding: 0.4em 0.85em;
     text-align: left;
     color: #1a1a1a !important;
   }
-  .lumina-print-inner .markdown-content th {
-    background-color: #f4f1ea;
-    font-weight: bold;
-  }
+  .lumina-print-inner .markdown-content th { background-color: #f4f1ea; font-weight: 600; }
   /* Standalone print window (real body) */
   body.lumina-print-window {
     font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
@@ -128,6 +120,20 @@ export const PRINT_DOCUMENT_CSS = `
     background: #ffffff;
   }
 `;
+
+/** The user's reading font + size (Profile → Reading & writing), for paper. */
+function readerPrintCss(): string {
+  try {
+    const prefs = getStoredReading();
+    const font = READER_FONTS.find((f) => f.id === prefs.font) ?? READER_FONTS[0];
+    const heading = font.id === 'lumina' ? '"Fraunces", Georgia, serif' : font.stack;
+    // Screen px → print: a touch smaller reads the same on paper.
+    const size = Math.max(10, Math.round(prefs.size * 0.875));
+    return `.lumina-print-inner{--print-font:${font.stack};--print-heading-font:${heading};--print-size:${size}px;}`;
+  } catch {
+    return '';
+  }
+}
 
 function escapeHtml(s: string): string {
   return s
@@ -160,7 +166,7 @@ export function buildPrintDocumentHtml(
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>${escapeHtml(fileTitle)}</title>
-  <style>${PRINT_DOCUMENT_CSS}</style>
+  <style>${PRINT_DOCUMENT_CSS}${readerPrintCss()}</style>
 </head>
 <body class="lumina-print-window">
   <div class="lumina-print-inner">

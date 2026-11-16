@@ -1,6 +1,6 @@
 # ADR 0004: Markdown reader typography (VS Code–like) and user font settings
 
-- **Status:** Proposed
+- **Status:** Accepted (implemented in v1.3.0)
 - **Date:** 2026-11-16
 - **Deciders:** Lumina Notes maintainers
 
@@ -42,3 +42,17 @@ We will use **Option A**:
 
 - Need contrast checks when users pick light text on light backgrounds
 - Mermaid/Plotly embeds must still fit the reader margins
+
+## Implementation (v1.3.0)
+
+| Decision | Where |
+|----------|-------|
+| 1. Reader stylesheet (VS Code–like) | `.md-reader` in `src/index.css` (heading scale, rules under h1/h2, list/quote/table/code rhythm, 54rem measure); `Preview.tsx` no longer depends on the missing Tailwind typography plugin and keeps fenced code as real `<pre>`. Print/PDF share the same rhythm and the user's font + size (`src/lib/printDocument.ts`, always dark-on-white for paper). Flutter: `readerStyleSheet()` in `page_editor_screen.dart`, centred 760 px column. |
+| 2. Default identity | Lumina serif (Source Serif 4 body + Fraunces headings) stays the default on desktop; platform serif on Flutter. |
+| 3. Font style / size / colour | Profile → Appearance → **Reading & writing** (`src/lib/readingPrefs.ts`): curated families incl. System UI, 12–28 px, colour picker or “Match theme”, live preview. Flutter Settings: same three controls with swatches. Editor and stick'n strips use the same prefs. |
+| 4. Per-device persistence | `localStorage` (`lumina_reading`) on desktop/web; Flutter `AppSettings` via the secure key-value store. |
+| 5. Editor | Follows the same family/size so writing and reading match (the ADR allowed either). |
+
+**Contrast follow-up — done:** a custom colour below WCAG 3:1 against the current theme's paper is ignored and the theme colour is used instead; Profile / Settings show “Too faint on this theme”. Re-checked on every theme change (`THEME_APPLIED_EVENT`). Tests: `src/lib/version.test.ts`, `mobile/test/updates_test.dart`.
+
+**Diagrams:** Mermaid/Plotly render inside `.md-diagram` (horizontal scroll, no overflow past the margins).

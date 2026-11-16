@@ -29,3 +29,17 @@ describe('pickAsset', () => {
     expect(pickAsset(assets, 'android')?.url).toBe('a');
   });
 });
+
+import { contrastRatio, isReadableOn } from './readingPrefs';
+
+describe('reader colour contrast guard', () => {
+  it('computes WCAG ratios', () => {
+    expect(contrastRatio('#000000', '#ffffff')).toBeCloseTo(21, 0);
+    expect(contrastRatio('#ffffff', '#ffffff')).toBeCloseTo(1, 5);
+  });
+  it('rejects light text on white and dark text on black', () => {
+    expect(isReadableOn('#f3f3f0', '#ffffff')).toBe(false);
+    expect(isReadableOn('#111111', '#000000')).toBe(false);
+    expect(isReadableOn('#375348', '#ffffff')).toBe(true);
+  });
+});

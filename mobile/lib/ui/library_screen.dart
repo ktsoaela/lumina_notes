@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 
 import '../app_scope.dart';
 import '../data/models.dart';
-import '../version.dart';
 import 'book_screen.dart';
 import 'connect_screen.dart';
 import 'lumina_theme.dart';
@@ -52,26 +51,32 @@ class _LibraryScreenState extends State<LibraryScreen> {
   }
 
   /// Launch check for a newer release (skipped in tests: autoSync is off there).
+  /// With auto-download on, the APK is fetched first and the notice offers Install.
   Future<void> _maybeNotifyUpdate() async {
     final services = AppScope.of(context);
-    if (!services.autoSync || !services.settings.notifyUpdates) return;
-    try {
-      final r = await fetchLatestRelease();
-      if (!mounted || !r.isNewer) return;
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-        duration: const Duration(seconds: 8),
-        content: Text('Lumina v${r.version} is available'),
-        action: SnackBarAction(
-          label: 'View',
-          onPressed: () => Navigator.push(
-            context,
-            MaterialPageRoute<void>(builder: (_) => const SettingsScreen(initialSection: SettingsSection.about)),
-          ),
-        ),
-      ));
-    } catch (_) {
-      // Offline or rate-limited: try again next launch.
+    final settings = services.settings;
+    if (!services.autoSync || !(settings.notifyUpdates || settings.autoDownloadUpdates)) return;
+    final updates = services.updates;
+    final r = await updates.check();
+    if (!mounted || r == null || !r.isNewer) return;
+    if (settings.autoDownloadUpdates && r.apkUrl != null && !updates.isDownloaded) {
+      await updates.download();
+      if (!mounted) return;
     }
+    final ready = updates.isDownloaded;
+    ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+      duration: const Duration(seconds: 10),
+      content: Text(ready ? 'Lumina v${r.version} is downloaded' : 'Lumina v${r.version} is available'),
+      action: ready
+          ? SnackBarAction(label: 'Install', onPressed: updates.install)
+          : SnackBarAction(
+              label: 'View',
+              onPressed: () => Navigator.push(
+                context,
+                MaterialPageRoute<void>(builder: (_) => const SettingsScreen(initialSection: SettingsSection.about)),
+              ),
+            ),
+    ));
   }
 
   @override

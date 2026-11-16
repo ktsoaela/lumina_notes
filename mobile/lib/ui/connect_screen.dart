@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../app_scope.dart';
 import '../data/pair_link.dart';
 import '../data/session_store.dart';
+import '../version.dart';
 import 'repo_list.dart' show errorMessage;
 import 'scan_screen.dart';
 
@@ -174,6 +175,13 @@ class _ConnectScreenState extends State<ConnectScreen> {
                 if (!showLogin) ..._scanFirst(context),
                 if (showLogin) ..._serverRow(context, server),
                 if (showLogin) ..._loginForm(context, server),
+                const SizedBox(height: 28),
+                Text(
+                  'Lumina Notes $appVersionLabel',
+                  key: const Key('connectVersion'),
+                  textAlign: TextAlign.center,
+                  style: theme.textTheme.bodySmall?.copyWith(color: scheme.onSurfaceVariant),
+                ),
               ],
             ),
           ),

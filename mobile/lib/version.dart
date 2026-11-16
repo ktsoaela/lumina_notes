@@ -2,8 +2,12 @@ import 'dart:convert';
 
 import 'package:http/http.dart' as http;
 
-/// Keep in sync with `version:` in pubspec.yaml (a test checks this).
-const appVersion = '1.2.0';
+/// Keep in sync with `version:` in pubspec.yaml (`appVersion+appBuild`; a test checks this).
+const appVersion = '1.3.0';
+const appBuild = 3;
+
+/// Shown in Settings, the book tree and the sign-in screen.
+const appVersionLabel = 'v$appVersion (build $appBuild)';
 
 const releasesRepo = 'ktsoaela/lumina_notes';
 const releasesPage = 'https://github.com/$releasesRepo/releases';

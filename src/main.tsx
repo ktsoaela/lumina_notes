@@ -7,13 +7,15 @@ import { ErrorBoundary } from './components/ErrorBoundary';
 import { AppDialogsProvider } from './context/AppDialogsContext';
 import { ToastProvider } from './context/ToastContext';
 import './index.css';
-import {applyTheme, getStoredTheme} from './lib/theme';
+import {applyTheme, getStoredTheme, THEME_APPLIED_EVENT} from './lib/theme';
 import { applyReading, getStoredReading, READING_EVENT } from './lib/readingPrefs';
 import { defaultLogo } from './assets';
 import { isElectronApp } from './lib/platform';
 
 applyTheme(getStoredTheme());
 applyReading(getStoredReading());
+// Contrast guard depends on the theme's paper colour.
+window.addEventListener(THEME_APPLIED_EVENT, () => applyReading(getStoredReading()));
 // Same tab (Profile) and other windows (sticky strips) pick up font changes live.
 window.addEventListener(READING_EVENT, () => applyReading(getStoredReading()));
 window.addEventListener('storage', (e) => {

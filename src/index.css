@@ -1581,6 +1581,22 @@ html.sticky-strip-mode #root {
   border: 1px solid color-mix(in srgb, var(--film-color) 25%, var(--app-border));
 }
 
+.film-note-body:focus-within {
+  border-color: color-mix(in srgb, var(--film-color) 70%, var(--app-border));
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--film-color) 22%, transparent);
+}
+
+/* Keyboard focus stays visible on neon headers and on the paper. */
+.film-note-head :focus-visible {
+  outline: 2px solid rgba(0, 0, 0, 0.75);
+  outline-offset: 1px;
+}
+.film-note-mode :focus-visible,
+.film-note-foot :focus-visible {
+  outline: 2px solid var(--focus);
+  outline-offset: 1px;
+}
+
 .film-note-empty {
   margin: auto;
   padding: 1.5rem;

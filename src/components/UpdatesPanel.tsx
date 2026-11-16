@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
-import { CheckCircle2, Download, ExternalLink, FolderOpen, Loader2, RefreshCw } from 'lucide-react';
+import { CheckCircle2, Download, ExternalLink, FolderOpen, Loader2, RefreshCw, Rocket } from 'lucide-react';
+import { useAppDialogs } from '../context/AppDialogsContext';
 import { cn } from '../lib/utils';
 import { formatBytes } from '../lib/markdownIO';
 import { isElectronApp } from '../lib/platform';
@@ -61,6 +62,7 @@ function Toggle({
 /** Profile → About & updates: version, update check, in-app download. */
 export function UpdatesPanel({ className }: { className?: string }) {
   const desktop = isElectronApp() && !!window.luminaDesktop?.downloadUpdate;
+  const { confirm } = useAppDialogs();
   const target: DownloadTarget = detectDownloadTarget();
   const [prefs, setPrefs] = useState<UpdatePrefs>(() => getUpdatePrefs());
   const [checking, setChecking] = useState(false);
@@ -137,6 +139,23 @@ export function UpdatesPanel({ className }: { className?: string }) {
     }
   };
 
+  /** Install stays user-confirmed (ADR 0003). */
+  const install = async () => {
+    if (!downloaded || !window.luminaDesktop?.installUpdate) return;
+    const quits = target !== 'mac';
+    const ok = await confirm({
+      title: `Install Lumina v${downloaded.version}?`,
+      message: quits
+        ? 'Lumina will close and the new version will start. Your notes are saved.'
+        : 'The installer opens — drag Lumina Notes into Applications to finish.',
+      confirmLabel: 'Install now',
+      variant: 'default',
+    });
+    if (!ok) return;
+    const res = await window.luminaDesktop.installUpdate(downloaded.path);
+    if (!res.ok) setDlErr(res.error || 'Could not start the installer');
+  };
+
   const pct =
     progress && progress.total > 0
       ? Math.min(100, Math.round((progress.received / progress.total) * 100))
@@ -206,14 +225,24 @@ export function UpdatesPanel({ className }: { className?: string }) {
             ) : null}
             <div className="mt-3 flex flex-wrap gap-2">
               {alreadyDownloaded && desktop ? (
-                <button
-                  type="button"
-                  className="studio-btn-primary !px-4 !py-2 !text-xs"
-                  onClick={() => void window.luminaDesktop?.showUpdateFile?.(downloaded!.path)}
-                >
-                  <FolderOpen className="h-3.5 w-3.5" />
-                  Show downloaded file
-                </button>
+                <>
+                  <button
+                    type="button"
+                    className="studio-btn-primary !px-4 !py-2 !text-xs"
+                    onClick={() => void install()}
+                  >
+                    <Rocket className="h-3.5 w-3.5" />
+                    Install now
+                  </button>
+                  <button
+                    type="button"
+                    className="studio-btn !px-4 !py-2 !text-xs"
+                    onClick={() => void window.luminaDesktop?.showUpdateFile?.(downloaded!.path)}
+                  >
+                    <FolderOpen className="h-3.5 w-3.5" />
+                    Show file
+                  </button>
+                </>
               ) : asset ? (
                 <button
                   type="button"
@@ -241,8 +270,8 @@ export function UpdatesPanel({ className }: { className?: string }) {
             </div>
             {alreadyDownloaded && desktop ? (
               <p className="mt-2 text-xs text-[var(--app-muted)]">
-                Saved to your Downloads → “Lumina Notes updates”. Close Lumina and run the new
-                file to finish updating{target === 'windows' ? ' (replace your old Lumina-Notes.exe)' : ''}.
+                Saved to your Downloads → “Lumina Notes updates”. “Install now” closes Lumina and
+                starts the new version{target === 'windows' ? ' — afterwards you can delete the old Lumina-Notes.exe' : ''}.
               </p>
             ) : null}
             {dlErr ? <p className="mt-2 text-xs text-[var(--danger)]">{dlErr}</p> : null}

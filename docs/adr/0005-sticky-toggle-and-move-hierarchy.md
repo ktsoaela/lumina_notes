@@ -1,6 +1,6 @@
 # ADR 0005: Disable stick'n strips; move pages and chapters across books
 
-- **Status:** Proposed
+- **Status:** Accepted (implemented in v1.3.0)
 - **Date:** 2026-11-16
 - **Deciders:** Lumina Notes maintainers
 
@@ -50,3 +50,16 @@ We will use **Option A**:
 
 - Drag targets and forbidden drops (e.g. page into shelf) need clear UX
 - Undo of a move is nice-to-have, not required in v1 of this ADR
+
+## Implementation (v1.3.0)
+
+**stick'n toggle** — Profile → Sticky note strips → “Show sticky note strips” (default on). Stored in `userData/desktop-prefs.json` so the main process reads it at boot; off closes the window immediately and it is not created on next launch (`setStickyEnabled` in `electron/main.cjs`). The tray checkbox and the Profile switch stay in sync (`lumina:desktop-prefs-changed`).
+
+**Move pages / chapters**
+
+| Decision | Where |
+|----------|-------|
+| Reparent page → chapter, chapter → book | API `POST /api/pages/{id}/move`, `POST /api/sections/{id}/move` (`app.py`, ownership-checked; `tests/test_api.py::test_move_page_and_section_between_books`). |
+| Drag and drop | Desktop sidebar: drag a page onto a chapter, a chapter onto a book; only valid targets highlight (`Sidebar.tsx`). Flutter: long-press a page and drop it on a chapter tab. |
+| Move to… | Desktop `MoveDialog.tsx` (searchable, every bookshelf). Flutter ⋮ → “Move to another chapter / book” (`move_sheet.dart`). |
+| Sync | Server triggers stamp `updatedAt` on `sectionId` / `notebookId` changes, so `/api/sync/changes` carries moves; Flutter local moves go through the outbox (`LocalRepository.movePage/moveSection`, tested in `local_repository_test.dart`). Conflicts stay last-write-wins (ADR 0001). |

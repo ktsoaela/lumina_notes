@@ -5,6 +5,8 @@ export const DEFAULT_THEME: ThemeMode = 'light';
 
 const KEY = 'lumina_theme';
 
+export const THEME_APPLIED_EVENT = 'lumina-theme-applied';
+
 export function getStoredTheme(): ThemeMode {
   try {
     const v = localStorage.getItem(KEY)?.trim();
@@ -37,4 +39,10 @@ export function applyTheme(mode: ThemeMode): void {
   }
   root.style.colorScheme =
     mode === 'dark' || mode === 'contrast' ? 'dark' : 'light';
+  try {
+    // Reading colour depends on the theme's paper (contrast guard) — re-apply.
+    window.dispatchEvent(new Event(THEME_APPLIED_EVENT));
+  } catch {
+    /* ignore */
+  }
 }

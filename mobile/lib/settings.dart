@@ -39,6 +39,9 @@ class AppSettings extends ChangeNotifier {
   int? fontColor;
   bool notifyUpdates = true;
 
+  /// Opt-in (ADR 0003): fetch a newer APK in the background. Installing still asks.
+  bool autoDownloadUpdates = false;
+
   Future<void> load() async {
     try {
       final raw = await _store.read(_key);
@@ -50,6 +53,7 @@ class AppSettings extends ChangeNotifier {
       fontSize = size.clamp(minSize, maxSize);
       fontColor = (j['fontColor'] as num?)?.toInt();
       notifyUpdates = j['notifyUpdates'] != false;
+      autoDownloadUpdates = j['autoDownloadUpdates'] == true;
     } catch (_) {
       // Corrupt prefs: keep defaults.
     }
@@ -64,6 +68,7 @@ class AppSettings extends ChangeNotifier {
           'fontSize': fontSize,
           'fontColor': fontColor,
           'notifyUpdates': notifyUpdates,
+          'autoDownloadUpdates': autoDownloadUpdates,
         }),
       );
 
@@ -74,12 +79,14 @@ class AppSettings extends ChangeNotifier {
     int? fontColor,
     bool clearFontColor = false,
     bool? notifyUpdates,
+    bool? autoDownloadUpdates,
   }) {
     this.themeMode = themeMode ?? this.themeMode;
     this.font = font ?? this.font;
     this.fontSize = (fontSize ?? this.fontSize).clamp(minSize, maxSize);
     this.fontColor = clearFontColor ? null : (fontColor ?? this.fontColor);
     this.notifyUpdates = notifyUpdates ?? this.notifyUpdates;
+    this.autoDownloadUpdates = autoDownloadUpdates ?? this.autoDownloadUpdates;
     notifyListeners();
     _save().ignore();
   }
@@ -90,11 +97,28 @@ class AppSettings extends ChangeNotifier {
         clearFontColor: true,
       );
 
-  /// Text style for page content (editor + reader body).
+  /// Minimum WCAG contrast for a custom text colour (ADR 0004 contrast guard).
+  static const minContrast = 3.0;
+
+  /// True when the chosen colour stays readable on [background].
+  bool fontColorReadableOn(Color background) {
+    if (fontColor == null) return true;
+    return contrastRatio(Color(fontColor!), background) >= minContrast;
+  }
+
+  /// Text style for page content (editor + reader body). A colour that would
+  /// vanish on the current theme falls back to the theme's text colour.
   TextStyle readerStyle(ColorScheme scheme) => TextStyle(
         fontFamily: font.family,
         fontSize: fontSize,
         height: 1.6,
-        color: fontColor != null ? Color(fontColor!) : scheme.onSurface,
+        color: fontColor != null && fontColorReadableOn(scheme.surface) ? Color(fontColor!) : scheme.onSurface,
       );
+}
+
+/// WCAG contrast ratio between two colours (1–21).
+double contrastRatio(Color a, Color b) {
+  final la = a.computeLuminance(), lb = b.computeLuminance();
+  final hi = la > lb ? la : lb, lo = la > lb ? lb : la;
+  return (hi + 0.05) / (lo + 0.05);
 }

@@ -1,6 +1,6 @@
 # ADR 0007: stick'n strip open animation, clearer UX, and tray access
 
-- **Status:** Proposed
+- **Status:** Accepted (implemented in v1.3.0)
 - **Date:** 2026-11-16
 - **Deciders:** Lumina Notes maintainers
 
@@ -51,3 +51,15 @@ We will use **Option A**:
 
 - Tray + animation need Windows QA (multi-monitor, always-on-top, DWM transparency)
 - Coordinate with existing sticky edge snap / white-bar refresh logic so animation does not fight DWM
+
+## Implementation (v1.3.0)
+
+| Decision | Where |
+|----------|-------|
+| Open animation | Clicking a strip pulls the note out of its docked edge (slide + slight peel, 340 ms, per-edge keyframes `film-pull-*`); closing tucks it back (`film-tuck-*`, 220 ms) before the window shrinks. Off when the OS or Profile “Reduce motion” is on. |
+| Placeholder | Readable muted grey, normal weight, with a Markdown hint (“Take a note… # Heading, - a list item, - [ ] a to-do”). |
+| Hierarchy / focus | Header in the strip's colour (title, colour dots, actions), paper body with focus glow, formatting bar (bold, italic, strike, list, to-do, Mermaid); visible `:focus-visible` rings on header and paper. |
+| Close | Large × in the header and **Esc**; both save then tuck back to the edge (pack). Hiding strips entirely is the explicit toggle (Profile / tray). |
+| Tray | `Tray` in `electron/main.cjs`: Open Lumina Notes · Sticky notes ▸ Pink…Blue · Show sticky note strips · version · Quit. Left-click brings strips back (spawns the window if gone). When strips are off the tray is **inactive** for stick'n: colour notes are disabled and left-click just opens Lumina; only the explicit checkbox re-enables. |
+
+Windows QA still recommended on multi-monitor setups; the existing DWM transparency refresh runs on blur/focus as before.

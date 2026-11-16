@@ -651,12 +651,12 @@ async function showMainWindow() {
   mainWindow.focus();
 }
 
-/** Open one colour's note straight from the tray (turns strips on if needed). */
+/** Open one colour's note straight from the tray (only while strips are enabled). */
 async function openStickyFilm(filmId) {
   if (!STICKY_FILMS.some((f) => f.id === filmId)) return;
+  if (!readDesktopPrefs().stickyEnabled) return; // ADR 0005/0007: disabled = inactive
   const fresh = !stickyWindow || stickyWindow.isDestroyed();
-  if (!readDesktopPrefs().stickyEnabled) await setStickyEnabled(true);
-  else if (fresh) await createStickyWindow();
+  if (fresh) await createStickyWindow();
   if (!stickyWindow || stickyWindow.isDestroyed()) return;
   if (fresh || stickyWindow.webContents.isLoading()) {
     await new Promise((resolve) => {
@@ -671,11 +671,13 @@ async function openStickyFilm(filmId) {
 
 function buildTrayMenu() {
   const prefs = readDesktopPrefs();
+  const enabled = prefs.stickyEnabled !== false;
   return Menu.buildFromTemplate([
     { label: "Open Lumina Notes", click: () => void showMainWindow() },
     { type: "separator" },
     {
-      label: "Sticky notes",
+      label: enabled ? "Sticky notes" : "Sticky notes (strips are off)",
+      enabled,
       submenu: STICKY_FILMS.map((f) => ({
         label: `${f.label} note`,
         click: () => void openStickyFilm(f.id),
@@ -705,13 +707,24 @@ function createTray() {
   tray = new Tray(base.resize({ width: size, height: size, quality: "best" }));
   tray.setToolTip("Lumina Notes — sticky notes");
   tray.setContextMenu(buildTrayMenu());
-  // Left-click: bring the strips forward (or switch them on); menu if already showing.
+  // Left-click: strips on → bring them back (spawn if gone), menu if already showing.
+  // Strips off → stay inactive and just open Lumina (re-enable via the menu checkbox).
   tray.on("click", () => {
+    if (!readDesktopPrefs().stickyEnabled) {
+      void showMainWindow();
+      return;
+    }
     if (stickyWindow && !stickyWindow.isDestroyed() && stickyWindow.isVisible()) {
       tray.popUpContextMenu();
       return;
     }
-    void setStickyEnabled(true);
+    void createStickyWindow().then(() => {
+      if (stickyWindow && !stickyWindow.isDestroyed()) {
+        stickyWindow.show();
+        applyStickyAlwaysOnTop(stickyWindow);
+        stickyWindow.moveTop();
+      }
+    });
   });
 }
 
@@ -779,6 +792,41 @@ ipcMain.handle("lumina:download-update", async (_event, payload) => {
     }
   })();
   return updateDownload;
+});
+
+/**
+ * Install a downloaded update (user already confirmed in Profile).
+ * Windows portable / Linux AppImage: quit first (frees the API port), then a
+ * detached helper starts the new build. macOS: open the .dmg for the usual drag-install.
+ */
+ipcMain.handle("lumina:install-update", async (_event, filePath) => {
+  const dir = path.join(app.getPath("downloads"), "Lumina Notes updates");
+  const p = path.resolve(String(filePath || ""));
+  if (!p.startsWith(dir + path.sep) || !fs.existsSync(p)) {
+    return { ok: false, error: "Update file not found" };
+  }
+  try {
+    if (process.platform === "darwin") {
+      const err = await shell.openPath(p);
+      return err ? { ok: false, error: err } : { ok: true, quitting: false };
+    }
+    if (process.platform === "win32") {
+      // /s + verbatim args: cmd strips only the outer quotes, so paths with spaces survive.
+      spawn("cmd.exe", ["/d", "/s", "/c", `"timeout /t 2 /nobreak >nul & start "" "${p}""`], {
+        detached: true,
+        stdio: "ignore",
+        windowsHide: true,
+        windowsVerbatimArguments: true,
+      }).unref();
+    } else {
+      fs.chmodSync(p, 0o755);
+      spawn("sh", ["-c", 'sleep 2; exec "$0"', p], { detached: true, stdio: "ignore" }).unref();
+    }
+    setTimeout(() => app.quit(), 300);
+    return { ok: true, quitting: true };
+  } catch (err) {
+    return { ok: false, error: err instanceof Error ? err.message : String(err) };
+  }
 });
 
 /** Reveal a downloaded update in the file manager (only inside our updates folder). */

@@ -7,6 +7,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [1.3.0] - 2026-11-17
+
+### Added
+
+- Version shown in Profile (desktop/web) and in Settings, the book tree and the sign-in screen (Flutter) — ADR 0003
+- Update check against GitHub Releases with notices; in-app download (desktop installer / Android APK) and **Install now**; opt-in automatic download — ADR 0003
+- Reading & writing settings: font style, size and colour, with a contrast guard; print/PDF follow the reader — ADR 0004
+- Move pages between chapters and chapters between books: drag-and-drop and **Move to…** on desktop and mobile (`POST /api/pages/{id}/move`, `POST /api/sections/{id}/move`) — ADR 0005
+- stick'n on/off switch; system tray icon with per-colour notes — ADR 0005 / 0007
+- Flutter phone/tablet redesign: Library, chapter tabs, book tree, two-pane tablet — ADR 0006
+- stick'n notes pull out of the strip and tuck back on close, colour header with × / Esc, formatting bar, clearer placeholder — ADR 0007
+
+### Fixed
+
+- Markdown preview spacing and margins (styles relied on a Tailwind plugin that was not installed); fenced code blocks keep their line breaks
+
 ## [1.1.0] - 2026-11-16
 
 ### Added

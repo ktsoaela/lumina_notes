@@ -7,10 +7,11 @@ import 'package:http/testing.dart';
 import 'package:lumina_notes/version.dart';
 
 void main() {
-  test('appVersion matches pubspec.yaml', () {
+  test('appVersion + appBuild match pubspec.yaml', () {
     final pubspec = File('pubspec.yaml').readAsStringSync();
-    final v = RegExp(r'^version:\s*([0-9.]+)', multiLine: true).firstMatch(pubspec)!.group(1);
-    expect(appVersion, v);
+    final m = RegExp(r'^version:\s*([0-9.]+)\+(\d+)', multiLine: true).firstMatch(pubspec)!;
+    expect(appVersion, m.group(1));
+    expect(appBuild, int.parse(m.group(2)!));
   });
 
   test('compareVersions orders numerically', () {

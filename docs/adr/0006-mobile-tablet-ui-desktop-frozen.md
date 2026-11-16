@@ -1,6 +1,6 @@
 # ADR 0006: Flutter phone/tablet UI polish; desktop layout frozen
 
-- **Status:** Proposed
+- **Status:** Accepted (implemented in v1.3.0)
 - **Date:** 2026-11-16
 - **Deciders:** Lumina Notes maintainers
 
@@ -39,3 +39,14 @@ We will use **Option A**:
 
 - Desktop and mobile will diverge visually until a later ADR optionally aligns them
 - Feature guides should screenshot Flutter separately from desktop
+
+## Implementation (v1.3.0)
+
+- Desktop React/Electron layout untouched; all changes are under `mobile/lib/ui/`.
+- **Library** (home): bookshelf chips + book cards with coloured spines (`library_screen.dart`).
+- **Book**: chapters as colour-coded tabs, numbered page list styled like the desktop sidebar, Book · chapter · page tree drawer (`book_screen.dart`).
+- **Tablet (≥ 840 dp)**: page list beside the editor; **phone**: single pane, editor pushed on the back stack.
+- **Brand tokens**: sage / paper / stone palette from `src/index.css` in `lumina_theme.dart`; reader typography per ADR 0004.
+- Pairing, sync chip and offline behaviour unchanged (ADR 0001 / 0002); sign-out and re-auth flows kept.
+- Covered by `test/adaptive_test.dart`, `test/browse_test.dart`, `test/workspace_test.dart`.
+- Feature guide updated: `docs/features/flutter-mobile.md`.
