@@ -35,6 +35,10 @@ class SyncEngine extends ChangeNotifier {
 
   Future<void>? _running;
   bool _again = false;
+
+  /// Ops the server refused for a reason other than "gone" (e.g. validation).
+  /// They stay queued and the local data is kept; the user sees the error.
+  final List<String> _problems = [];
   int _failures = 0;
   Timer? _retryTimer;
   bool _disposed = false;
@@ -67,11 +71,18 @@ class SyncEngine extends ChangeNotifier {
     _retryTimer?.cancel();
     _set(SyncState.syncing);
     try {
+      _problems.clear();
       await _push();
       await _pull();
       _failures = 0;
       lastSyncedAt = DateTime.now();
       pending = await repo.pendingCount();
+      if (_problems.isNotEmpty) {
+        // Not retried automatically: it would fail the same way. The next
+        // edit (or a manual retry) syncs again.
+        _set(SyncState.error, error: _problems.first);
+        return;
+      }
       _set(SyncState.idle);
     } on ApiException catch (e) {
       if (e.isAuthError) {
@@ -97,9 +108,14 @@ class SyncEngine extends ChangeNotifier {
   }
 
   Future<void> _push() async {
+    final attempted = <int>{};
     while (true) {
-      final batch = await repo.pendingOps(limit: batchSize);
+      final batch = (await repo.pendingOps(limit: batchSize + attempted.length))
+          .where((e) => !attempted.contains(e.seq))
+          .take(batchSize)
+          .toList();
       if (batch.isEmpty) return;
+      attempted.addAll(batch.map((e) => e.seq));
       final ops = <PushOp>[];
       for (final e in batch) {
         final kind = entityKindFromWire(e.entity);
@@ -125,8 +141,16 @@ class SyncEngine extends ChangeNotifier {
     }
   }
 
+  /// Server details that mean "this row no longer exists for you".
+  static const _goneDetails = {'Not found', 'Parent not found'};
+
   Future<void> _settle(OutboxEntry e, PushResult r) async {
     final kind = entityKindFromWire(e.entity);
+    if (r.status == 'rejected' && r.current == null && !_goneDetails.contains(r.detail)) {
+      // Refused (e.g. too long): never delete the user's data. Keep the op.
+      _problems.add("Couldn't sync \"${_labelOf(e)}\": ${r.detail ?? 'rejected by server'}");
+      return;
+    }
     // If the user edited the row again while this push was in flight, the
     // outbox entry changed: keep it so the newer edit is pushed next.
     await repo.removeOpIfUnchanged(e);
@@ -144,6 +168,15 @@ class SyncEngine extends ChangeNotifier {
         } else {
           await _applyCurrent(kind, cur);
         }
+    }
+  }
+
+  static String _labelOf(OutboxEntry e) {
+    try {
+      final p = jsonDecode(e.payload) as Map<String, dynamic>;
+      return (p['title'] ?? p['name'] ?? e.entityId).toString();
+    } catch (_) {
+      return e.entityId;
     }
   }
 

@@ -164,4 +164,18 @@ void main() {
     expect(server.pagesById['page-1']!.content, 'second');
     expect((await local.page('page-1'))!.content, 'second');
   });
+
+  test('validation rejection keeps the local note and reports an error', () async {
+    server.seed();
+    await engine.syncNow();
+    final p = await local.createPage('sec-1', 'Huge');
+    server.invalidIds.add(p.id);
+
+    await engine.syncNow();
+
+    expect(await local.page(p.id), isNotNull); // never delete the user's note
+    expect(engine.state, SyncState.error);
+    expect(engine.lastError, contains('Huge'));
+    expect(await local.hasPending(EntityKind.page, p.id), isTrue);
+  });
 }

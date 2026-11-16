@@ -118,6 +118,9 @@ class FakeApiClient extends ApiClient {
   final List<(EntityKind, String, DateTime)> tombstoneLog = [];
   int pushCalls = 0;
 
+  /// Ids the server refuses with a validation error (e.g. content too long).
+  final Set<String> invalidIds = {};
+
   /// Runs at the start of push() (simulates the user typing while a push is in flight).
   Future<void> Function()? beforePush;
 
@@ -203,6 +206,10 @@ class FakeApiClient extends ApiClient {
         continue;
       }
       final d = op.data ?? const {};
+      if (invalidIds.contains(op.id)) {
+        out.add(PushResult(opId: op.opId, status: 'rejected', detail: 'String should have at most 2000000 characters'));
+        continue;
+      }
       if (!_parentExists(op.entity, d)) {
         out.add(PushResult(opId: op.opId, status: 'rejected', detail: 'Parent not found', current: current()));
         continue;
