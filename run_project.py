@@ -44,7 +44,7 @@ def _uvicorn_command(*, reload: bool) -> list[str]:
         "uvicorn",
         "app:app",
         "--host",
-        "127.0.0.1",
+        os.environ.get("LUMINA_HOST", "127.0.0.1"),
         "--port",
         str(API_PORT),
     ]

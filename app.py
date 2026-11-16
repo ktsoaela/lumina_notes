@@ -22,6 +22,7 @@ from pydantic import BaseModel, Field, field_validator, model_validator
 import db as database
 from db import Connection, IntegrityError, OperationalError, SQLITE_PATH, USE_POSTGRES
 from export_document import render_pdf_bytes
+import pairing
 import sync_api
 
 
@@ -403,6 +404,7 @@ def init_db() -> None:
     try:
         database.init_schema(conn)
         _migrate_bookshelves(conn)
+        pairing.migrate(conn)
         conn.execute(
             "INSERT OR REPLACE INTO schema_meta (key, value) VALUES (?, ?)",
             ("version", SCHEMA_VERSION),
@@ -987,6 +989,54 @@ def auth_me(user: CurrentUser, db: Db):
     if row is None:
         return user
     return _row_to_user(row)
+
+
+class PairStartBody(BaseModel):
+    serverUrl: str | None = Field(None, max_length=512)
+
+
+class PairCompleteBody(BaseModel):
+    code: str = Field(..., min_length=1, max_length=32)
+    deviceName: str | None = Field(None, max_length=64)
+
+
+@app.post("/api/pair/start")
+def pair_start(request: Request, user: CurrentUser, db: Db, body: PairStartBody | None = None):
+    """Short-lived single-use code + `lumina://pair` link for connecting a phone."""
+    try:
+        base, lan = pairing.resolve_base_url(
+            body.serverUrl if body else None,
+            str(request.base_url),
+            os.environ.get("PORT", "58888"),
+        )
+    except ValueError:
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, detail="Invalid server URL")
+    code, expires_at = pairing.start(db, user["id"])
+    return {
+        "code": code,
+        "expiresAt": expires_at,
+        "serverUrl": base,
+        "deepLink": pairing.build_deep_link(base, code),
+        "lan": lan,
+    }
+
+
+@app.post("/api/pair/complete")
+def pair_complete(request: Request, body: PairCompleteBody, db: Db):
+    """Exchange a pairing code for a session (same shape as login)."""
+    _rate_limit_auth(request)
+    user_id = pairing.redeem(db, body.code, body.deviceName)
+    row = (
+        db.execute("SELECT * FROM users WHERE id = ?", (user_id,)).fetchone()
+        if user_id is not None
+        else None
+    )
+    if row is None:
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, detail=pairing.INVALID_CODE)
+    return {
+        "token": create_token(int(row["id"]), row["email"], row["name"]),
+        "user": _row_to_user(row),
+    }
 
 
 @app.put("/api/auth/password")
