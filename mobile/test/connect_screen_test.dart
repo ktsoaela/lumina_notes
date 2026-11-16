@@ -11,7 +11,8 @@ Future<(AppServices, MemoryKeyValueStore)> _pumpApp(WidgetTester tester, FakeApi
   final kv = MemoryKeyValueStore();
   final session = SessionStore(kv);
   await session.load();
-  final services = AppServices(session: session, apiFactory: (url, token) => fake..token = token);
+  final services = AppServices(
+      session: session, apiFactory: (url, token) => fake..token = token, local: memoryLocal());
   await tester.pumpWidget(LuminaApp(services: services));
   await tester.pumpAndSettle();
   return (services, kv);

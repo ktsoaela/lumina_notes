@@ -3,38 +3,58 @@ import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:lumina_notes/app_scope.dart';
+import 'package:lumina_notes/data/local_repository.dart';
+import 'package:lumina_notes/data/models.dart';
 import 'package:lumina_notes/data/session_store.dart';
 import 'package:lumina_notes/main.dart';
 
 import 'fakes.dart';
 
-Future<FakeApiClient> _pumpSignedIn(WidgetTester tester) async {
-  final fake = FakeApiClient()..seed();
+/// Signed-in app backed by an in-memory local DB that already holds one
+/// synced shelf → notebook → section → page.
+Future<LocalRepository> _pumpSignedIn(WidgetTester tester) async {
+  final local = memoryLocal();
+  await tester.runAsync(() async {
+    await ensureOwner(local, 'http://fake', 1);
+    await local.applyRemote(
+      bookshelves: [const Bookshelf(id: 'bs-1', name: 'My bookshelf')],
+      notebooks: [const Notebook(id: 'nb-1', name: 'Welcome', bookshelfId: 'bs-1')],
+      sections: [const Section(id: 'sec-1', notebookId: 'nb-1', name: 'Notes')],
+      pages: [const NotePage(id: 'page-1', sectionId: 'sec-1', title: 'Getting started', content: '# Hello')],
+    );
+  });
   final kv = MemoryKeyValueStore()
     ..values['lumina.serverUrl'] = 'http://fake'
     ..values['lumina.token'] = 'tok'
     ..values['lumina.user'] = jsonEncode({'id': 1, 'email': 'a@b.co', 'name': 'A'});
   final session = SessionStore(kv);
   await session.load();
-  final services = AppServices(session: session, apiFactory: (url, token) => fake..token = token);
+  final services = AppServices(session: session, apiFactory: (_, _) => FakeApiClient(), local: local);
   await tester.pumpWidget(LuminaApp(services: services));
-  await tester.pumpAndSettle();
-  return fake;
+  await _settle(tester);
+  return local;
 }
 
-Future<void> _openNotebook(WidgetTester tester) async {
-  await tester.tap(find.text('My bookshelf'));
-  await tester.pumpAndSettle();
+/// Drift does real async I/O; let it run, then settle the frame.
+Future<void> _settle(WidgetTester tester) async {
+  for (var i = 0; i < 3; i++) {
+    await tester.runAsync(() => Future<void>.delayed(const Duration(milliseconds: 20)));
+    await tester.pumpAndSettle();
+  }
 }
+
+Future<void> _tap(WidgetTester tester, Finder f) async {
+  await tester.tap(f);
+  await _settle(tester);
+}
+
+Future<void> _openNotebook(WidgetTester tester) => _tap(tester, find.text('My bookshelf'));
 
 Future<void> _openEditor(WidgetTester tester) async {
   await _openNotebook(tester);
-  await tester.tap(find.text('Welcome'));
-  await tester.pumpAndSettle();
-  await tester.tap(find.text('Notes'));
-  await tester.pumpAndSettle();
-  await tester.tap(find.text('Getting started'));
-  await tester.pumpAndSettle();
+  await _tap(tester, find.text('Welcome'));
+  await _tap(tester, find.text('Notes'));
+  await _tap(tester, find.text('Getting started'));
 }
 
 void main() {
@@ -47,57 +67,62 @@ void main() {
     expect(title.controller!.text, 'Getting started');
   });
 
-  testWidgets('typing in editor saves after debounce', (tester) async {
-    final fake = await _pumpSignedIn(tester);
+  testWidgets('typing in editor saves locally after debounce and queues a push', (tester) async {
+    final local = await _pumpSignedIn(tester);
     await _openEditor(tester);
     await tester.enterText(find.byKey(const Key('pageContent')), 'New text');
     await tester.pump(const Duration(milliseconds: 300));
-    expect(fake.pagesById['page-1']!.content, '# Hello'); // not yet
+    expect(await tester.runAsync(() => local.page('page-1')).then((p) => p!.content), '# Hello');
     await tester.pump(const Duration(milliseconds: 900));
-    await tester.pumpAndSettle();
-    expect(fake.pagesById['page-1']!.content, 'New text');
+    await _settle(tester);
+    expect(await tester.runAsync(() => local.page('page-1')).then((p) => p!.content), 'New text');
+    expect(await tester.runAsync(() => local.hasPending(EntityKind.page, 'page-1')), isTrue);
     expect(find.text('Saved'), findsOneWidget);
   });
 
   testWidgets('create notebook via FAB appears in list', (tester) async {
-    final fake = await _pumpSignedIn(tester);
+    final local = await _pumpSignedIn(tester);
     await _openNotebook(tester);
-    await tester.tap(find.byKey(const Key('fab')));
-    await tester.pumpAndSettle();
+    await _tap(tester, find.byKey(const Key('fab')));
     await tester.enterText(find.byKey(const Key('nameField')), 'Ideas');
-    await tester.tap(find.text('Create'));
-    await tester.pumpAndSettle();
+    await _tap(tester, find.text('Create'));
     expect(find.text('Ideas'), findsOneWidget);
-    expect(fake.notebooksById.values.map((n) => n.name), contains('Ideas'));
+    final names = await tester.runAsync(() => local.notebooks('bs-1'));
+    expect(names!.map((n) => n.name), contains('Ideas'));
   });
 
   testWidgets('delete asks for confirmation', (tester) async {
-    final fake = await _pumpSignedIn(tester);
+    final local = await _pumpSignedIn(tester);
     await _openNotebook(tester);
 
     await tester.longPress(find.text('Welcome'));
-    await tester.pumpAndSettle();
-    await tester.tap(find.text('Delete'));
-    await tester.pumpAndSettle();
+    await _settle(tester);
+    await _tap(tester, find.text('Delete'));
     expect(find.text('Delete "Welcome"?'), findsOneWidget);
-    await tester.tap(find.text('Cancel'));
-    await tester.pumpAndSettle();
-    expect(fake.notebooksById, contains('nb-1'));
+    await _tap(tester, find.text('Cancel'));
+    expect(find.text('Welcome'), findsOneWidget);
 
     await tester.longPress(find.text('Welcome'));
-    await tester.pumpAndSettle();
-    await tester.tap(find.text('Delete'));
-    await tester.pumpAndSettle();
-    await tester.tap(find.widgetWithText(FilledButton, 'Delete'));
-    await tester.pumpAndSettle();
-    expect(fake.notebooksById, isNot(contains('nb-1')));
+    await _settle(tester);
+    await _tap(tester, find.text('Delete'));
+    await _tap(tester, find.widgetWithText(FilledButton, 'Delete'));
     expect(find.text('Welcome'), findsNothing);
+    expect(await tester.runAsync(() => local.notebooks('bs-1')), isEmpty);
   });
 
   testWidgets('sign out returns to connect screen', (tester) async {
     await _pumpSignedIn(tester);
-    await tester.tap(find.byTooltip('Sign out'));
-    await tester.pumpAndSettle();
+    await _tap(tester, find.byTooltip('Sign out'));
     expect(find.byKey(const Key('serverUrl')), findsOneWidget);
+  });
+
+  testWidgets('sign out with unsynced changes asks first', (tester) async {
+    final local = await _pumpSignedIn(tester);
+    await tester.runAsync(() => local.createBookshelf('Offline'));
+    await _settle(tester);
+    await _tap(tester, find.byTooltip('Sign out'));
+    expect(find.text('1 unsynced change will be lost'), findsOneWidget);
+    await _tap(tester, find.text('Cancel'));
+    expect(find.byKey(const Key('serverUrl')), findsNothing);
   });
 }

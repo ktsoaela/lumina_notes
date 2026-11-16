@@ -1,4 +1,8 @@
+import 'package:drift/drift.dart' show driftRuntimeOptions;
+import 'package:drift/native.dart';
 import 'package:lumina_notes/data/api_client.dart';
+import 'package:lumina_notes/data/local_db.dart';
+import 'package:lumina_notes/data/local_repository.dart';
 import 'package:lumina_notes/data/models.dart';
 
 /// In-memory stand-in for the FastAPI server.
@@ -100,4 +104,10 @@ class FakeApiClient extends ApiClient {
         pagesById.remove(id);
     }
   }
+}
+
+/// Fresh in-memory local store for widget tests.
+LocalRepository memoryLocal() {
+  driftRuntimeOptions.dontWarnAboutMultipleDatabases = true;
+  return LocalRepository(LocalDb.forTesting(NativeDatabase.memory()));
 }

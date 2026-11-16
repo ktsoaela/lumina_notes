@@ -357,3 +357,12 @@ class LocalRepository implements NotesRepository {
   static PageRow _pageRow(NotePage p) => PageRow(
       id: p.id, sectionId: p.sectionId, title: p.title, content: p.content, updatedAt: p.updatedAt);
 }
+
+/// The local DB belongs to one (server, user). Signing in as someone else, or
+/// against another server, wipes it first so data never mixes.
+Future<void> ensureOwner(LocalRepository repo, String serverUrl, int userId) async {
+  final owner = '$serverUrl|$userId';
+  if (await repo.meta('owner') == owner) return;
+  await repo.wipe();
+  await repo.setMeta('owner', owner);
+}

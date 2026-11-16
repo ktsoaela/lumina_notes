@@ -80,25 +80,50 @@ class _ConnectScreenState extends State<ConnectScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
     return Scaffold(
-      appBar: AppBar(title: const Text('Lumina Notes')),
-      body: Center(
-        child: ConstrainedBox(
-          constraints: const BoxConstraints(maxWidth: 480),
-          child: ListView(
-            padding: const EdgeInsets.all(16),
-            children: [
-              TextField(
-                key: const Key('serverUrl'),
-                controller: _url,
-                keyboardType: TextInputType.url,
-                autocorrect: false,
-                decoration: const InputDecoration(
-                  labelText: 'Server URL',
-                  hintText: 'http://192.168.1.10:58888',
-                  helperText: 'The same Lumina API your desktop app uses',
+      body: SafeArea(
+        child: Center(
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 480),
+            child: ListView(
+              padding: const EdgeInsets.all(16),
+              children: [
+                const SizedBox(height: 24),
+                Image.asset(
+                  'assets/logo.png',
+                  height: 96,
+                  filterQuality: FilterQuality.high,
+                  semanticLabel: 'Lumina Notes',
                 ),
-              ),
+                const SizedBox(height: 12),
+                Text(
+                  'Lumina Notes',
+                  textAlign: TextAlign.center,
+                  style: Theme.of(context).textTheme.headlineSmall?.copyWith(
+                        fontWeight: FontWeight.w600,
+                      ),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  'Same account. Same server. Phone and desktop.',
+                  textAlign: TextAlign.center,
+                  style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                        color: scheme.onSurfaceVariant,
+                      ),
+                ),
+                const SizedBox(height: 28),
+                TextField(
+                  key: const Key('serverUrl'),
+                  controller: _url,
+                  keyboardType: TextInputType.url,
+                  autocorrect: false,
+                  decoration: const InputDecoration(
+                    labelText: 'Server URL',
+                    hintText: 'http://192.168.0.225:58888',
+                    helperText: 'The same Lumina API your desktop app uses',
+                  ),
+                ),
               Align(
                 alignment: Alignment.centerRight,
                 child: TextButton(
@@ -166,7 +191,8 @@ class _ConnectScreenState extends State<ConnectScreen> {
                     ? const SizedBox.square(dimension: 18, child: CircularProgressIndicator(strokeWidth: 2))
                     : Text(_signup ? 'Create account' : 'Log in'),
               ),
-            ],
+              ],
+            ),
           ),
         ),
       ),

@@ -126,7 +126,16 @@ class HierarchyListScreen<T> extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: Text(title), actions: actions),
+      appBar: AppBar(
+        title: Row(
+          children: [
+            Image.asset('assets/logo_mark.png', height: 28, semanticLabel: 'Lumina Notes'),
+            const SizedBox(width: 10),
+            Flexible(child: Text(title, overflow: TextOverflow.ellipsis)),
+          ],
+        ),
+        actions: actions,
+      ),
       body: RepoList<T>(
         load: load,
         item: (item) => ListTile(
