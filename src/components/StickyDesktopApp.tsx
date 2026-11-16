@@ -10,8 +10,22 @@ import {
 } from '../lib/stickyStrips';
 import { coerceEntityTitle } from '../lib/validation';
 import { applyTheme, getStoredTheme } from '../lib/theme';
+import { applyA11y, getStoredA11y } from '../lib/a11y';
 import { cn } from '../lib/utils';
 import Preview from './Preview';
+import {
+  Bold,
+  CheckSquare,
+  ExternalLink,
+  Eye,
+  Italic,
+  List,
+  Pencil,
+  RotateCw,
+  Strikethrough,
+  Workflow,
+  X,
+} from 'lucide-react';
 
 const NEON_KEY = 'lumina_sticky_neon';
 const PAGE_PREFIX = 'lumina_sticky_page_';
@@ -27,6 +41,26 @@ const NEONS: { id: NeonId; label: string; color: string }[] = [
   { id: 'green', label: 'Green', color: 'rgba(50, 205, 50, 0.88)' },
   { id: 'blue', label: 'Blue', color: 'rgba(0, 191, 255, 0.88)' },
 ];
+
+/** How long the note takes to tuck back into the strip (matches CSS). */
+const TUCK_MS = 220;
+
+function prefersReducedMotion(): boolean {
+  try {
+    if (document.documentElement.classList.contains('reduce-motion')) return true;
+    return window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  } catch {
+    return false;
+  }
+}
+
+const PLACEHOLDER = `Take a note…
+
+Markdown works here:
+# Heading
+- a list item
+- [ ] a to-do
+**bold**  _italic_`;
 
 const MERMAID_SNIPPET = `\`\`\`mermaid
 flowchart LR
@@ -107,6 +141,9 @@ export default function StickyDesktopApp() {
   const [targetTick, setTargetTick] = useState(0);
   const [reloadTick, setReloadTick] = useState(0);
   const [tab, setTab] = useState<EditorTab>('write');
+  /** Note is tucking back into its strip (close animation running). */
+  const [closing, setClosing] = useState(false);
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
   const [edge, setEdge] = useState<StickyEdge>(() => readStickyEdge());
   const lastLoadedRef = useRef('');
   const draftRef = useRef('');
@@ -143,6 +180,7 @@ export default function StickyDesktopApp() {
   useEffect(() => {
     document.title = '\u200b';
     applyTheme(getStoredTheme());
+    applyA11y(getStoredA11y()); // honour Profile → Accessibility → Reduce motion
     document.documentElement.classList.add('sticky-strip-mode');
     document.body.style.background = 'transparent';
     document.body.style.margin = '0';
@@ -464,25 +502,97 @@ export default function StickyDesktopApp() {
     return () => window.clearTimeout(t);
   }, [draft, writingId, loadingPage, persistDraft]);
 
-  const pickFilm = (id: NeonId) => {
-    setNeonId(id);
-    setDraft('');
-    lastLoadedRef.current = '';
-    pageMetaRef.current = null;
-    setSaveState('idle');
-    setWritingId(id);
-    setHoveredId(null);
-    setTab('write');
-  };
+  const pickFilm = useCallback(
+    (id: NeonId) => {
+      void (async () => {
+        // Switching colour from inside a note: save the current one first.
+        if (writingId && draftRef.current !== lastLoadedRef.current) await persistDraft();
+        setNeonId(id);
+        setDraft('');
+        lastLoadedRef.current = '';
+        pageMetaRef.current = null;
+        setSaveState('idle');
+        setClosing(false);
+        setWritingId(id);
+        setHoveredId(null);
+        setTab('write');
+      })();
+    },
+    [writingId, persistDraft]
+  );
 
-  const backToPack = () => {
-    void (async () => {
-      if (dirty) await persistDraft();
+  /** Save, tuck the note back into its strip, then shrink the window. */
+  const closeNote = useCallback(() => {
+    if (!writingId || closing) return;
+    setClosing(true);
+    const saved =
+      draftRef.current !== lastLoadedRef.current ? persistDraft() : Promise.resolve(true);
+    const tucked = new Promise((r) =>
+      window.setTimeout(r, prefersReducedMotion() ? 0 : TUCK_MS)
+    );
+    void Promise.all([saved, tucked]).then(() => {
       setWritingId(null);
+      setClosing(false);
       setTab('write');
       setError(null);
       setSaveState('idle');
-    })();
+    });
+  }, [writingId, closing, persistDraft]);
+
+  // Esc closes the note (like Sticky Notes).
+  useEffect(() => {
+    if (!writingId) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        e.preventDefault();
+        closeNote();
+      }
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [writingId, closeNote]);
+
+  // Tray → “Sticky notes › Pink note” opens that colour directly.
+  useEffect(() => {
+    return window.luminaDesktop?.onStickyOpenFilm?.((id) => {
+      if (NEONS.some((n) => n.id === id)) pickFilm(id as NeonId);
+    });
+  }, [pickFilm]);
+
+  /** Wrap the selection (or a placeholder word) in Markdown markers. */
+  const wrapSelection = (before: string, after = before, fallback = 'text') => {
+    const el = textareaRef.current;
+    if (!el) return;
+    const { selectionStart: a, selectionEnd: b, value } = el;
+    const picked = value.slice(a, b) || fallback;
+    const next = value.slice(0, a) + before + picked + after + value.slice(b);
+    setDraft(next);
+    setTab('write');
+    requestAnimationFrame(() => {
+      el.focus();
+      el.setSelectionRange(a + before.length, a + before.length + picked.length);
+    });
+  };
+
+  /** Prefix the current line(s) — lists and to-dos. */
+  const prefixLines = (prefix: string) => {
+    const el = textareaRef.current;
+    if (!el) return;
+    const { selectionStart: a, selectionEnd: b, value } = el;
+    const lineStart = value.lastIndexOf('\n', a - 1) + 1;
+    const block = value.slice(lineStart, b);
+    const replaced = block
+      .split('\n')
+      .map((l) => (l.startsWith(prefix) ? l : prefix + l))
+      .join('\n');
+    const next = value.slice(0, lineStart) + replaced + value.slice(b);
+    setDraft(next);
+    setTab('write');
+    requestAnimationFrame(() => {
+      el.focus();
+      const end = lineStart + replaced.length;
+      el.setSelectionRange(end, end);
+    });
   };
 
   const insertMermaid = () => {
@@ -563,145 +673,149 @@ export default function StickyDesktopApp() {
           ) : null}
         </div>
       ) : (
-        <div className="studio-shell film-writer-shell">
-          <div className="film-writer-drag app-region-drag" title="Drag" />
-          <div className="acoustic-pillar film-writer app-region-no-drag">
-            <div className="film-writer-top">
-              <div className="film-writer-toolbar">
-                <button
-                  type="button"
-                  className="studio-btn"
-                  onClick={backToPack}
-                >
-                  ← Films
-                </button>
-                <span
-                  className="neon-swatch"
-                  style={{ backgroundColor: neon.color }}
-                  title={neon.label}
-                />
-                <span className="font-display text-sm font-medium tracking-tight text-[var(--app-fg)]">
-                  {neon.label}
-                </span>
-                <span
-                  className="text-[10px] text-[var(--app-muted)]"
-                  aria-live="polite"
-                >
-                  {loadingPage
-                    ? ''
-                    : saveState === 'saving' || saving
-                      ? 'Saving…'
-                      : saveState === 'dirty'
-                        ? 'Editing…'
-                        : saveState === 'saved'
-                          ? 'Saved'
-                          : ''}
-                </span>
-                <button
-                  type="button"
-                  className="studio-btn ml-auto"
-                  disabled={loadingPage || dirty || saving}
-                  title={
-                    dirty
-                      ? 'Wait for autosave before refresh'
-                      : 'Reload from app'
-                  }
-                  onClick={() => setReloadTick((n) => n + 1)}
-                >
-                  Refresh
-                </button>
-              </div>
-              <nav
-                className="film-writer-path text-[11px] tracking-[0.04em] text-[var(--app-muted)]"
-                aria-label="Target book"
-              >
-                <span className="font-medium text-[var(--spine)]">
-                  {activeBook?.title ?? 'No book selected'}
-                </span>
-                <span aria-hidden className="opacity-30">
-                  ·
-                </span>
-                <span>autosaves to the same page</span>
-              </nav>
-            </div>
-
+        <div
+          className={cn('film-note', closing ? 'is-tucking' : 'is-pulling')}
+          style={{ ['--film-color' as string]: neon.color }}
+          role="dialog"
+          aria-label={`${neon.label} sticky note`}
+        >
+          <header className="film-note-head app-region-drag">
             <div
-              className="film-tabs"
-              role="tablist"
-              aria-label="Editor mode"
+              className="film-note-swatches app-region-no-drag"
+              role="radiogroup"
+              aria-label="Note colour"
             >
-              <button
-                type="button"
-                role="tab"
-                aria-selected={tab === 'write'}
-                className={cn('studio-btn', tab === 'write' && 'is-active-tab')}
-                onClick={() => setTab('write')}
-              >
-                Write
-              </button>
-              <button
-                type="button"
-                role="tab"
-                aria-selected={tab === 'preview'}
-                className={cn(
-                  'studio-btn',
-                  tab === 'preview' && 'is-active-tab'
-                )}
-                onClick={() => setTab('preview')}
-              >
-                Preview
-              </button>
-              <button
-                type="button"
-                className="studio-btn ml-auto"
-                onClick={insertMermaid}
-                title="Insert mermaid block"
-              >
-                + Mermaid
-              </button>
-            </div>
-
-            <div className="paper-page film-writer-paper">
-              {loadingPage ? (
-                <p className="px-6 py-8 text-center text-sm text-[var(--app-muted)]">
-                  Loading page…
-                </p>
-              ) : tab === 'write' ? (
-                <textarea
-                  className="strip-textarea"
-                  placeholder={
-                    'Continue this note — same page as the main app…\n\n# Heading\n- list\n\n```mermaid\nflowchart LR\n  A --> B\n```'
-                  }
-                  value={draft}
-                  autoFocus
-                  onChange={(e) => setDraft(e.target.value)}
-                  onBlur={() => {
-                    if (dirty) void persistDraft();
-                  }}
+              {NEONS.map((n) => (
+                <button
+                  key={n.id}
+                  type="button"
+                  role="radio"
+                  aria-checked={n.id === writingId}
+                  aria-label={`${n.label} note`}
+                  title={`${n.label} note`}
+                  className={cn('film-note-dot', n.id === writingId && 'is-current')}
+                  style={{ backgroundColor: n.color }}
+                  onClick={() => n.id !== writingId && pickFilm(n.id)}
                 />
-              ) : draft.trim() ? (
-                <Preview content={draft} className="strip-preview-inner" />
-              ) : (
-                <p className="px-6 py-8 text-center text-sm text-[var(--app-muted)]">
-                  Nothing to preview yet.
-                </p>
-              )}
+              ))}
             </div>
-
-            {error ? (
-              <p className="text-xs text-[var(--danger-fg)]">{error}</p>
-            ) : null}
-            <div className="strip-actions">
+            <span className="film-note-title">{neon.label}</span>
+            <div className="film-note-actions app-region-no-drag">
               <button
                 type="button"
-                className="studio-btn flex-1"
+                className="film-note-icon"
+                disabled={loadingPage || dirty || saving}
+                title={dirty ? 'Saving first…' : 'Reload from app'}
+                aria-label="Reload from app"
+                onClick={() => setReloadTick((n) => n + 1)}
+              >
+                <RotateCw className="h-3.5 w-3.5" />
+              </button>
+              <button
+                type="button"
+                className="film-note-icon"
                 disabled={saving || loadingPage || !activeBook}
+                title="Open in Lumina"
+                aria-label="Open in Lumina"
                 onClick={() => void openInApp()}
               >
-                Open in app
+                <ExternalLink className="h-3.5 w-3.5" />
+              </button>
+              <button
+                type="button"
+                className="film-note-icon film-note-close"
+                title="Close (Esc) — saves automatically"
+                aria-label="Close note"
+                onClick={closeNote}
+              >
+                <X className="h-4 w-4" />
               </button>
             </div>
+          </header>
+
+          <div className="film-note-mode" role="tablist" aria-label="Editor mode">
+            <button
+              type="button"
+              role="tab"
+              aria-selected={tab === 'write'}
+              className={cn('film-note-tab', tab === 'write' && 'is-active')}
+              onClick={() => setTab('write')}
+            >
+              <Pencil className="h-3 w-3" /> Write
+            </button>
+            <button
+              type="button"
+              role="tab"
+              aria-selected={tab === 'preview'}
+              className={cn('film-note-tab', tab === 'preview' && 'is-active')}
+              onClick={() => setTab('preview')}
+            >
+              <Eye className="h-3 w-3" /> Preview
+            </button>
+            <span className="film-note-status" aria-live="polite">
+              {loadingPage
+                ? 'Loading…'
+                : saveState === 'saving' || saving
+                  ? 'Saving…'
+                  : saveState === 'dirty'
+                    ? 'Editing…'
+                    : saveState === 'saved'
+                      ? 'Saved'
+                      : ''}
+            </span>
           </div>
+
+          <div className="film-note-body">
+            {loadingPage ? (
+              <p className="film-note-empty">Loading page…</p>
+            ) : tab === 'write' ? (
+              <textarea
+                ref={textareaRef}
+                className="strip-textarea"
+                placeholder={PLACEHOLDER}
+                aria-label={`${neon.label} note text`}
+                value={draft}
+                autoFocus
+                spellCheck
+                onChange={(e) => setDraft(e.target.value)}
+                onBlur={() => {
+                  if (dirty) void persistDraft();
+                }}
+              />
+            ) : draft.trim() ? (
+              <Preview content={draft} className="strip-preview-inner" />
+            ) : (
+              <p className="film-note-empty">Nothing to preview yet — switch to Write.</p>
+            )}
+          </div>
+
+          {error ? <p className="film-note-error">{error}</p> : null}
+
+          <footer className="film-note-foot">
+            <div className="film-note-format" role="toolbar" aria-label="Formatting">
+              <button type="button" className="film-note-icon" title="Bold" aria-label="Bold" onClick={() => wrapSelection('**')}>
+                <Bold className="h-3.5 w-3.5" />
+              </button>
+              <button type="button" className="film-note-icon" title="Italic" aria-label="Italic" onClick={() => wrapSelection('_')}>
+                <Italic className="h-3.5 w-3.5" />
+              </button>
+              <button type="button" className="film-note-icon" title="Strikethrough" aria-label="Strikethrough" onClick={() => wrapSelection('~~')}>
+                <Strikethrough className="h-3.5 w-3.5" />
+              </button>
+              <button type="button" className="film-note-icon" title="Bulleted list" aria-label="Bulleted list" onClick={() => prefixLines('- ')}>
+                <List className="h-3.5 w-3.5" />
+              </button>
+              <button type="button" className="film-note-icon" title="To-do" aria-label="To-do" onClick={() => prefixLines('- [ ] ')}>
+                <CheckSquare className="h-3.5 w-3.5" />
+              </button>
+              <button type="button" className="film-note-icon" title="Insert Mermaid diagram" aria-label="Insert Mermaid diagram" onClick={insertMermaid}>
+                <Workflow className="h-3.5 w-3.5" />
+              </button>
+            </div>
+            <span className="film-note-book" title="Saves to this book">
+              {activeBook?.title ?? 'No book selected'}
+            </span>
+          </footer>
         </div>
       )}
     </div>

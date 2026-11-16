@@ -1231,6 +1231,10 @@ html.sticky-strip-mode #root {
     box-shadow 0.2s ease;
 }
 
+.neon-film-stack:active {
+  filter: brightness(0.94);
+}
+
 .neon-film-stack.is-expanded,
 .neon-film-stack:hover,
 .neon-film-stack:focus-visible {
@@ -1345,95 +1349,273 @@ html.sticky-strip-mode #root {
   display: none;
 }
 
-/* Writer — same shell / paper / studio buttons as main Lumina notes UI */
+/* ---------- stick'n note: pulled out of its strip ---------- */
 .stickn-root.is-writing {
-  padding: 0;
+  padding: 6px;
   align-items: stretch;
   justify-content: stretch;
+  overflow: hidden;
 }
 
-.film-writer-shell {
+.film-note {
+  --film-color: var(--film-accent);
+  position: relative;
   width: 100%;
   height: 100%;
-  box-sizing: border-box;
   display: flex;
   flex-direction: column;
   overflow: hidden;
-  border-radius: var(--radius-ui);
-  border: 1px solid color-mix(in srgb, var(--app-border) 85%, transparent);
-  box-shadow: var(--shadow-micro);
+  border-radius: 12px;
+  background: color-mix(in srgb, var(--film-color) 9%, var(--paper));
+  border: 1px solid color-mix(in srgb, var(--film-color) 45%, var(--app-border));
+  box-shadow:
+    0 1px 2px rgba(0, 0, 0, 0.08),
+    0 14px 32px -14px rgba(0, 0, 0, 0.38);
+  will-change: transform, opacity;
 }
 
-.film-writer-drag {
-  height: 14px;
+/* Pull out of the strip: slides from the docked edge with a slight peel. */
+.film-note.is-pulling {
+  animation: film-pull-right 340ms cubic-bezier(0.22, 1.2, 0.36, 1) both;
+  transform-origin: right center;
+}
+.stickn-root[data-edge='left'] .film-note.is-pulling {
+  animation-name: film-pull-left;
+  transform-origin: left center;
+}
+.stickn-root[data-edge='top'] .film-note.is-pulling {
+  animation-name: film-pull-top;
+  transform-origin: center top;
+}
+.stickn-root[data-edge='bottom'] .film-note.is-pulling {
+  animation-name: film-pull-bottom;
+  transform-origin: center bottom;
+}
+
+/* Tuck back in on close (TUCK_MS in StickyDesktopApp matches 220ms). */
+.film-note.is-tucking {
+  animation: film-tuck-right 220ms cubic-bezier(0.55, 0, 0.75, 0.4) both;
+  transform-origin: right center;
+  pointer-events: none;
+}
+.stickn-root[data-edge='left'] .film-note.is-tucking {
+  animation-name: film-tuck-left;
+  transform-origin: left center;
+}
+.stickn-root[data-edge='top'] .film-note.is-tucking {
+  animation-name: film-tuck-top;
+  transform-origin: center top;
+}
+.stickn-root[data-edge='bottom'] .film-note.is-tucking {
+  animation-name: film-tuck-bottom;
+  transform-origin: center bottom;
+}
+
+@keyframes film-pull-right {
+  0% { transform: translateX(104%) rotate(2.5deg) scaleY(0.9); opacity: 0.35; }
+  65% { transform: translateX(-1.5%) rotate(-0.4deg) scaleY(1); opacity: 1; }
+  100% { transform: none; opacity: 1; }
+}
+@keyframes film-pull-left {
+  0% { transform: translateX(-104%) rotate(-2.5deg) scaleY(0.9); opacity: 0.35; }
+  65% { transform: translateX(1.5%) rotate(0.4deg) scaleY(1); opacity: 1; }
+  100% { transform: none; opacity: 1; }
+}
+@keyframes film-pull-top {
+  0% { transform: translateY(-104%) rotate(-1.5deg) scaleX(0.92); opacity: 0.35; }
+  65% { transform: translateY(1.5%) scaleX(1); opacity: 1; }
+  100% { transform: none; opacity: 1; }
+}
+@keyframes film-pull-bottom {
+  0% { transform: translateY(104%) rotate(1.5deg) scaleX(0.92); opacity: 0.35; }
+  65% { transform: translateY(-1.5%) scaleX(1); opacity: 1; }
+  100% { transform: none; opacity: 1; }
+}
+@keyframes film-tuck-right {
+  to { transform: translateX(104%) rotate(2deg) scaleY(0.9); opacity: 0; }
+}
+@keyframes film-tuck-left {
+  to { transform: translateX(-104%) rotate(-2deg) scaleY(0.9); opacity: 0; }
+}
+@keyframes film-tuck-top {
+  to { transform: translateY(-104%) scaleX(0.92); opacity: 0; }
+}
+@keyframes film-tuck-bottom {
+  to { transform: translateY(104%) scaleX(0.92); opacity: 0; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .film-note.is-pulling,
+  .film-note.is-tucking {
+    animation: none !important;
+  }
+}
+.reduce-motion .film-note.is-pulling,
+.reduce-motion .film-note.is-tucking {
+  animation: none !important;
+}
+
+/* Header in the strip's own colour — drag to move, dots switch notes, × closes. */
+.film-note-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  height: 40px;
   flex-shrink: 0;
+  padding: 0 6px 0 10px;
+  background: var(--film-color);
+  color: rgba(0, 0, 0, 0.74);
   cursor: grab;
-  background: color-mix(in srgb, var(--app-fg) 6%, transparent);
 }
 
-.film-writer {
-  position: relative;
+.film-note-swatches {
   display: flex;
-  flex-direction: column;
-  width: 100%;
-  height: 100%;
-  min-height: 0;
-  gap: 0.5rem;
-  padding: 0.75rem 0.85rem 0.85rem;
+  gap: 5px;
 }
 
-.film-writer-top {
-  display: flex;
-  flex-direction: column;
-  gap: 0.35rem;
-  position: relative;
-  z-index: 1;
-}
-
-.film-writer-toolbar {
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-}
-
-.film-writer-path {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  justify-content: center;
-  gap: 0.35rem;
-}
-
-.neon-swatch {
+.film-note-dot {
   width: 12px;
   height: 12px;
-  border-radius: 3px;
-  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--app-fg) 18%, transparent);
-  flex-shrink: 0;
+  padding: 0;
+  border-radius: 999px;
+  border: 1px solid rgba(0, 0, 0, 0.28);
+  cursor: pointer;
+  transition: transform 0.15s ease;
+}
+.film-note-dot:hover {
+  transform: scale(1.2);
+}
+.film-note-dot.is-current {
+  box-shadow:
+    0 0 0 2px rgba(255, 255, 255, 0.95),
+    0 0 0 3px rgba(0, 0, 0, 0.45);
 }
 
-.film-tabs {
+.film-note-title {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-family: var(--font-display);
+  font-size: 13px;
+  font-weight: 600;
+  letter-spacing: 0.01em;
+}
+
+.film-note-actions {
   display: flex;
-  flex-wrap: wrap;
-  gap: 0.35rem;
   align-items: center;
-  position: relative;
-  z-index: 1;
+  gap: 2px;
 }
 
-.film-tabs .studio-btn.is-active-tab {
-  background: var(--sage);
-  box-shadow: inset 0 -2px 0 var(--spine);
+.film-note-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  border: none;
+  border-radius: 8px;
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
+  transition: background-color 0.15s ease;
+}
+.film-note-icon:hover:not(:disabled) {
+  background: color-mix(in srgb, currentColor 12%, transparent);
+}
+.film-note-icon:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+.film-note-close:hover:not(:disabled) {
+  background: rgba(0, 0, 0, 0.16);
 }
 
-.film-writer-paper {
+.film-note-mode {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 8px 10px 6px;
+}
+
+.film-note-tab {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 3px 10px;
+  border: 1px solid transparent;
+  border-radius: 999px;
+  background: transparent;
+  font-size: 11px;
+  font-weight: 500;
+  color: var(--app-muted);
+  cursor: pointer;
+}
+.film-note-tab:hover {
+  color: var(--app-fg);
+}
+.film-note-tab.is-active {
+  background: var(--paper);
+  border-color: color-mix(in srgb, var(--film-color) 55%, var(--app-border));
+  color: var(--app-fg);
+}
+
+.film-note-status {
+  margin-left: auto;
+  font-size: 10px;
+  color: var(--app-muted);
+}
+
+.film-note-body {
   flex: 1;
   min-height: 0;
   display: flex;
   flex-direction: column;
+  margin: 0 8px;
   overflow: hidden;
-  position: relative;
-  z-index: 1;
+  border-radius: 8px;
+  background: var(--paper);
+  border: 1px solid color-mix(in srgb, var(--film-color) 25%, var(--app-border));
+}
+
+.film-note-empty {
+  margin: auto;
+  padding: 1.5rem;
+  text-align: center;
+  font-size: 12px;
+  color: var(--app-muted);
+}
+
+.film-note-error {
+  margin: 6px 10px 0;
+  font-size: 11px;
+  color: var(--danger-fg);
+}
+
+.film-note-foot {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px;
+  padding: 6px 8px 8px;
+  color: var(--app-muted);
+}
+
+.film-note-format {
+  display: flex;
+  gap: 1px;
+}
+
+.film-note-book {
+  max-width: 120px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 10px;
+  color: var(--spine);
 }
 
 .strip-textarea {
@@ -1443,21 +1625,29 @@ html.sticky-strip-mode #root {
   resize: none;
   border: none;
   outline: none;
-  background: var(--paper);
-  font-family: var(--font-serif);
-  font-size: 12px;
-  line-height: 1.55;
+  background: transparent;
+  font-family: var(--reader-font, var(--font-serif));
+  font-size: 13px;
+  line-height: 1.6;
   letter-spacing: 0.01em;
-  color: var(--app-fg);
+  color: var(--reader-color, var(--app-fg));
   caret-color: var(--app-fg);
-  -webkit-text-fill-color: var(--app-fg);
+  -webkit-text-fill-color: var(--reader-color, var(--app-fg));
   padding: 0.75rem 0.85rem;
 }
 
+/* A clear, readable hint — grey, not faint — so it reads as “write here”. */
 .strip-textarea::placeholder {
-  color: color-mix(in srgb, var(--app-muted) 45%, transparent);
-  font-style: italic;
-  font-size: 12px;
+  color: var(--app-muted);
+  -webkit-text-fill-color: var(--app-muted);
+  opacity: 0.85;
+  font-style: normal;
+  font-size: 12.5px;
+  line-height: 1.6;
+}
+
+.strip-textarea:focus::placeholder {
+  opacity: 0.65;
 }
 
 .strip-preview-inner {
@@ -1469,24 +1659,14 @@ html.sticky-strip-mode #root {
   line-height: 1.55;
 }
 
-.strip-preview-inner.prose {
-  font-size: 12px;
+/* Sticky widget: compact reader — everything scales from the 12px base. */
+.strip-preview-inner.md-reader {
+  --reader-size: 12px;
 }
 
-.strip-preview-inner.prose :where(p, li, h1, h2, h3, code, pre) {
-  font-size: inherit;
-}
-
-.strip-preview-inner.prose :where(h1) {
-  font-size: 1.15em;
-}
-
-.strip-preview-inner.prose :where(h2) {
-  font-size: 1.08em;
-}
-
-.strip-preview-inner.prose :where(h3) {
-  font-size: 1.02em;
+.strip-preview-inner .md-reader-body {
+  padding: 0;
+  max-width: none;
 }
 
 /* Mermaid diagrams in the sticky widget */
@@ -1513,4 +1693,193 @@ html.sticky-strip-mode #root {
 
 .strip-actions .studio-btn-primary {
   flex: 1;
+}
+
+/* ------------------------------------------------------------------
+   Markdown reader — modelled on VS Code's built-in Markdown preview.
+   Font / size / colour come from Profile → Reading & writing.
+   ------------------------------------------------------------------ */
+:root {
+  --reader-font: var(--font-serif);
+  --reader-heading-font: var(--font-display);
+  --reader-size: 16px;
+  --reader-code-bg: color-mix(in srgb, var(--app-fg) 6%, transparent);
+  --reader-rule: color-mix(in srgb, var(--app-border) 85%, transparent);
+}
+
+.md-reader {
+  background: transparent;
+  color: var(--reader-color, var(--app-fg));
+  font-family: var(--reader-font);
+  font-size: var(--reader-size);
+  line-height: 1.6;
+  word-wrap: break-word;
+  overflow-wrap: break-word;
+}
+
+.md-reader-body {
+  max-width: 54rem;
+  margin: 0 auto;
+  padding: 1.5rem 1.75rem 4rem;
+}
+
+@media (min-width: 640px) {
+  .md-reader-body {
+    padding: 2rem 2.5rem 5rem;
+  }
+}
+
+.md-reader-body > :first-child {
+  margin-top: 0 !important;
+}
+
+.md-reader :where(p, ul, ol, dl, blockquote, pre, table, details, .md-table-wrap, .md-diagram) {
+  margin-top: 0;
+  margin-bottom: 1em;
+}
+
+.md-reader :where(h1, h2, h3, h4, h5, h6) {
+  font-family: var(--reader-heading-font);
+  font-weight: 600;
+  line-height: 1.25;
+  letter-spacing: -0.01em;
+  color: var(--reader-color, var(--app-fg));
+  margin-top: 1.5em;
+  margin-bottom: 0.65em;
+}
+
+.md-reader h1 {
+  font-size: 2em;
+  padding-bottom: 0.3em;
+  border-bottom: 1px solid var(--reader-rule);
+}
+
+.md-reader h2 {
+  font-size: 1.5em;
+  padding-bottom: 0.3em;
+  border-bottom: 1px solid var(--reader-rule);
+}
+
+.md-reader h3 { font-size: 1.25em; }
+.md-reader h4 { font-size: 1em; }
+.md-reader h5 { font-size: 0.875em; }
+.md-reader h6 { font-size: 0.85em; color: var(--app-muted); }
+
+.md-reader a {
+  color: var(--spine);
+  text-decoration: none;
+}
+
+.md-reader a:hover {
+  text-decoration: underline;
+  text-underline-offset: 0.18em;
+}
+
+.md-reader strong { font-weight: 600; }
+
+.md-reader :where(ul, ol) {
+  padding-left: 2em;
+}
+
+.md-reader ul { list-style: disc; }
+.md-reader ol { list-style: decimal; }
+.md-reader ul ul { list-style: circle; }
+.md-reader ul ul ul { list-style: square; }
+
+.md-reader li + li { margin-top: 0.25em; }
+
+.md-reader li > :where(ul, ol) {
+  margin-top: 0.25em;
+  margin-bottom: 0;
+}
+
+.md-reader li > p { margin-bottom: 0.5em; }
+
+/* GFM task lists */
+.md-reader li.task-list-item {
+  list-style: none;
+}
+
+.md-reader li.task-list-item input[type='checkbox'] {
+  margin: 0 0.45em 0.2em -1.4em;
+  vertical-align: middle;
+  accent-color: var(--spine);
+}
+
+.md-reader blockquote {
+  margin-left: 0;
+  margin-right: 0;
+  padding: 0 1em;
+  border-left: 0.25em solid var(--reader-rule);
+  color: var(--app-muted);
+}
+
+.md-reader blockquote > :last-child { margin-bottom: 0; }
+
+.md-reader hr {
+  height: 2px;
+  margin: 1.75em 0;
+  border: 0;
+  background: var(--reader-rule);
+}
+
+.md-reader img {
+  max-width: 100%;
+  height: auto;
+  border-radius: 4px;
+}
+
+.md-reader code {
+  font-family: var(--font-mono);
+  font-size: 0.875em;
+  padding: 0.15em 0.4em;
+  border-radius: 4px;
+  background: var(--reader-code-bg);
+}
+
+.md-reader pre {
+  font-family: var(--font-mono);
+  font-size: 0.875em;
+  line-height: 1.5;
+  padding: 1em;
+  overflow: auto;
+  border-radius: 6px;
+  background: var(--reader-code-bg);
+  border: 1px solid color-mix(in srgb, var(--app-border) 55%, transparent);
+}
+
+.md-reader pre code {
+  font-size: 1em;
+  padding: 0;
+  background: transparent;
+  border-radius: 0;
+  white-space: pre;
+}
+
+.md-reader .md-table-wrap {
+  overflow-x: auto;
+}
+
+.md-reader table {
+  border-collapse: collapse;
+  font-size: 0.95em;
+}
+
+.md-reader :where(th, td) {
+  padding: 0.4em 0.85em;
+  border: 1px solid var(--reader-rule);
+  text-align: left;
+}
+
+.md-reader th {
+  font-weight: 600;
+  background: var(--reader-code-bg);
+}
+
+.md-reader tbody tr:nth-child(2n) {
+  background: color-mix(in srgb, var(--app-fg) 2.5%, transparent);
+}
+
+.md-reader .md-diagram {
+  overflow-x: auto;
 }

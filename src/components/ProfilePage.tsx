@@ -8,6 +8,9 @@ import {
   Download,
   FileDown,
   FileUp,
+  Info,
+  RotateCcw,
+  Type,
   Loader2,
   Moon,
   Palette,
@@ -43,6 +46,28 @@ import {
   type StickyStripEdge,
 } from '../lib/stickyStrips';
 import { isElectronApp } from '../lib/platform';
+import { UpdatesPanel } from './UpdatesPanel';
+import { APP_VERSION } from '../lib/version';
+import Preview from './Preview';
+import {
+  DEFAULT_READING,
+  READER_FONTS,
+  READER_SIZE_MAX,
+  READER_SIZE_MIN,
+  getStoredReading,
+  setStoredReading,
+  type ReaderFontId,
+  type ReadingPrefs,
+} from '../lib/readingPrefs';
+
+const READING_SAMPLE = `## A page heading
+
+Notes read like a **Markdown preview** — comfortable spacing, \`inline code\` and lists:
+
+- First thought
+- Second thought
+
+> A quiet quote.`;
 
 type ProfileSection =
   | 'account'
@@ -51,6 +76,7 @@ type ProfileSection =
   | 'sticky'
   | 'accessibility'
   | 'storage'
+  | 'about'
   | 'danger';
 
 const NAV: {
@@ -75,6 +101,7 @@ const NAV: {
     icon: <Accessibility className="w-4 h-4" />,
   },
   { id: 'storage', label: 'Storage', icon: <Database className="w-4 h-4" /> },
+  { id: 'about', label: 'About & updates', icon: <Info className="w-4 h-4" /> },
   {
     id: 'danger',
     label: 'Danger Zone',
@@ -194,6 +221,46 @@ export default function ProfilePage({
     getStickyStripEdge()
   );
   const desktopShell = isElectronApp();
+  const [reading, setReading] = useState<ReadingPrefs>(() => getStoredReading());
+  const updateReading = (next: ReadingPrefs) => {
+    setReading(next);
+    setStoredReading(next);
+  };
+  const [stickyEnabled, setStickyEnabledState] = useState(true);
+  const [stickyToggleBusy, setStickyToggleBusy] = useState(false);
+  useEffect(() => {
+    if (!desktopShell) return;
+    let cancelled = false;
+    window.luminaDesktop
+      ?.getDesktopPrefs?.()
+      .then((p) => {
+        if (!cancelled) setStickyEnabledState(p.stickyEnabled !== false);
+      })
+      .catch(() => {
+        /* older shell without prefs IPC */
+      });
+    // Tray menu can flip the switch too.
+    const unsub = window.luminaDesktop?.onDesktopPrefsChanged?.((p) => {
+      setStickyEnabledState(p.stickyEnabled !== false);
+    });
+    return () => {
+      cancelled = true;
+      unsub?.();
+    };
+  }, [desktopShell]);
+  const toggleSticky = async (on: boolean) => {
+    setStickyToggleBusy(true);
+    setStickyEnabledState(on);
+    try {
+      await window.luminaDesktop?.setStickyEnabled?.(on);
+      setStickyMsg(on ? 'Sticky note strips are on.' : 'Sticky note strips are off.');
+    } catch {
+      setStickyEnabledState(!on);
+      setStickyMsg('Could not change the sticky strips setting.');
+    } finally {
+      setStickyToggleBusy(false);
+    }
+  };
   const navItems = NAV.filter((item) => !item.desktopOnly || desktopShell);
 
   const refreshStats = async () => {
@@ -519,6 +586,15 @@ export default function ProfilePage({
               <p className="mt-1 text-sm text-[var(--app-muted)]">
                 {user.username ? `@${user.username}` : user.email}
               </p>
+              <button
+                type="button"
+                onClick={() => setSection('about')}
+                className="mt-3 inline-flex items-center gap-1.5 rounded-full border border-[var(--app-border)] px-3 py-1 text-[11px] font-medium text-[var(--app-muted)] hover:bg-[var(--gutter)] hover:text-[var(--app-fg)]"
+                title="About & updates"
+              >
+                <Info className="h-3 w-3" />
+                Lumina Notes v{APP_VERSION}
+              </button>
             </div>
             <div className="grid w-full max-w-2xl gap-3 sm:grid-cols-3">
               <div className="footprint-card text-left">
@@ -864,6 +940,113 @@ export default function ProfilePage({
                 </section>
               ) : null}
 
+              {section === 'appearance' ? (
+                <section className={cn(sectionClass, 'mt-6')}>
+                  <div className="mb-1 flex items-center justify-between gap-3">
+                    <h2 className="inline-flex items-center gap-2 font-display text-base font-medium text-[var(--app-fg)]">
+                      <Type className="h-4 w-4 text-[var(--spine)]" />
+                      Reading &amp; writing
+                    </h2>
+                    <button
+                      type="button"
+                      onClick={() => updateReading({ ...DEFAULT_READING })}
+                      className="inline-flex items-center gap-1.5 rounded-full border border-[var(--app-border)] px-3 py-1 text-xs font-medium text-[var(--app-muted)] hover:bg-[var(--gutter)] hover:text-[var(--app-fg)]"
+                    >
+                      <RotateCcw className="h-3 w-3" />
+                      Reset
+                    </button>
+                  </div>
+                  <p className={cn(mutedText, 'mb-6')}>
+                    Font style, size, and colour for your pages — used by the editor and the
+                    Markdown preview.
+                  </p>
+
+                  <div className="space-y-5">
+                    <div className="grid grid-cols-1 gap-5 sm:grid-cols-12 sm:items-start">
+                      <label className={cn(labelClass, 'sm:col-span-4 sm:pt-2')} htmlFor="reader-font">
+                        Font style
+                      </label>
+                      <div className="sm:col-span-8">
+                        <select
+                          id="reader-font"
+                          className={fieldClass}
+                          value={reading.font}
+                          onChange={(e) =>
+                            updateReading({ ...reading, font: e.target.value as ReaderFontId })
+                          }
+                        >
+                          {READER_FONTS.map((f) => (
+                            <option key={f.id} value={f.id}>
+                              {f.label}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-1 gap-5 sm:grid-cols-12 sm:items-start">
+                      <label className={cn(labelClass, 'sm:col-span-4 sm:pt-2')} htmlFor="reader-size">
+                        Font size
+                      </label>
+                      <div className="flex items-center gap-3 sm:col-span-8">
+                        <input
+                          id="reader-size"
+                          type="range"
+                          min={READER_SIZE_MIN}
+                          max={READER_SIZE_MAX}
+                          step={1}
+                          value={reading.size}
+                          onChange={(e) =>
+                            updateReading({ ...reading, size: Number(e.target.value) })
+                          }
+                          className="h-2 flex-1 accent-[var(--spine)]"
+                        />
+                        <span className="w-12 text-right text-sm tabular-nums text-[var(--app-fg)]">
+                          {reading.size}px
+                        </span>
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-1 gap-5 sm:grid-cols-12 sm:items-start">
+                      <label className={cn(labelClass, 'sm:col-span-4 sm:pt-2')} htmlFor="reader-color">
+                        Font colour
+                      </label>
+                      <div className="flex flex-wrap items-center gap-3 sm:col-span-8">
+                        <input
+                          id="reader-color"
+                          type="color"
+                          value={reading.color ?? (theme === 'light' ? '#111111' : '#f3f3f0')}
+                          onChange={(e) => updateReading({ ...reading, color: e.target.value })}
+                          className="h-9 w-12 cursor-pointer rounded-md border border-[var(--app-border)] bg-transparent p-0.5"
+                        />
+                        <button
+                          type="button"
+                          onClick={() => updateReading({ ...reading, color: null })}
+                          className={cn(
+                            'rounded-md px-3 py-1.5 text-xs font-medium transition-colors',
+                            reading.color === null
+                              ? 'bg-[color-mix(in_srgb,var(--spine)_12%,var(--paper))] text-[var(--spine)]'
+                              : 'border border-[var(--app-border)] text-[var(--app-muted)] hover:bg-[var(--gutter)]'
+                          )}
+                        >
+                          Match theme
+                        </button>
+                        <span className="text-xs text-[var(--app-muted)]">
+                          {reading.color ? reading.color : 'Follows light / dark theme'}
+                        </span>
+                      </div>
+                    </div>
+
+                    <div>
+                      <p className={cn(labelClass, 'mb-2')}>Preview</p>
+                      <div className="max-h-72 overflow-hidden rounded-xl border border-[var(--app-border)] bg-[var(--paper)]">
+                        <Preview content={READING_SAMPLE} className="!h-auto" />
+                      </div>
+                    </div>
+                  </div>
+                </section>
+              ) : null}
+
               {section === 'sticky' && desktopShell ? (
                 <section className={sectionClass}>
                   <h2 className="mb-1 font-display text-base font-medium text-[var(--app-fg)]">
@@ -873,6 +1056,20 @@ export default function ProfilePage({
                     Choose which book the desktop neon strips write into and which screen edge
                     they dock to. Each film (Pink, Orange, …) becomes a page in that book.
                   </p>
+                  <div className="mb-6">
+                    <A11yToggle
+                      checked={stickyEnabled}
+                      onChange={(on) => {
+                        if (!stickyToggleBusy) void toggleSticky(on);
+                      }}
+                      label="Show sticky note strips"
+                      description="Turn off to hide the neon strips from your screen edge. Your strip pages stay in their book."
+                    />
+                  </div>
+                  <fieldset
+                    disabled={!stickyEnabled}
+                    className={cn('m-0 min-w-0 border-0 p-0', !stickyEnabled && 'opacity-50')}
+                  >
                   <div className="grid grid-cols-1 gap-5 sm:grid-cols-12 sm:items-start">
                     <label className={cn(labelClass, 'sm:col-span-4 sm:pt-2')} htmlFor="sticky-book">
                       Book
@@ -965,6 +1162,7 @@ export default function ProfilePage({
                       </p>
                     </div>
                   </div>
+                  </fieldset>
                 </section>
               ) : null}
 
@@ -1199,6 +1397,8 @@ export default function ProfilePage({
                   </section>
                 </div>
               ) : null}
+
+              {section === 'about' ? <UpdatesPanel /> : null}
 
               {section === 'danger' ? (
                 <section

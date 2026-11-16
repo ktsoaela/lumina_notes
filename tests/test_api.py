@@ -135,6 +135,54 @@ class ApiIntegrationTests(unittest.TestCase):
         res = self.client.get("/api/notebooks")
         self.assertEqual(res.status_code, 401)
 
+    def _signup(self, username: str) -> dict[str, str]:
+        res = self.client.post(
+            "/api/auth/signup",
+            json={
+                "email": f"{username}@example.com",
+                "password": "secret12",
+                "name": username,
+                "username": username,
+            },
+        )
+        self.assertEqual(res.status_code, 200, res.text)
+        return {"Authorization": f"Bearer {res.json()['token']}"}
+
+    def test_move_page_and_section_between_books(self) -> None:
+        h = self._signup("mover")
+        c = self.client
+        self.assertEqual(c.post("/api/bookshelves", headers=h, json={"id": "mv-shelf", "name": "S"}).status_code, 200)
+        for nb in ("mv-nb1", "mv-nb2"):
+            r = c.post("/api/notebooks", headers=h, json={"id": nb, "name": nb, "bookshelfId": "mv-shelf"})
+            self.assertEqual(r.status_code, 200, r.text)
+        for sec, nb in (("mv-s1", "mv-nb1"), ("mv-s2", "mv-nb2")):
+            r = c.post("/api/sections", headers=h, json={"id": sec, "notebookId": nb, "name": sec})
+            self.assertEqual(r.status_code, 200, r.text)
+        r = c.post("/api/pages", headers=h, json={"id": "mv-p1", "sectionId": "mv-s1", "title": "P", "content": "x"})
+        self.assertEqual(r.status_code, 200, r.text)
+
+        # Page → chapter in another book
+        r = c.post("/api/pages/mv-p1/move", headers=h, json={"sectionId": "mv-s2"})
+        self.assertEqual(r.status_code, 200, r.text)
+        self.assertEqual(r.json()["sectionId"], "mv-s2")
+        ids = [p["id"] for p in c.get("/api/pages/mv-s2", headers=h).json()]
+        self.assertIn("mv-p1", ids)
+        self.assertEqual(c.get("/api/pages/mv-s1", headers=h).json(), [])
+
+        # Chapter → another book, pages travel with it
+        r = c.post("/api/sections/mv-s2/move", headers=h, json={"notebookId": "mv-nb1"})
+        self.assertEqual(r.status_code, 200, r.text)
+        secs = [s["id"] for s in c.get("/api/sections/mv-nb1", headers=h).json()]
+        self.assertIn("mv-s2", secs)
+        self.assertIn("mv-p1", [p["id"] for p in c.get("/api/pages/mv-s2", headers=h).json()])
+
+        # Cannot move into someone else's chapter
+        other = self._signup("intruder")
+        r = c.post("/api/pages/mv-p1/move", headers=other, json={"sectionId": "mv-s1"})
+        self.assertEqual(r.status_code, 404)
+        r = c.post("/api/pages/mv-p1/move", headers=h, json={"sectionId": "nope"})
+        self.assertEqual(r.status_code, 404)
+
     def test_demo_user_not_seeded(self) -> None:
         login = self.client.post(
             "/api/auth/login",

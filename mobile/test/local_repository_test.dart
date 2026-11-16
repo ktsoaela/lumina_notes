@@ -138,4 +138,28 @@ void main() {
     final (b, _, _) = await tree();
     await expectLater(repo.delete(EntityKind.bookshelf, b.id), throwsA(isA<RuleException>()));
   });
+
+  test('movePage reparents the page and queues an upsert with the new chapter', () async {
+    final (b, n, s1) = await tree();
+    final s2 = await repo.createSection(n.id, 'Other chapter');
+    final p = await repo.createPage(s1.id, 'Wanderer');
+    await repo.movePage(p.id, s2.id);
+    expect(await repo.pages(s1.id), isEmpty);
+    expect((await repo.pages(s2.id)).single.id, p.id);
+    final op = (await repo.pendingOps()).singleWhere((o) => o.entityId == p.id);
+    expect(jsonDecode(op.payload)['sectionId'], s2.id);
+    expect(b.id, isNotEmpty);
+  });
+
+  test('moveSection carries its pages into another book', () async {
+    final (b, n1, s) = await tree();
+    final n2 = await repo.createNotebook(b.id, 'Second book');
+    final p = await repo.createPage(s.id, 'Along for the ride');
+    await repo.moveSection(s.id, n2.id);
+    expect(await repo.sections(n1.id), isEmpty);
+    expect((await repo.sections(n2.id)).single.id, s.id);
+    expect((await repo.pages(s.id)).single.id, p.id);
+    final op = (await repo.pendingOps()).singleWhere((o) => o.entityId == s.id);
+    expect(jsonDecode(op.payload)['notebookId'], n2.id);
+  });
 }

@@ -6,6 +6,8 @@ import 'package:flutter_markdown_plus/flutter_markdown_plus.dart';
 import '../app_scope.dart';
 import '../data/models.dart';
 import '../data/notes_repository.dart';
+import '../settings.dart';
+import 'lumina_theme.dart';
 import 'repo_list.dart' show errorMessage;
 
 enum _SaveState { saved, dirty, saving, failed }
@@ -174,6 +176,9 @@ class _PageEditorScreenState extends State<PageEditorScreen> {
           style: Theme.of(context).textTheme.titleLarge,
           decoration: const InputDecoration(
             border: InputBorder.none,
+            enabledBorder: InputBorder.none,
+            focusedBorder: InputBorder.none,
+            filled: false,
             counterText: '',
             hintText: 'Title',
           ),
@@ -221,8 +226,19 @@ class _PageEditorScreenState extends State<PageEditorScreen> {
     );
   }
 
-  Widget _buildEditor() => Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 16),
+  AppSettings get _settings => AppScope.of(context).settings;
+
+  /// Centred reading column, like the desktop / VS Code preview.
+  Widget _paper(Widget child) => ColoredBox(
+        color: Theme.of(context).colorScheme.surface,
+        child: Align(
+          alignment: Alignment.topCenter,
+          child: ConstrainedBox(constraints: const BoxConstraints(maxWidth: 760), child: child),
+        ),
+      );
+
+  Widget _buildEditor() => _paper(Padding(
+        padding: const EdgeInsets.fromLTRB(20, 8, 20, 0),
         child: TextField(
           key: const Key('pageContent'),
           controller: _content,
@@ -232,21 +248,72 @@ class _PageEditorScreenState extends State<PageEditorScreen> {
           minLines: null,
           textAlignVertical: TextAlignVertical.top,
           keyboardType: TextInputType.multiline,
-          style: const TextStyle(fontFamily: 'monospace', height: 1.4),
+          style: _settings.readerStyle(Theme.of(context).colorScheme),
           decoration: const InputDecoration(
             border: InputBorder.none,
+            enabledBorder: InputBorder.none,
+            focusedBorder: InputBorder.none,
+            filled: false,
             hintText: 'Write in Markdown…',
           ),
         ),
-      );
+      ));
 
   // Mermaid/Plotly fences render as plain code blocks on mobile (v1).
   Widget _buildPreview() => _content.text.trim().isEmpty
       ? const Center(child: Text('Nothing to preview'))
-      : Markdown(
+      : _paper(Markdown(
           key: const Key('pagePreview'),
           data: _content.text,
           selectable: true,
-          padding: const EdgeInsets.all(16),
-        );
+          padding: const EdgeInsets.fromLTRB(24, 20, 24, 48),
+          styleSheet: readerStyleSheet(context, _settings),
+        ));
+}
+
+/// Markdown styles modelled on VS Code's preview, using the reader settings.
+MarkdownStyleSheet readerStyleSheet(BuildContext context, AppSettings settings) {
+  final theme = Theme.of(context);
+  final scheme = theme.colorScheme;
+  final body = settings.readerStyle(scheme);
+  final size = settings.fontSize;
+  final heading = body.copyWith(
+    fontFamily: settings.font == ReaderFont.lumina ? displayFamily : body.fontFamily,
+    fontWeight: FontWeight.w600,
+    height: 1.25,
+  );
+  final codeBg = scheme.onSurface.withValues(alpha: 0.06);
+  return MarkdownStyleSheet.fromTheme(theme).copyWith(
+    p: body,
+    pPadding: EdgeInsets.only(bottom: size * 0.5),
+    h1: heading.copyWith(fontSize: size * 2),
+    h1Padding: EdgeInsets.only(top: size * 0.8, bottom: size * 0.3),
+    h2: heading.copyWith(fontSize: size * 1.5),
+    h2Padding: EdgeInsets.only(top: size * 0.8, bottom: size * 0.3),
+    h3: heading.copyWith(fontSize: size * 1.25),
+    h4: heading.copyWith(fontSize: size),
+    h5: heading.copyWith(fontSize: size * 0.875),
+    h6: heading.copyWith(fontSize: size * 0.85, color: scheme.onSurfaceVariant),
+    blockSpacing: size * 0.9,
+    listIndent: size * 1.6,
+    listBullet: body,
+    a: body.copyWith(color: scheme.primary, decoration: TextDecoration.none),
+    strong: body.copyWith(fontWeight: FontWeight.w600),
+    em: body.copyWith(fontStyle: FontStyle.italic),
+    code: body.copyWith(fontFamily: 'monospace', fontSize: size * 0.875, backgroundColor: codeBg),
+    codeblockPadding: EdgeInsets.all(size),
+    codeblockDecoration: BoxDecoration(
+      color: codeBg,
+      borderRadius: BorderRadius.circular(6),
+      border: Border.all(color: scheme.outline.withValues(alpha: 0.6)),
+    ),
+    blockquote: body.copyWith(color: scheme.onSurfaceVariant),
+    blockquotePadding: EdgeInsets.symmetric(horizontal: size, vertical: size * 0.25),
+    blockquoteDecoration: BoxDecoration(border: Border(left: BorderSide(color: scheme.outline, width: 4))),
+    horizontalRuleDecoration: BoxDecoration(border: Border(top: BorderSide(color: scheme.outline, width: 2))),
+    tableHead: body.copyWith(fontWeight: FontWeight.w600),
+    tableBody: body,
+    tableBorder: TableBorder.all(color: scheme.outline),
+    tableCellsPadding: EdgeInsets.symmetric(horizontal: size * 0.85, vertical: size * 0.4),
+  );
 }

@@ -30,6 +30,29 @@ contextBridge.exposeInMainWorld("luminaDesktop", {
     ipcRenderer.on("lumina:sticky-target-changed", handler);
     return () => ipcRenderer.removeListener("lumina:sticky-target-changed", handler);
   },
+  /** { stickyEnabled, version, platform } */
+  getDesktopPrefs: () => ipcRenderer.invoke("lumina:get-desktop-prefs"),
+  setStickyEnabled: (enabled) => ipcRenderer.invoke("lumina:set-sticky-enabled", enabled),
+  /** Download a GitHub release asset into Downloads/Lumina Notes updates */
+  downloadUpdate: (asset) => ipcRenderer.invoke("lumina:download-update", asset),
+  showUpdateFile: (filePath) => ipcRenderer.invoke("lumina:show-update", filePath),
+  onUpdateProgress: (cb) => {
+    const handler = (_event, p) => cb(p);
+    ipcRenderer.on("lumina:update-progress", handler);
+    return () => ipcRenderer.removeListener("lumina:update-progress", handler);
+  },
+  /** Tray → sticky: open one colour's note */
+  onStickyOpenFilm: (cb) => {
+    const handler = (_event, filmId) => cb(filmId);
+    ipcRenderer.on("lumina:sticky-open-film", handler);
+    return () => ipcRenderer.removeListener("lumina:sticky-open-film", handler);
+  },
+  /** Tray toggled strips — Profile updates its switch */
+  onDesktopPrefsChanged: (cb) => {
+    const handler = (_event, prefs) => cb(prefs);
+    ipcRenderer.on("lumina:desktop-prefs-changed", handler);
+    return () => ipcRenderer.removeListener("lumina:desktop-prefs-changed", handler);
+  },
   onStickyEdge: (cb) => {
     const handler = (_event, edge) => cb(edge);
     ipcRenderer.on("lumina:sticky-edge", handler);

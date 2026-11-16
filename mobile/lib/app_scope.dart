@@ -7,6 +7,7 @@ import 'data/models.dart';
 import 'data/notes_repository.dart';
 import 'data/pair_link.dart';
 import 'data/session_store.dart';
+import 'settings.dart';
 import 'sync/sync_engine.dart';
 import 'sync/sync_scheduler.dart';
 
@@ -23,14 +24,19 @@ class AppServices extends ChangeNotifier {
     ApiFactory? apiFactory,
     LocalRepository? local,
     RepoFactory? repoFactory,
+    AppSettings? settings,
     this.autoSync = true,
-  })  : _apiFactory = apiFactory ?? ((url, token) => ApiClient(baseUrl: url, token: token)),
+  })  : settings = settings ?? AppSettings.inMemory(),
+        _apiFactory = apiFactory ?? ((url, token) => ApiClient(baseUrl: url, token: token)),
         _local = local, // ignore: prefer_initializing_formals
         _repoFactory = repoFactory { // ignore: prefer_initializing_formals
     if (session.isSignedIn) _connect();
   }
 
   final SessionStore session;
+
+  /// Theme, reading typography and update preferences (device-local).
+  final AppSettings settings;
   final ApiFactory _apiFactory;
   final RepoFactory? _repoFactory; // tests: bypass the local DB
   LocalRepository? _local;

@@ -174,6 +174,30 @@ class LocalRepository implements NotesRepository {
   }
 
   @override
+  Future<void> movePage(String pageId, String toSectionId) async {
+    final at = _now();
+    await db.transaction(() async {
+      final r = await (db.select(db.pages)..where((t) => t.id.equals(pageId))).getSingle();
+      final p = _page(r).copyWith(sectionId: toSectionId, updatedAt: at);
+      await db.into(db.pages).insertOnConflictUpdate(_pageRow(p).toCompanion(true));
+      await enqueue(EntityKind.page, p.id, 'upsert', _payload(p), at);
+    });
+    _edited();
+  }
+
+  @override
+  Future<void> moveSection(String sectionId, String toNotebookId) async {
+    final at = _now();
+    await db.transaction(() async {
+      final r = await (db.select(db.sections)..where((t) => t.id.equals(sectionId))).getSingle();
+      final s = _section(r).copyWith(notebookId: toNotebookId, updatedAt: at);
+      await db.into(db.sections).insertOnConflictUpdate(_sectionRow(s).toCompanion(true));
+      await enqueue(EntityKind.section, s.id, 'upsert', _payload(s), at);
+    });
+    _edited();
+  }
+
+  @override
   Future<void> delete(EntityKind kind, String id) async {
     if (kind == EntityKind.bookshelf) {
       final n = await (db.select(db.notebooks)..where((t) => t.bookshelfId.equals(id))).get();

@@ -107,6 +107,20 @@ class RemoteRepository implements NotesRepository {
   }
 
   @override
+  Future<void> movePage(String pageId, String toSectionId) async {
+    await api.movePage(pageId, toSectionId);
+    final p = _pageCache[pageId];
+    if (p != null) _pageCache[pageId] = p.copyWith(sectionId: toSectionId);
+    _changed();
+  }
+
+  @override
+  Future<void> moveSection(String sectionId, String toNotebookId) async {
+    await api.moveSection(sectionId, toNotebookId);
+    _changed();
+  }
+
+  @override
   Future<void> delete(EntityKind kind, String id) async {
     await api.delete(kind, id);
     _pageCache.remove(id);

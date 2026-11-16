@@ -180,6 +180,12 @@ class ApiClient {
   Future<void> updatePage(NotePage p) => _send('PUT', '/api/pages/${Uri.encodeComponent(p.id)}',
       body: {'title': p.title, 'content': p.content});
 
+  Future<void> movePage(String id, String sectionId) =>
+      _send('POST', '/api/pages/${Uri.encodeComponent(id)}/move', body: {'sectionId': sectionId});
+
+  Future<void> moveSection(String id, String notebookId) =>
+      _send('POST', '/api/sections/${Uri.encodeComponent(id)}/move', body: {'notebookId': notebookId});
+
   Future<void> delete(EntityKind kind, String id) =>
       _send('DELETE', '${_paths[kind]}/${Uri.encodeComponent(id)}');
 

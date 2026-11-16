@@ -57,7 +57,7 @@ Future<void> _openNotebook(WidgetTester tester) => _tap(tester, find.text('My bo
 Future<void> _openEditor(WidgetTester tester) async {
   await _openNotebook(tester);
   await _tap(tester, find.text('Welcome'));
-  await _tap(tester, find.text('Notes'));
+  await _tap(tester, find.byKey(const Key('chapterTab-sec-1')));
   await _tap(tester, find.text('Getting started'));
 }
 

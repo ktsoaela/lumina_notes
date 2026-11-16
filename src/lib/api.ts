@@ -250,6 +250,16 @@ export const api = {
       });
       if (!res.ok) throw new Error('Failed to delete section');
     },
+    /** Move a chapter (and its pages) into another book. */
+    move: async (id: string, notebookId: string) => {
+      const res = await fetch(apiUrl(`/api/sections/${id}/move`), {
+        method: 'POST',
+        headers: getHeaders(),
+        body: JSON.stringify({ notebookId }),
+      });
+      if (!res.ok) throw new Error('Failed to move chapter');
+      return res.json();
+    },
   },
   pages: {
     list: async (sectionId: string): Promise<Page[]> => {
@@ -301,6 +311,16 @@ export const api = {
         headers: getHeaders(),
       });
       if (!res.ok) throw new Error('Failed to delete page');
+    },
+    /** Move a page into another chapter (any book). */
+    move: async (id: string, sectionId: string) => {
+      const res = await fetch(apiUrl(`/api/pages/${id}/move`), {
+        method: 'POST',
+        headers: getHeaders(),
+        body: JSON.stringify({ sectionId }),
+      });
+      if (!res.ok) throw new Error('Failed to move page');
+      return res.json();
     },
   },
 };

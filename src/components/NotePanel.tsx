@@ -163,7 +163,7 @@ const NotePanel: React.FC<NotePanelProps> = ({
             )}
             {(viewMode === 'preview' || viewMode === 'split') && (
               <Panel defaultSize={viewMode === 'preview' ? '100%' : '50%'}>
-                <div className="h-full min-w-0 font-serif">
+                <div className="h-full min-w-0">
                   <Preview content={page.content} />
                 </div>
               </Panel>

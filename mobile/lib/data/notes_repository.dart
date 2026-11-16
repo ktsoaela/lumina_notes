@@ -20,4 +20,10 @@ abstract class NotesRepository {
   Future<void> savePage(NotePage page);
   Future<void> rename(EntityKind kind, String id, String name);
   Future<void> delete(EntityKind kind, String id);
+
+  /// Moves a page into another chapter (any book).
+  Future<void> movePage(String pageId, String toSectionId);
+
+  /// Moves a chapter, with its pages, into another book.
+  Future<void> moveSection(String sectionId, String toNotebookId);
 }

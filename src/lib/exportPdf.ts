@@ -34,6 +34,29 @@ declare global {
       notifyStickyTargetChanged?: () => void;
       onStickyTargetChanged?: (cb: () => void) => () => void;
       onStickyEdge?: (cb: (edge: 'left' | 'right' | 'top' | 'bottom') => void) => () => void;
+      getDesktopPrefs?: () => Promise<{
+        stickyEnabled: boolean;
+        version: string;
+        platform: string;
+      }>;
+      setStickyEnabled?: (enabled: boolean) => Promise<{ ok: boolean; stickyEnabled: boolean }>;
+      onStickyOpenFilm?: (cb: (filmId: string) => void) => () => void;
+      onDesktopPrefsChanged?: (cb: (prefs: { stickyEnabled: boolean }) => void) => () => void;
+      downloadUpdate?: (asset: {
+        url: string;
+        name: string;
+        size?: number;
+      }) => Promise<{ ok: boolean; path?: string; error?: string }>;
+      showUpdateFile?: (filePath: string) => Promise<{ ok: boolean }>;
+      onUpdateProgress?: (
+        cb: (p: {
+          received?: number;
+          total?: number;
+          done?: boolean;
+          path?: string;
+          error?: string;
+        }) => void
+      ) => () => void;
       /** Push page content to the other Electron window after save */
       publishPageSync?: (patch: {
         pageId: string;

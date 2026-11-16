@@ -1559,6 +1559,25 @@ def update_section(section_id: str, user: CurrentUser, body: SectionUpdate, db: 
     return {"id": section_id, "name": body.name}
 
 
+class SectionMove(BaseModel):
+    notebookId: str = Field(..., min_length=1, max_length=64)
+
+
+@app.post("/api/sections/{section_id}/move")
+def move_section(section_id: str, user: CurrentUser, body: SectionMove, db: Db):
+    """Move a chapter (with all its pages) into another book."""
+    if not _section_owned(db, section_id, user["id"]):
+        raise HTTPException(status.HTTP_404_NOT_FOUND, detail="Section not found")
+    if not _notebook_owned(db, body.notebookId, user["id"]):
+        raise HTTPException(status.HTTP_404_NOT_FOUND, detail="Notebook not found")
+    db.execute(
+        "UPDATE sections SET notebookId = ? WHERE id = ?",
+        (body.notebookId, section_id),
+    )
+    row = db.execute("SELECT * FROM sections WHERE id = ?", (section_id,)).fetchone()
+    return dict(row)
+
+
 @app.delete("/api/sections/{section_id}", status_code=status.HTTP_204_NO_CONTENT)
 def delete_section(section_id: str, user: CurrentUser, db: Db):
     if not _section_owned(db, section_id, user["id"]):
@@ -1603,6 +1622,25 @@ def update_page(page_id: str, user: CurrentUser, body: PageUpdate, db: Db):
         (body.title, body.content, page_id),
     )
     return {"id": page_id, "title": body.title, "content": body.content}
+
+
+class PageMove(BaseModel):
+    sectionId: str = Field(..., min_length=1, max_length=64)
+
+
+@app.post("/api/pages/{page_id}/move")
+def move_page(page_id: str, user: CurrentUser, body: PageMove, db: Db):
+    """Move a page into another chapter (any book the user owns)."""
+    if not _page_owned(db, page_id, user["id"]):
+        raise HTTPException(status.HTTP_404_NOT_FOUND, detail="Page not found")
+    if not _section_owned(db, body.sectionId, user["id"]):
+        raise HTTPException(status.HTTP_404_NOT_FOUND, detail="Section not found")
+    db.execute(
+        "UPDATE pages SET sectionId = ?, updatedAt = CURRENT_TIMESTAMP WHERE id = ?",
+        (body.sectionId, page_id),
+    )
+    row = db.execute("SELECT * FROM pages WHERE id = ?", (page_id,)).fetchone()
+    return dict(row)
 
 
 @app.delete("/api/pages/{page_id}", status_code=status.HTTP_204_NO_CONTENT)

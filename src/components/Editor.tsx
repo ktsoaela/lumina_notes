@@ -71,7 +71,8 @@ const Editor: React.FC<EditorProps> = ({ value, onChange, className, onBreathCha
         ref={taRef}
         className={cn(
           'min-h-0 flex-1 resize-none border-0 bg-transparent px-6 py-6 sm:px-10 sm:py-8',
-          'font-serif text-[16px] leading-[1.8] text-[var(--app-fg)]',
+          'leading-[1.8] text-[var(--reader-color,var(--app-fg))]',
+          '[font-family:var(--reader-font)] [font-size:var(--reader-size)]',
           'placeholder:text-[var(--app-muted)]/40 focus:outline-none',
           'tracking-[0.01em]'
         )}

@@ -1,4 +1,4 @@
-const { app, BrowserWindow, dialog, ipcMain, nativeImage, screen } = require("electron");
+const { app, BrowserWindow, dialog, ipcMain, Menu, nativeImage, net, screen, shell, Tray } = require("electron");
 const path = require("path");
 const fs = require("fs");
 const { spawn } = require("child_process");
@@ -17,6 +17,34 @@ function windowIcon() {
     return nativeImage.createFromPath(p);
   }
   return undefined;
+}
+
+/* ---------- Desktop prefs (main-process readable, survives reloads) ---------- */
+
+const DEFAULT_DESKTOP_PREFS = { stickyEnabled: true };
+
+function prefsPath() {
+  return path.join(app.getPath("userData"), "desktop-prefs.json");
+}
+
+function readDesktopPrefs() {
+  try {
+    const raw = JSON.parse(fs.readFileSync(prefsPath(), "utf8"));
+    return { ...DEFAULT_DESKTOP_PREFS, ...raw };
+  } catch {
+    return { ...DEFAULT_DESKTOP_PREFS };
+  }
+}
+
+function writeDesktopPrefs(patch) {
+  const next = { ...readDesktopPrefs(), ...patch };
+  try {
+    fs.mkdirSync(path.dirname(prefsPath()), { recursive: true });
+    fs.writeFileSync(prefsPath(), JSON.stringify(next, null, 2));
+  } catch (err) {
+    console.error("Could not save desktop prefs:", err);
+  }
+  return next;
 }
 
 const API_PORT = process.env.PORT || "58888";
@@ -442,10 +470,12 @@ async function createWindow() {
   });
 
   // Sticky is nice-to-have; don't kill the main app if Win transparency/GPU flakes.
-  try {
-    await createStickyWindow();
-  } catch (err) {
-    console.error("Sticky window failed to start:", err);
+  if (readDesktopPrefs().stickyEnabled) {
+    try {
+      await createStickyWindow();
+    } catch (err) {
+      console.error("Sticky window failed to start:", err);
+    }
   }
 }
 
@@ -523,6 +553,7 @@ ipcMain.on("lumina:sticky-refresh-chrome", () => {
 
 ipcMain.on("lumina:sticky-set-edge", async (_event, edge) => {
   if (!["left", "right", "top", "bottom"].includes(edge)) return;
+  if (!readDesktopPrefs().stickyEnabled) return;
   if (!stickyWindow || stickyWindow.isDestroyed()) {
     await createStickyWindow();
   }
@@ -569,6 +600,196 @@ ipcMain.on("lumina:sticky-target-changed", () => {
   stickyWindow.webContents.send("lumina:sticky-target-changed");
 });
 
+ipcMain.handle("lumina:get-desktop-prefs", () => ({
+  ...readDesktopPrefs(),
+  version: app.getVersion(),
+  platform: process.platform,
+}));
+
+/** Turn the sticky strips on/off — opens or closes the window immediately. */
+/** Turn strips on/off from Profile or the tray; keeps both in sync. */
+async function setStickyEnabled(enabled) {
+  const on = Boolean(enabled);
+  writeDesktopPrefs({ stickyEnabled: on });
+  if (on) {
+    try {
+      await createStickyWindow();
+    } catch (err) {
+      console.error("Sticky window failed to start:", err);
+    }
+  } else if (stickyWindow && !stickyWindow.isDestroyed()) {
+    stickyWindow.close();
+  }
+  refreshTrayMenu();
+  if (mainWindow && !mainWindow.isDestroyed()) {
+    mainWindow.webContents.send("lumina:desktop-prefs-changed", readDesktopPrefs());
+  }
+  return { ok: true, stickyEnabled: on };
+}
+
+ipcMain.handle("lumina:set-sticky-enabled", (_event, enabled) => setStickyEnabled(enabled));
+
+/* ---------- System tray (Windows “hidden icons”, macOS menu bar) ---------- */
+
+const STICKY_FILMS = [
+  { id: "pink", label: "Pink" },
+  { id: "orange", label: "Orange" },
+  { id: "yellow", label: "Yellow" },
+  { id: "green", label: "Green" },
+  { id: "blue", label: "Blue" },
+];
+
+let tray = null;
+
+async function showMainWindow() {
+  if (!mainWindow || mainWindow.isDestroyed()) {
+    await createWindow();
+    return;
+  }
+  if (mainWindow.isMinimized()) mainWindow.restore();
+  mainWindow.show();
+  mainWindow.focus();
+}
+
+/** Open one colour's note straight from the tray (turns strips on if needed). */
+async function openStickyFilm(filmId) {
+  if (!STICKY_FILMS.some((f) => f.id === filmId)) return;
+  const fresh = !stickyWindow || stickyWindow.isDestroyed();
+  if (!readDesktopPrefs().stickyEnabled) await setStickyEnabled(true);
+  else if (fresh) await createStickyWindow();
+  if (!stickyWindow || stickyWindow.isDestroyed()) return;
+  if (fresh || stickyWindow.webContents.isLoading()) {
+    await new Promise((resolve) => {
+      stickyWindow.webContents.once("did-finish-load", resolve);
+      setTimeout(resolve, 4000);
+    });
+  }
+  stickyWindow.show();
+  stickyWindow.focus();
+  stickyWindow.webContents.send("lumina:sticky-open-film", filmId);
+}
+
+function buildTrayMenu() {
+  const prefs = readDesktopPrefs();
+  return Menu.buildFromTemplate([
+    { label: "Open Lumina Notes", click: () => void showMainWindow() },
+    { type: "separator" },
+    {
+      label: "Sticky notes",
+      submenu: STICKY_FILMS.map((f) => ({
+        label: `${f.label} note`,
+        click: () => void openStickyFilm(f.id),
+      })),
+    },
+    {
+      label: "Show sticky note strips",
+      type: "checkbox",
+      checked: prefs.stickyEnabled !== false,
+      click: (item) => void setStickyEnabled(item.checked),
+    },
+    { type: "separator" },
+    { label: `Lumina Notes v${app.getVersion()}`, enabled: false },
+    { label: "Quit Lumina Notes", click: () => app.quit() },
+  ]);
+}
+
+function refreshTrayMenu() {
+  if (tray && !tray.isDestroyed()) tray.setContextMenu(buildTrayMenu());
+}
+
+function createTray() {
+  if (tray && !tray.isDestroyed()) return;
+  const base = windowIcon();
+  if (!base) return;
+  const size = process.platform === "darwin" ? 18 : 16;
+  tray = new Tray(base.resize({ width: size, height: size, quality: "best" }));
+  tray.setToolTip("Lumina Notes — sticky notes");
+  tray.setContextMenu(buildTrayMenu());
+  // Left-click: bring the strips forward (or switch them on); menu if already showing.
+  tray.on("click", () => {
+    if (stickyWindow && !stickyWindow.isDestroyed() && stickyWindow.isVisible()) {
+      tray.popUpContextMenu();
+      return;
+    }
+    void setStickyEnabled(true);
+  });
+}
+
+/* ---------- In-app update download (GitHub release assets only) ---------- */
+
+const UPDATE_URL_PREFIX = "https://github.com/ktsoaela/lumina_notes/releases/download/";
+let updateDownload = null;
+
+function sendUpdateProgress(payload) {
+  if (mainWindow && !mainWindow.isDestroyed()) {
+    mainWindow.webContents.send("lumina:update-progress", payload);
+  }
+}
+
+ipcMain.handle("lumina:download-update", async (_event, payload) => {
+  const url = String(payload?.url || "");
+  const name = path.basename(String(payload?.name || "")).replace(/[<>:"/\\|?*\x00-\x1f]/g, "");
+  if (!url.startsWith(UPDATE_URL_PREFIX) || !name) {
+    return { ok: false, error: "Not a Lumina release download" };
+  }
+  if (updateDownload) return updateDownload;
+  const dir = path.join(app.getPath("downloads"), "Lumina Notes updates");
+  const dest = path.join(dir, name);
+  const tmp = `${dest}.part`;
+  updateDownload = (async () => {
+    try {
+      fs.mkdirSync(dir, { recursive: true });
+      const res = await net.fetch(url, { redirect: "follow" });
+      if (!res.ok || !res.body) throw new Error(`Download failed (${res.status})`);
+      const total = Number(res.headers.get("content-length") || payload?.size || 0);
+      const out = fs.createWriteStream(tmp);
+      const reader = res.body.getReader();
+      let received = 0;
+      let lastSent = 0;
+      for (;;) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        received += value.length;
+        if (!out.write(Buffer.from(value))) {
+          await new Promise((r) => out.once("drain", r));
+        }
+        const now = Date.now();
+        if (now - lastSent > 200) {
+          lastSent = now;
+          sendUpdateProgress({ received, total });
+        }
+      }
+      await new Promise((resolve, reject) => {
+        out.end((err) => (err ? reject(err) : resolve()));
+      });
+      fs.renameSync(tmp, dest);
+      sendUpdateProgress({ received, total, done: true, path: dest });
+      return { ok: true, path: dest };
+    } catch (err) {
+      try {
+        fs.rmSync(tmp, { force: true });
+      } catch {
+        /* ignore */
+      }
+      const message = err instanceof Error ? err.message : String(err);
+      sendUpdateProgress({ error: message });
+      return { ok: false, error: message };
+    } finally {
+      updateDownload = null;
+    }
+  })();
+  return updateDownload;
+});
+
+/** Reveal a downloaded update in the file manager (only inside our updates folder). */
+ipcMain.handle("lumina:show-update", (_event, filePath) => {
+  const dir = path.join(app.getPath("downloads"), "Lumina Notes updates");
+  const p = path.resolve(String(filePath || ""));
+  if (!p.startsWith(dir + path.sep) || !fs.existsSync(p)) return { ok: false };
+  shell.showItemInFolder(p);
+  return { ok: true };
+});
+
 /** Relay live page edits to the other window (main ↔ sticky). */
 ipcMain.on("lumina:page-sync", (event, patch) => {
   const sender = event.sender;
@@ -582,6 +803,11 @@ ipcMain.on("lumina:page-sync", (event, patch) => {
 async function boot() {
   try {
     await createWindow();
+    try {
+      createTray();
+    } catch (err) {
+      console.error("Tray icon failed:", err);
+    }
   } catch (err) {
     console.error(err);
     const message = err instanceof Error ? err.message : String(err);
@@ -592,6 +818,14 @@ async function boot() {
     app.quit();
   }
 }
+
+// Note links + release pages open in the system browser, never in an app window.
+app.on("web-contents-created", (_event, contents) => {
+  contents.setWindowOpenHandler(({ url }) => {
+    if (/^https?:\/\//i.test(url)) void shell.openExternal(url);
+    return { action: "deny" };
+  });
+});
 
 app.whenReady().then(boot);
 
@@ -604,6 +838,7 @@ app.on("window-all-closed", () => {
 
 app.on("before-quit", () => {
   killBackend();
+  if (tray && !tray.isDestroyed()) tray.destroy();
 });
 
 app.on("activate", () => {

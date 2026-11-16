@@ -55,15 +55,15 @@ Future<void> _tap(WidgetTester tester, Finder f) async {
 Future<void> _toPages(WidgetTester tester) async {
   await _tap(tester, find.text('My bookshelf'));
   await _tap(tester, find.text('Welcome'));
-  await _tap(tester, find.text('Notes'));
+  await _tap(tester, find.byKey(const Key('chapterTab-sec-1')));
 }
 
 void main() {
   testWidgets('wide layout shows list and editor side by side', (tester) async {
     await _pump(tester, const Size(1280, 800));
+    await _toPages(tester);
     expect(find.byKey(const Key('navPane')), findsOneWidget);
     expect(find.text('Select a page'), findsOneWidget);
-    await _toPages(tester);
     await _tap(tester, find.text('Getting started'));
     // Page list stays visible next to the editor.
     expect(find.text('Second'), findsOneWidget);
@@ -76,8 +76,8 @@ void main() {
 
   testWidgets('narrow layout pushes editor', (tester) async {
     await _pump(tester, const Size(400, 800));
-    expect(find.byKey(const Key('navPane')), findsNothing);
     await _toPages(tester);
+    expect(find.byKey(const Key('navPane')), findsNothing);
     await _tap(tester, find.text('Getting started'));
     expect(find.byKey(const Key('pageContent')), findsOneWidget);
     expect(find.text('Second'), findsNothing); // list is behind the pushed editor

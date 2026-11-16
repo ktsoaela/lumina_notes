@@ -9,6 +9,8 @@ import {
   Trash2,
   Pencil,
   Archive,
+  FolderInput,
+  GripVertical,
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { Notebook, Section, Page } from '../types';
@@ -19,6 +21,66 @@ import {
   displayPageTitle,
   displaySectionTitle,
 } from '../lib/displayTitle';
+import type { DragItem } from '../lib/moveItems';
+
+/** Drag-and-drop + “Move to…” wiring shared by every row in the tree. */
+type MoveCtx = {
+  drag: DragItem | null;
+  setDrag: (d: DragItem | null) => void;
+  onMovePage?: (pageId: string, toSectionId: string) => void;
+  onMoveSection?: (sectionId: string, toNotebookId: string) => void;
+  onRequestMove?: (item: DragItem, label: string) => void;
+};
+const MoveContext = React.createContext<MoveCtx>({ drag: null, setDrag: () => {} });
+
+const DRAG_MIME = 'application/x-lumina-item';
+
+/** Drop-target state for a row: highlights while a compatible item hovers. */
+function useDropTarget(accepts: (d: DragItem) => boolean, onDrop: (d: DragItem) => void) {
+  const { drag, setDrag } = React.useContext(MoveContext);
+  const [over, setOver] = React.useState(false);
+  const ok = !!drag && accepts(drag);
+  const handlers = {
+    onDragOver: (e: React.DragEvent) => {
+      if (!ok) return;
+      e.preventDefault();
+      e.stopPropagation();
+      e.dataTransfer.dropEffect = 'move';
+      if (!over) setOver(true);
+    },
+    onDragLeave: (e: React.DragEvent) => {
+      if (e.currentTarget.contains(e.relatedTarget as Node | null)) return;
+      setOver(false);
+    },
+    onDrop: (e: React.DragEvent) => {
+      setOver(false);
+      if (!ok || !drag) return;
+      e.preventDefault();
+      e.stopPropagation();
+      onDrop(drag);
+      setDrag(null);
+    },
+  };
+  return { over: over && ok, handlers };
+}
+
+function useDragSource(item: DragItem) {
+  const { setDrag } = React.useContext(MoveContext);
+  return {
+    draggable: true,
+    onDragStart: (e: React.DragEvent) => {
+      e.stopPropagation();
+      e.dataTransfer.effectAllowed = 'move';
+      e.dataTransfer.setData(DRAG_MIME, JSON.stringify(item));
+      e.dataTransfer.setData('text/plain', item.id);
+      setDrag(item);
+    },
+    onDragEnd: () => setDrag(null),
+  };
+}
+
+const dropRing =
+  'ring-2 ring-[var(--spine)] ring-offset-1 ring-offset-[var(--app-surface)] bg-[color-mix(in_srgb,var(--spine)_10%,transparent)]';
 
 const NOTEBOOK_ROW_H = 44;
 
@@ -46,6 +108,12 @@ interface SidebarProps {
   onRenameNotebook: (id: string, name: string) => void;
   onRenameSection: (notebookId: string, sectionId: string, name: string) => void;
   onRenamePage: (sectionId: string, pageId: string, title: string) => void;
+  /** Drop a page onto a chapter (drag-and-drop). */
+  onMovePage?: (pageId: string, toSectionId: string) => void;
+  /** Drop a chapter onto a book (drag-and-drop). */
+  onMoveSection?: (sectionId: string, toNotebookId: string) => void;
+  /** Open the “Move to…” picker (works across bookshelves, and on touch). */
+  onRequestMove?: (item: DragItem, label: string) => void;
 }
 
 const Sidebar: React.FC<SidebarProps> = ({
@@ -67,7 +135,15 @@ const Sidebar: React.FC<SidebarProps> = ({
   onRenameNotebook,
   onRenameSection,
   onRenamePage,
+  onMovePage,
+  onMoveSection,
+  onRequestMove,
 }) => {
+  const [drag, setDrag] = React.useState<DragItem | null>(null);
+  const moveCtx = React.useMemo<MoveCtx>(
+    () => ({ drag, setDrag, onMovePage, onMoveSection, onRequestMove }),
+    [drag, onMovePage, onMoveSection, onRequestMove]
+  );
   const [editTarget, setEditTarget] = React.useState<EditTarget | null>(null);
   const [editDraft, setEditDraft] = React.useState('');
   const [expandedNotebookIds, setExpandedNotebookIds] = React.useState<Set<string>>(
@@ -149,6 +225,7 @@ const Sidebar: React.FC<SidebarProps> = ({
   };
 
   return (
+    <MoveContext.Provider value={moveCtx}>
     <aside className="@container/sidebar flex h-full min-w-0 w-full flex-col select-none border-r border-[var(--app-border)] bg-[var(--app-surface)] text-[var(--app-fg)]">
       <div className="shrink-0 border-b border-[var(--app-border)] px-2 pb-3 pt-4 @[14rem]/sidebar:px-4 @[14rem]/sidebar:pb-4 @[14rem]/sidebar:pt-5">
         <div className="flex items-start justify-between gap-2">
@@ -262,7 +339,13 @@ const Sidebar: React.FC<SidebarProps> = ({
           ))
         )}
       </div>
+      {drag ? (
+        <p className="shrink-0 border-t border-[var(--app-border)] px-3 py-2 text-[11px] text-[var(--app-muted)]">
+          {drag.kind === 'page' ? 'Drop on a chapter to move the page' : 'Drop on a book to move the chapter'}
+        </p>
+      ) : null}
     </aside>
+    </MoveContext.Provider>
   );
 };
 
@@ -327,6 +410,11 @@ const NotebookItem: React.FC<NotebookItemProps> = ({
   const chapterCount = notebook.sections.length;
   const pageCount = notebook.sections.reduce((n, s) => n + s.pages.length, 0);
   const bookLabel = displayBookTitle(notebook.title);
+  const { onMoveSection } = React.useContext(MoveContext);
+  const drop = useDropTarget(
+    (d) => d.kind === 'section' && d.notebookId !== notebook.id && !!onMoveSection,
+    (d) => onMoveSection?.(d.id, notebook.id)
+  );
 
   return (
     <div className="mb-3">
@@ -335,9 +423,11 @@ const NotebookItem: React.FC<NotebookItemProps> = ({
           'group relative flex cursor-pointer items-center gap-1 rounded-xl border px-1.5 py-2 transition',
           isActive
             ? 'border-[var(--spine)]/40 bg-[var(--paper)] shadow-sm'
-            : 'border-transparent hover:border-[var(--app-border)] hover:bg-[var(--gutter)]/50'
+            : 'border-transparent hover:border-[var(--app-border)] hover:bg-[var(--gutter)]/50',
+          drop.over && dropRing
         )}
         onClick={onNotebookRowClick}
+        {...drop.handlers}
       >
         {isActive && (
           <span
@@ -561,6 +651,13 @@ const SectionItem: React.FC<SectionItemProps> = ({
     editTarget.id === section.id &&
     editTarget.notebookId === notebookId;
   const chapterLabel = displaySectionTitle(section.title, chapterIndex);
+  const { onMovePage, onRequestMove, drag } = React.useContext(MoveContext);
+  const dragSrc = useDragSource({ kind: 'section', id: section.id, notebookId });
+  const drop = useDropTarget(
+    (d) => d.kind === 'page' && d.sectionId !== section.id && !!onMovePage,
+    (d) => onMovePage?.(d.id, section.id)
+  );
+  const beingDragged = drag?.kind === 'section' && drag.id === section.id;
 
   return (
     <div className="mb-1">
@@ -569,9 +666,13 @@ const SectionItem: React.FC<SectionItemProps> = ({
           'group flex cursor-pointer items-center gap-1 rounded-lg px-1.5 py-1.5 transition',
           isActive
             ? 'bg-[var(--gutter)] text-[var(--spine)]'
-            : 'hover:bg-[var(--gutter)]/70'
+            : 'hover:bg-[var(--gutter)]/70',
+          drop.over && dropRing,
+          beingDragged && 'opacity-40'
         )}
         onClick={onSectionRowClick}
+        {...(editingSection ? {} : dragSrc)}
+        {...drop.handlers}
       >
         <button
           type="button"
@@ -641,6 +742,20 @@ const SectionItem: React.FC<SectionItemProps> = ({
           >
             <Pencil className="h-3 w-3" />
           </button>
+          {onRequestMove ? (
+            <button
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation();
+                onRequestMove({ kind: 'section', id: section.id, notebookId }, chapterLabel.text);
+              }}
+              className={actionBtn}
+              title="Move chapter to another book"
+              aria-label="Move chapter"
+            >
+              <FolderInput className="h-3 w-3" />
+            </button>
+          ) : null}
           <button
             type="button"
             onClick={(e) => {
@@ -753,6 +868,9 @@ const PageRow: React.FC<PageRowProps> = ({
     editTarget.id === page.id &&
     editTarget.sectionId === sectionId;
   const pageLabel = displayPageTitle(page);
+  const { onRequestMove, drag } = React.useContext(MoveContext);
+  const dragSrc = useDragSource({ kind: 'page', id: page.id, sectionId });
+  const beingDragged = drag?.kind === 'page' && drag.id === page.id;
 
   return (
     <div
@@ -760,11 +878,17 @@ const PageRow: React.FC<PageRowProps> = ({
         'group flex cursor-pointer items-center gap-1 rounded-md px-1.5 py-1 transition',
         isActive && 'bg-[var(--spine)] text-white shadow-sm',
         isSecondary && !isActive && 'bg-brand-100 text-[var(--spine)] dark:bg-brand-900/40',
-        !isActive && !isSecondary && 'hover:bg-[var(--gutter)]'
+        !isActive && !isSecondary && 'hover:bg-[var(--gutter)]',
+        beingDragged && 'opacity-40'
       )}
       onClick={(e) => onSelectPage(page.id, e.shiftKey)}
       title={pageLabel.text}
+      {...(editingPage ? {} : dragSrc)}
     >
+      <GripVertical
+        className="-ml-1 hidden h-3 w-3 shrink-0 cursor-grab opacity-0 transition group-hover:opacity-50 @[16rem]/sidebar:block"
+        aria-hidden
+      />
       <FileText
         className={cn(
           'h-3 w-3 shrink-0',
@@ -825,6 +949,23 @@ const PageRow: React.FC<PageRowProps> = ({
       >
         <Pencil className="h-3 w-3" />
       </button>
+      {onRequestMove ? (
+        <button
+          type="button"
+          onClick={(e) => {
+            e.stopPropagation();
+            onRequestMove({ kind: 'page', id: page.id, sectionId }, pageLabel.text);
+          }}
+          className={cn(
+            'rounded p-1 opacity-0 transition group-hover:opacity-100 focus-visible:opacity-100 @[14rem]/sidebar:opacity-100',
+            isActive ? 'hover:bg-white/15' : 'hover:bg-[var(--paper)]'
+          )}
+          title="Move page to another chapter"
+          aria-label="Move page"
+        >
+          <FolderInput className="h-3 w-3" />
+        </button>
+      ) : null}
       <button
         type="button"
         onClick={(e) => {

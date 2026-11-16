@@ -67,11 +67,29 @@ import {
   parseImportedMarkdown,
 } from './lib/markdownIO';
 import { isElectronApp } from './lib/platform';
+import {
+  detectDownloadTarget,
+  fetchLatestRelease,
+  getDownloadedUpdate,
+  getUpdatePrefs,
+  isNewer,
+  markChecked,
+  pickAsset,
+  setDownloadedUpdate,
+  shouldAutoCheck,
+} from './lib/version';
 import { coerceEntityTitle, validatePageContent } from './lib/validation';
 import { useAppDialogs } from './context/AppDialogsContext';
 import { useToast } from './context/ToastContext';
 import { useIsCompactLayout } from './hooks/useMediaQuery';
 import InstallPrompt from './components/InstallPrompt';
+import { MoveDialog } from './components/MoveDialog';
+import {
+  locatePage,
+  movePageLocal,
+  moveSectionLocal,
+  type DragItem,
+} from './lib/moveItems';
 
 const LandingPage = React.lazy(() => import('./components/LandingPage'));
 const ProfilePage = React.lazy(() => import('./components/ProfilePage'));
@@ -150,6 +168,48 @@ export default function App() {
     applyTheme(theme);
     setStoredTheme(theme);
   }, [theme]);
+
+  // Launch update check: notice for new versions, optional background download (desktop).
+  const signedIn = !!auth.user;
+  useEffect(() => {
+    if (!signedIn) return;
+    const prefs = getUpdatePrefs();
+    if (!prefs.notify && !prefs.autoDownload) return;
+    if (!shouldAutoCheck()) return;
+    const ctrl = new AbortController();
+    (async () => {
+      try {
+        const rel = await fetchLatestRelease(ctrl.signal);
+        markChecked();
+        if (!isNewer(rel.version)) return;
+        const desktop = isElectronApp() && !!window.luminaDesktop?.downloadUpdate;
+        const asset = pickAsset(rel.assets, detectDownloadTarget());
+        if (desktop && prefs.autoDownload && asset) {
+          if (getDownloadedUpdate()?.version === rel.version) {
+            toast.info(`Lumina v${rel.version} is downloaded — install it from Profile → About & updates.`);
+            return;
+          }
+          const res = await window.luminaDesktop!.downloadUpdate!({
+            url: asset.url,
+            name: asset.name,
+            size: asset.size,
+          });
+          if (res.ok && res.path) {
+            setDownloadedUpdate({ version: rel.version, path: res.path });
+            toast.success(`Lumina v${rel.version} downloaded — open Profile → About & updates to install.`);
+          }
+          return;
+        }
+        if (prefs.notify) {
+          toast.info(`Lumina v${rel.version} is available — see Profile → About & updates.`);
+        }
+      } catch {
+        /* offline or rate-limited — try again next launch */
+      }
+    })();
+    return () => ctrl.abort();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [signedIn]);
 
   const [a11y, setA11y] = useState<A11yPrefs>(() => getStoredA11y());
   useEffect(() => {
@@ -932,6 +992,78 @@ export default function App() {
     }
   };
 
+  const [moveRequest, setMoveRequest] = useState<{ item: DragItem; label: string } | null>(null);
+  const requestMove = useCallback(
+    (item: DragItem, label: string) => setMoveRequest({ item, label }),
+    []
+  );
+
+  /** Move a page into another chapter — sidebar drag-and-drop or the Move dialog. */
+  const handleMovePage = useCallback(
+    async (pageId: string, toSectionId: string, destLabel?: string) => {
+      try {
+        await api.pages.move(pageId, toSectionId);
+      } catch (err) {
+        console.error('Failed to move page', err);
+        toast.error('Could not move the page');
+        throw err;
+      }
+      setState((prev) => {
+        const notebooks = movePageLocal(prev.notebooks, pageId, toSectionId);
+        const loc = locatePage(notebooks, pageId);
+        const wasActive = prev.activePageId === pageId;
+        if (wasActive && loc) {
+          // Follow the page to its new chapter.
+          return {
+            ...prev,
+            notebooks,
+            activeNotebookId: loc.notebookId,
+            activeSectionId: loc.sectionId,
+          };
+        }
+        return {
+          ...prev,
+          notebooks,
+          activePageId: wasActive ? null : prev.activePageId,
+          secondaryPageId: secondaryStillValid(prev, notebooks),
+        };
+      });
+      toast.success(destLabel ? `Page moved to “${destLabel}”` : 'Page moved');
+    },
+    [toast]
+  );
+
+  /** Move a chapter (and its pages) into another book. */
+  const handleMoveSection = useCallback(
+    async (sectionId: string, toNotebookId: string, destLabel?: string) => {
+      try {
+        await api.sections.move(sectionId, toNotebookId);
+      } catch (err) {
+        console.error('Failed to move chapter', err);
+        toast.error('Could not move the chapter');
+        throw err;
+      }
+      setState((prev) => {
+        const notebooks = moveSectionLocal(prev.notebooks, sectionId, toNotebookId);
+        const stillLoaded = notebooks.some((n) => n.sections.some((s) => s.id === sectionId));
+        if (prev.activeSectionId === sectionId) {
+          return stillLoaded
+            ? { ...prev, notebooks, activeNotebookId: toNotebookId }
+            : {
+                ...prev,
+                notebooks,
+                activeSectionId: null,
+                activePageId: null,
+                secondaryPageId: secondaryStillValid(prev, notebooks),
+              };
+        }
+        return { ...prev, notebooks, secondaryPageId: secondaryStillValid(prev, notebooks) };
+      });
+      toast.success(destLabel ? `Chapter moved to “${destLabel}”` : 'Chapter moved');
+    },
+    [toast]
+  );
+
   const handleDeletePage = async (sectionId: string, pageId: string) => {
     const page = state.notebooks
       .flatMap((n) => n.sections)
@@ -1332,6 +1464,9 @@ export default function App() {
                     onRenameNotebook={handleRenameNotebook}
                     onRenameSection={handleRenameSection}
                     onRenamePage={handleRenamePage}
+                    onMovePage={(id, to) => void handleMovePage(id, to).catch(() => {})}
+                    onMoveSection={(id, to) => void handleMoveSection(id, to).catch(() => {})}
+                    onRequestMove={requestMove}
                   />
                 </div>
               </div>
@@ -1417,6 +1552,9 @@ export default function App() {
                     onRenameNotebook={handleRenameNotebook}
                     onRenameSection={handleRenameSection}
                     onRenamePage={handleRenamePage}
+                    onMovePage={(id, to) => void handleMovePage(id, to).catch(() => {})}
+                    onMoveSection={(id, to) => void handleMoveSection(id, to).catch(() => {})}
+                    onRequestMove={requestMove}
                   />
                 </Panel>
                 <PanelResizeHandle className="w-1.5 shrink-0 cursor-col-resize bg-[var(--gutter)] transition-colors hover:bg-brand-200 dark:hover:bg-brand-800" />
@@ -1570,6 +1708,18 @@ export default function App() {
       </footer>
 
       <InstallPrompt />
+      {moveRequest ? (
+        <MoveDialog
+          item={moveRequest.item}
+          itemLabel={moveRequest.label}
+          onClose={() => setMoveRequest(null)}
+          onMove={(destId, destLabel) =>
+            moveRequest.item.kind === 'page'
+              ? handleMovePage(moveRequest.item.id, destId, destLabel)
+              : handleMoveSection(moveRequest.item.id, destId, destLabel)
+          }
+        />
+      ) : null}
     </div>
   );
 }

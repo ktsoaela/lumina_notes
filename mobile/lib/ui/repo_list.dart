@@ -6,8 +6,6 @@ import '../app_scope.dart';
 import '../data/api_client.dart';
 import '../data/local_repository.dart' show RuleException;
 import '../data/models.dart';
-import 'connect_screen.dart';
-import 'sync_status_chip.dart';
 
 /// Loads a list from the repository and reloads on every `repo.changes` event
 /// and on pull-to-refresh.
@@ -101,116 +99,136 @@ String errorMessage(Object e) => switch (e) {
       _ => 'Something went wrong',
     };
 
-/// A screen listing one level of the hierarchy with create / rename / delete.
-class HierarchyListScreen<T> extends StatelessWidget {
-  const HierarchyListScreen({
-    super.key,
-    required this.title,
-    required this.kind,
-    required this.newLabel,
-    required this.load,
-    required this.idOf,
-    required this.labelOf,
-    required this.icon,
-    required this.onOpen,
-    required this.onCreate,
-    this.actions,
-  });
+enum ItemAction { rename, move, delete }
 
-  final String title;
-  final EntityKind kind;
-  final String newLabel;
-  final Future<List<T>> Function() load;
-  final String Function(T) idOf;
-  final String Function(T) labelOf;
-  final IconData icon;
-  final void Function(BuildContext context, T item) onOpen;
-  final Future<void> Function(BuildContext context, String name) onCreate;
-  final List<Widget>? actions;
-
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(
-        title: Row(
-          children: [
-            Image.asset('assets/logo_mark.png', height: 28, semanticLabel: 'Lumina Notes'),
-            const SizedBox(width: 10),
-            Flexible(child: Text(title, overflow: TextOverflow.ellipsis)),
-          ],
-        ),
-        actions: [
-          if (AppScope.of(context).sync case final engine?)
-            SyncStatusChip(
-              engine: engine,
-              onSignInAgain: () => Navigator.push(
-                context,
-                MaterialPageRoute<void>(builder: (_) => const ConnectScreen(reauth: true)),
-              ),
-            ),
-          ...?actions,
-        ],
-      ),
-      body: RepoList<T>(
-        load: load,
-        item: (item) => ListTile(
-          leading: Icon(icon),
-          title: Text(labelOf(item)),
-          onTap: () => onOpen(context, item),
-          onLongPress: () => _itemMenu(context, item),
-        ),
-      ),
-      floatingActionButton: FloatingActionButton.extended(
-        key: const Key('fab'),
-        icon: const Icon(Icons.add),
-        label: Text(newLabel),
-        onPressed: () async {
-          final name = await askName(context, title: newLabel, action: 'Create');
-          if (name == null || !context.mounted) return;
-          await _guard(context, () => onCreate(context, name));
-        },
-      ),
-    );
-  }
-
-  Future<void> _itemMenu(BuildContext context, T item) async {
-    final choice = await showModalBottomSheet<String>(
+/// Bottom sheet with Rename / Move to… / Delete for a book, chapter or page.
+Future<ItemAction?> showItemMenu(BuildContext context, {required String label, String? moveLabel}) =>
+    showModalBottomSheet<ItemAction>(
       context: context,
       builder: (ctx) => SafeArea(
         child: Column(mainAxisSize: MainAxisSize.min, children: [
-          ListTile(
-            leading: const Icon(Icons.edit),
-            title: const Text('Rename'),
-            onTap: () => Navigator.pop(ctx, 'rename'),
+          Padding(
+            padding: const EdgeInsets.fromLTRB(24, 0, 24, 8),
+            child: Text(label, maxLines: 1, overflow: TextOverflow.ellipsis, style: Theme.of(ctx).textTheme.titleMedium),
           ),
+          ListTile(
+            leading: const Icon(Icons.edit_outlined),
+            title: const Text('Rename'),
+            onTap: () => Navigator.pop(ctx, ItemAction.rename),
+          ),
+          if (moveLabel != null)
+            ListTile(
+              leading: const Icon(Icons.drive_file_move_outline),
+              title: Text(moveLabel),
+              onTap: () => Navigator.pop(ctx, ItemAction.move),
+            ),
           ListTile(
             leading: const Icon(Icons.delete_outline),
             title: const Text('Delete'),
-            onTap: () => Navigator.pop(ctx, 'delete'),
+            onTap: () => Navigator.pop(ctx, ItemAction.delete),
           ),
         ]),
       ),
     );
-    if (!context.mounted || choice == null) return;
-    final repo = AppScope.of(context).repo;
-    if (choice == 'rename') {
-      final name = await askName(context, title: 'Rename', action: 'Rename', initial: labelOf(item));
-      if (name == null || !context.mounted) return;
-      await _guard(context, () => repo.rename(kind, idOf(item), name));
-    } else {
-      final ok = await confirmDelete(context, labelOf(item));
-      if (!ok || !context.mounted) return;
-      await _guard(context, () => repo.delete(kind, idOf(item)));
-    }
-  }
-}
 
-Future<void> _guard(BuildContext context, Future<void> Function() action) async {
+/// Runs [action]; shows its error as a snack bar instead of throwing.
+Future<bool> guard(BuildContext context, Future<void> Function() action) async {
   final messenger = ScaffoldMessenger.of(context);
   try {
     await action();
+    return true;
   } catch (e) {
     messenger.showSnackBar(SnackBar(content: Text(errorMessage(e))));
+    return false;
+  }
+}
+
+/// Rename or delete flow shared by books, chapters and pages.
+Future<void> runRenameOrDelete(
+  BuildContext context, {
+  required ItemAction action,
+  required EntityKind kind,
+  required String id,
+  required String label,
+}) async {
+  final repo = AppScope.of(context).repo;
+  if (action == ItemAction.rename) {
+    final name = await askName(context, title: 'Rename', action: 'Rename', initial: label);
+    if (name == null || !context.mounted) return;
+    await guard(context, () => repo.rename(kind, id, name));
+  } else if (action == ItemAction.delete) {
+    final ok = await confirmDelete(context, label);
+    if (!ok || !context.mounted) return;
+    await guard(context, () => repo.delete(kind, id));
+  }
+}
+
+/// Loads with [load] and rebuilds after every repository change.
+/// Give it a new `key` when what [load] fetches changes (e.g. another chapter).
+class RepoBuilder<T> extends StatefulWidget {
+  const RepoBuilder({super.key, required this.load, required this.builder});
+
+  final Future<T> Function() load;
+  final Widget Function(BuildContext context, T data) builder;
+
+  @override
+  State<RepoBuilder<T>> createState() => _RepoBuilderState<T>();
+}
+
+class _RepoBuilderState<T> extends State<RepoBuilder<T>> {
+  StreamSubscription<void>? _sub;
+  T? _data;
+  bool _loaded = false;
+  Object? _error;
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    if (_sub == null) {
+      _sub = AppScope.of(context).repo.changes.listen((_) => _reload());
+      _reload();
+    }
+  }
+
+  @override
+  void dispose() {
+    _sub?.cancel();
+    super.dispose();
+  }
+
+  Future<void> _reload() async {
+    try {
+      final d = await widget.load();
+      if (mounted) {
+        setState(() {
+          _data = d;
+          _loaded = true;
+          _error = null;
+        });
+      }
+    } catch (e) {
+      if (!mounted) return;
+      if (e is ApiException && e.isAuthError) {
+        await AppScope.of(context).signOut();
+        return;
+      }
+      setState(() => _error = e);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    if (_error != null && !_loaded) {
+      return Center(
+        child: Column(mainAxisSize: MainAxisSize.min, children: [
+          Text(errorMessage(_error!)),
+          const SizedBox(height: 8),
+          OutlinedButton(onPressed: _reload, child: const Text('Retry')),
+        ]),
+      );
+    }
+    if (!_loaded) return const Center(child: CircularProgressIndicator());
+    return widget.builder(context, _data as T);
   }
 }
 
