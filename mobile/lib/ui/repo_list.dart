@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 
 import '../app_scope.dart';
 import '../data/api_client.dart';
+import '../data/local_repository.dart' show RuleException;
 import '../data/models.dart';
 
 /// Loads a list from the repository and reloads on every `repo.changes` event
@@ -91,6 +92,7 @@ String errorMessage(Object e) => switch (e) {
       ApiException(:final message) => message,
       NetworkException() => 'Cannot reach server',
       FormatException(:final message) => message,
+      RuleException(:final message) => message,
       _ => 'Something went wrong',
     };
 
