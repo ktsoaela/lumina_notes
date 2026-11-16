@@ -73,5 +73,20 @@
 		<string>UIInterfaceOrientationLandscapeLeft</string>
 		<string>UIInterfaceOrientationLandscapeRight</string>
 	</array>
+	<key>NSCameraUsageDescription</key>
+	<string>Scan the pairing QR from Lumina on your computer to connect.</string>
+	<key>FlutterDeepLinkingEnabled</key>
+	<false/>
+	<key>CFBundleURLTypes</key>
+	<array>
+		<dict>
+			<key>CFBundleURLName</key>
+			<string>lumina.pair</string>
+			<key>CFBundleURLSchemes</key>
+			<array>
+				<string>lumina</string>
+			</array>
+		</dict>
+	</array>
 </dict>
 </plist>

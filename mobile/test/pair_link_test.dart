@@ -1,13 +1,19 @@
+import 'dart:async';
+
+import 'package:flutter/material.dart' show GlobalKey, ScaffoldMessengerState;
 import 'package:flutter_test/flutter_test.dart';
 import 'package:lumina_notes/app_scope.dart';
 import 'package:lumina_notes/data/api_client.dart';
 import 'package:lumina_notes/data/local_repository.dart' show RuleException;
 import 'package:lumina_notes/data/pair_link.dart';
 import 'package:lumina_notes/data/session_store.dart';
+import 'package:lumina_notes/pair_links.dart';
 
 import 'fakes.dart';
 
 void main() {
+  TestWidgetsFlutterBinding.ensureInitialized();
+
   group('parsePairLink', () {
     test('reads server and code', () {
       final l = parsePairLink('lumina://pair?u=http%3A%2F%2F192.168.0.225%3A58888&c=AB12CD34')!;
@@ -82,6 +88,24 @@ void main() {
       expect(kv.values['lumina.serverUrl'], 'http://a:1');
       expect(fake.pairedCodes, ['AB12CD34']);
     });
+  });
+
+  test('links from the OS stream are applied', () async {
+    final kv = MemoryKeyValueStore();
+    final session = SessionStore(kv);
+    await session.load();
+    final fake = FakeApiClient();
+    final services = AppServices(
+        session: session, apiFactory: (url, token) => fake..token = token, local: memoryLocal(), autoSync: false);
+    final links = StreamController<Uri>();
+    final sub = listenForPairLinks(services, GlobalKey<ScaffoldMessengerState>(), links: links.stream);
+    links.add(Uri.parse('lumina://pair?u=http%3A%2F%2F10.0.0.5%3A58888&c=AB12CD34'));
+    for (var i = 0; i < 50 && !services.isSignedIn; i++) {
+      await Future<void>.delayed(const Duration(milliseconds: 20));
+    }
+    expect(services.isSignedIn, isTrue);
+    await sub.cancel();
+    await links.close();
   });
 
   test('clearServerUrl forgets the saved server', () async {

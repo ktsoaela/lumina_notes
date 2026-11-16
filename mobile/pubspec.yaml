@@ -40,6 +40,8 @@ dependencies:
   drift_flutter: ^0.3.1
   connectivity_plus: ^7.3.2
   flutter_markdown_plus: ^1.0.12
+  mobile_scanner: ^7.5.0
+  app_links: ^7.2.2
 
 dev_dependencies:
   flutter_test:

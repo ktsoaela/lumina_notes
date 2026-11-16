@@ -12,6 +12,7 @@ void main() {
     await session.load();
     await tester.pumpWidget(LuminaApp(services: AppServices(session: session, local: memoryLocal(), autoSync: false)));
     expect(find.text('Lumina Notes'), findsWidgets);
-    expect(find.byKey(const Key('serverUrl')), findsOneWidget);
+    expect(find.byKey(const Key('scanQr')), findsOneWidget);
+    expect(find.byKey(const Key('serverUrl')), findsNothing);
   });
 }

@@ -117,7 +117,9 @@ void main() {
   testWidgets('sign out returns to connect screen', (tester) async {
     await _pumpSignedIn(tester);
     await _tap(tester, find.byTooltip('Sign out'));
-    expect(find.byKey(const Key('serverUrl')), findsOneWidget);
+    // Server is kept: straight to login, no URL to retype.
+    expect(find.byKey(const Key('serverLabel')), findsOneWidget);
+    expect(find.byKey(const Key('identifier')), findsOneWidget);
   });
 
   testWidgets('sign out with unsynced changes asks first', (tester) async {
@@ -135,7 +137,8 @@ void main() {
     _services.sync!.debugSetState(SyncState.authExpired, pendingCount: 1);
     await _settle(tester);
     await _tap(tester, find.text('Sign in again · 1'));
-    expect(find.byKey(const Key('serverUrl')), findsOneWidget);
+    expect(find.byKey(const Key('serverLabel')), findsOneWidget);
+    expect(find.byKey(const Key('changeServer')), findsNothing); // re-auth can't switch servers
     final id = tester.widget<TextField>(find.byKey(const Key('identifier')));
     expect(id.controller!.text, 'alice');
     expect(await tester.runAsync(() => local.bookshelves()).then((b) => b!.length), 1);
