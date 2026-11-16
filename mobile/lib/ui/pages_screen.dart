@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../app_scope.dart';
 import '../data/models.dart';
+import 'adaptive_home.dart';
 import 'page_editor_screen.dart';
 import 'repo_list.dart';
 
@@ -10,10 +11,17 @@ class PagesScreen extends StatelessWidget {
 
   final Section section;
 
-  static void _openEditor(BuildContext context, String pageId) => Navigator.push(
-        context,
-        MaterialPageRoute<void>(builder: (_) => PageEditorScreen(pageId: pageId)),
-      );
+  static void _openEditor(BuildContext context, String pageId) {
+    final selection = PageSelection.maybeOf(context);
+    if (selection != null) {
+      selection.value = pageId; // tablet: show in the editor pane
+      return;
+    }
+    Navigator.push(
+      context,
+      MaterialPageRoute<void>(builder: (_) => PageEditorScreen(pageId: pageId)),
+    );
+  }
 
   @override
   Widget build(BuildContext context) {

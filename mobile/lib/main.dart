@@ -3,7 +3,7 @@ import 'package:flutter/material.dart';
 import 'app_scope.dart';
 import 'data/session_store.dart';
 import 'ui/connect_screen.dart';
-import 'ui/shelves_screen.dart';
+import 'ui/adaptive_home.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -32,7 +32,7 @@ class LuminaApp extends StatelessWidget {
         home: ListenableBuilder(
           listenable: services,
           builder: (_, _) => services.isSignedIn
-              ? ShelvesScreen(key: ValueKey(services.session.user?.id))
+              ? AdaptiveHome(key: ValueKey(services.session.user?.id))
               : const ConnectScreen(),
         ),
       ),

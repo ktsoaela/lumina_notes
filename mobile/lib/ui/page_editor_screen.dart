@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:flutter_markdown_plus/flutter_markdown_plus.dart';
 
 import '../app_scope.dart';
 import '../data/models.dart';
@@ -9,11 +10,18 @@ import 'repo_list.dart' show errorMessage;
 
 enum _SaveState { saved, dirty, saving, failed }
 
-/// Markdown page editor. Autosaves 800 ms after the last keystroke and on close.
+/// Markdown page editor with an Edit / Preview toggle.
+///
+/// Autosaves 800 ms after the last keystroke and on close. When sync brings a
+/// newer version of this page and there are no unsaved local edits, the
+/// editor shows it.
 class PageEditorScreen extends StatefulWidget {
-  const PageEditorScreen({super.key, required this.pageId});
+  const PageEditorScreen({super.key, required this.pageId, this.embedded = false});
 
   final String pageId;
+
+  /// Shown in the tablet editor pane (no back button).
+  final bool embedded;
 
   static const debounce = Duration(milliseconds: 800);
 
@@ -25,18 +33,22 @@ class _PageEditorScreenState extends State<PageEditorScreen> {
   final _title = TextEditingController();
   final _content = TextEditingController();
   late NotesRepository _repo;
+  StreamSubscription<void>? _changesSub;
   NotePage? _page;
   Object? _loadError;
   Timer? _timer;
   _SaveState _state = _SaveState.saved;
   String? _saveError;
   Future<void>? _inFlight;
+  bool _preview = false;
+  bool _deleted = false;
 
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
-    if (_page == null && _loadError == null) {
+    if (_changesSub == null) {
       _repo = AppScope.of(context).repo;
+      _changesSub = _repo.changes.listen((_) => _refreshFromStore());
       _load();
     }
   }
@@ -59,6 +71,24 @@ class _PageEditorScreenState extends State<PageEditorScreen> {
     }
   }
 
+  /// Sync (or another screen) changed the store: adopt a newer stored version
+  /// unless the user has unsaved edits.
+  Future<void> _refreshFromStore() async {
+    final current = _page;
+    if (current == null || _hasChanges || _state == _SaveState.saving) return;
+    final p = await _repo.page(widget.pageId);
+    if (!mounted) return;
+    if (p == null) {
+      setState(() => _deleted = true);
+      return;
+    }
+    if (p.title == current.title && p.content == current.content) return;
+    _page = p; // set first so the controller listeners don't see "changes"
+    _title.text = p.title;
+    _content.text = p.content;
+    setState(() {});
+  }
+
   bool get _hasChanges =>
       _page != null && (_title.text != _page!.title || _content.text != _page!.content);
 
@@ -69,15 +99,17 @@ class _PageEditorScreenState extends State<PageEditorScreen> {
     if (_state != _SaveState.dirty) setState(() => _state = _SaveState.dirty);
   }
 
+  NotePage _draft() => _page!.copyWith(
+        title: _title.text.trim().isEmpty ? 'Untitled' : _title.text.trim(),
+        content: _content.text,
+      );
+
   Future<void> _save() async {
     _timer?.cancel();
-    if (!_hasChanges) return;
+    if (!_hasChanges || _deleted) return;
     await _inFlight; // keep saves ordered
     if (!_hasChanges) return;
-    final next = _page!.copyWith(
-      title: _title.text.trim().isEmpty ? 'Untitled' : _title.text.trim(),
-      content: _content.text,
-    );
+    final next = _draft();
     if (mounted) setState(() => _state = _SaveState.saving);
     final run = _repo.savePage(next);
     _inFlight = run;
@@ -97,15 +129,10 @@ class _PageEditorScreenState extends State<PageEditorScreen> {
   @override
   void dispose() {
     _timer?.cancel();
-    if (_hasChanges) {
+    _changesSub?.cancel();
+    if (_hasChanges && !_deleted) {
       // Fire-and-forget final save when leaving the editor.
-      final p = _page!;
-      _repo
-          .savePage(p.copyWith(
-            title: _title.text.trim().isEmpty ? 'Untitled' : _title.text.trim(),
-            content: _content.text,
-          ))
-          .ignore();
+      _repo.savePage(_draft()).ignore();
     }
     _title.dispose();
     _content.dispose();
@@ -121,18 +148,29 @@ class _PageEditorScreenState extends State<PageEditorScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final leading = widget.embedded ? const SizedBox.shrink() : null;
     if (_loadError != null) {
-      return Scaffold(appBar: AppBar(), body: Center(child: Text(_loadError.toString())));
+      return Scaffold(
+        appBar: AppBar(automaticallyImplyLeading: !widget.embedded),
+        body: Center(child: Text(_loadError.toString())),
+      );
     }
     if (_page == null) {
-      return Scaffold(appBar: AppBar(), body: const Center(child: CircularProgressIndicator()));
+      return Scaffold(
+        appBar: AppBar(automaticallyImplyLeading: !widget.embedded),
+        body: const Center(child: CircularProgressIndicator()),
+      );
     }
     return Scaffold(
       appBar: AppBar(
+        automaticallyImplyLeading: !widget.embedded,
+        leading: leading,
+        leadingWidth: widget.embedded ? 0 : null,
         title: TextField(
           key: const Key('pageTitle'),
           controller: _title,
           maxLength: 120,
+          readOnly: _deleted,
           style: Theme.of(context).textTheme.titleLarge,
           decoration: const InputDecoration(
             border: InputBorder.none,
@@ -153,12 +191,42 @@ class _PageEditorScreenState extends State<PageEditorScreen> {
             ),
           ),
         ],
+        bottom: PreferredSize(
+          preferredSize: const Size.fromHeight(48),
+          child: Padding(
+            padding: const EdgeInsets.only(bottom: 8),
+            child: SegmentedButton<bool>(
+              segments: const [
+                ButtonSegment(value: false, icon: Icon(Icons.edit_outlined), label: Text('Edit')),
+                ButtonSegment(value: true, icon: Icon(Icons.visibility_outlined), label: Text('Preview')),
+              ],
+              selected: {_preview},
+              onSelectionChanged: (s) => setState(() => _preview = s.first),
+            ),
+          ),
+        ),
       ),
-      body: Padding(
+      body: Column(children: [
+        if (_deleted)
+          MaterialBanner(
+            content: const Text('This page was deleted on another device.'),
+            actions: [
+              if (!widget.embedded)
+                TextButton(onPressed: () => Navigator.maybePop(context), child: const Text('Close')),
+              if (widget.embedded) const SizedBox.shrink(),
+            ],
+          ),
+        Expanded(child: _preview ? _buildPreview() : _buildEditor()),
+      ]),
+    );
+  }
+
+  Widget _buildEditor() => Padding(
         padding: const EdgeInsets.symmetric(horizontal: 16),
         child: TextField(
           key: const Key('pageContent'),
           controller: _content,
+          readOnly: _deleted,
           expands: true,
           maxLines: null,
           minLines: null,
@@ -170,7 +238,15 @@ class _PageEditorScreenState extends State<PageEditorScreen> {
             hintText: 'Write in Markdown…',
           ),
         ),
-      ),
-    );
-  }
+      );
+
+  // Mermaid/Plotly fences render as plain code blocks on mobile (v1).
+  Widget _buildPreview() => _content.text.trim().isEmpty
+      ? const Center(child: Text('Nothing to preview'))
+      : Markdown(
+          key: const Key('pagePreview'),
+          data: _content.text,
+          selectable: true,
+          padding: const EdgeInsets.all(16),
+        );
 }
