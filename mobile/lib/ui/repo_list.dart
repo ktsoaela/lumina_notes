@@ -6,6 +6,8 @@ import '../app_scope.dart';
 import '../data/api_client.dart';
 import '../data/local_repository.dart' show RuleException;
 import '../data/models.dart';
+import 'connect_screen.dart';
+import 'sync_status_chip.dart';
 
 /// Loads a list from the repository and reloads on every `repo.changes` event
 /// and on pull-to-refresh.
@@ -73,7 +75,10 @@ class _RepoListState<T> extends State<RepoList<T>> {
     }
     if (items == null) return const Center(child: CircularProgressIndicator());
     return RefreshIndicator(
-      onRefresh: _reload,
+      onRefresh: () async {
+        await AppScope.of(context).sync?.syncNow();
+        await _reload();
+      },
       child: items.isEmpty
           ? ListView(children: const [
               SizedBox(height: 120),
@@ -134,7 +139,17 @@ class HierarchyListScreen<T> extends StatelessWidget {
             Flexible(child: Text(title, overflow: TextOverflow.ellipsis)),
           ],
         ),
-        actions: actions,
+        actions: [
+          if (AppScope.of(context).sync case final engine?)
+            SyncStatusChip(
+              engine: engine,
+              onSignInAgain: () => Navigator.push(
+                context,
+                MaterialPageRoute<void>(builder: (_) => const ConnectScreen(reauth: true)),
+              ),
+            ),
+          ...?actions,
+        ],
       ),
       body: RepoList<T>(
         load: load,

@@ -10,7 +10,7 @@ void main() {
   testWidgets('signed-out app shows Lumina Notes connect screen', (tester) async {
     final session = SessionStore(MemoryKeyValueStore());
     await session.load();
-    await tester.pumpWidget(LuminaApp(services: AppServices(session: session, local: memoryLocal())));
+    await tester.pumpWidget(LuminaApp(services: AppServices(session: session, local: memoryLocal(), autoSync: false)));
     expect(find.text('Lumina Notes'), findsWidgets);
     expect(find.byKey(const Key('serverUrl')), findsOneWidget);
   });

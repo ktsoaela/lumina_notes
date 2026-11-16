@@ -7,11 +7,14 @@ import 'package:lumina_notes/data/local_repository.dart';
 import 'package:lumina_notes/data/models.dart';
 import 'package:lumina_notes/data/session_store.dart';
 import 'package:lumina_notes/main.dart';
+import 'package:lumina_notes/sync/sync_engine.dart';
 
 import 'fakes.dart';
 
 /// Signed-in app backed by an in-memory local DB that already holds one
 /// synced shelf → notebook → section → page.
+late AppServices _services;
+
 Future<LocalRepository> _pumpSignedIn(WidgetTester tester) async {
   final local = memoryLocal();
   await tester.runAsync(() async {
@@ -26,10 +29,11 @@ Future<LocalRepository> _pumpSignedIn(WidgetTester tester) async {
   final kv = MemoryKeyValueStore()
     ..values['lumina.serverUrl'] = 'http://fake'
     ..values['lumina.token'] = 'tok'
-    ..values['lumina.user'] = jsonEncode({'id': 1, 'email': 'a@b.co', 'name': 'A'});
+    ..values['lumina.user'] = jsonEncode({'id': 1, 'email': 'a@b.co', 'name': 'A', 'username': 'alice'});
   final session = SessionStore(kv);
   await session.load();
-  final services = AppServices(session: session, apiFactory: (_, _) => FakeApiClient(), local: local);
+  final services = AppServices(session: session, apiFactory: (_, _) => FakeApiClient(), local: local, autoSync: false);
+  _services = services;
   await tester.pumpWidget(LuminaApp(services: services));
   await _settle(tester);
   return local;
@@ -124,5 +128,16 @@ void main() {
     expect(find.text('1 unsynced change will be lost'), findsOneWidget);
     await _tap(tester, find.text('Cancel'));
     expect(find.byKey(const Key('serverUrl')), findsNothing);
+  });
+
+  testWidgets('Sign in again opens connect screen prefilled and keeps local data', (tester) async {
+    final local = await _pumpSignedIn(tester);
+    _services.sync!.debugSetState(SyncState.authExpired, pendingCount: 1);
+    await _settle(tester);
+    await _tap(tester, find.text('Sign in again · 1'));
+    expect(find.byKey(const Key('serverUrl')), findsOneWidget);
+    final id = tester.widget<TextField>(find.byKey(const Key('identifier')));
+    expect(id.controller!.text, 'alice');
+    expect(await tester.runAsync(() => local.bookshelves()).then((b) => b!.length), 1);
   });
 }

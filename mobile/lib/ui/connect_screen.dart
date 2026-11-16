@@ -6,7 +6,11 @@ import 'repo_list.dart' show errorMessage;
 
 /// Server URL + login / sign up.
 class ConnectScreen extends StatefulWidget {
-  const ConnectScreen({super.key});
+  const ConnectScreen({super.key, this.reauth = false});
+
+  /// Opened from "Sign in again": pop on success; local data is kept when the
+  /// same user signs back in.
+  final bool reauth;
 
   @override
   State<ConnectScreen> createState() => _ConnectScreenState();
@@ -28,7 +32,9 @@ class _ConnectScreenState extends State<ConnectScreen> {
   void didChangeDependencies() {
     super.didChangeDependencies();
     if (_url.text.isEmpty) {
-      _url.text = AppScope.of(context).session.serverUrl ?? '';
+      final session = AppScope.of(context).session;
+      _url.text = session.serverUrl ?? '';
+      if (widget.reauth) _identifier.text = session.user?.username ?? session.user?.email ?? '';
     }
   }
 
@@ -71,6 +77,7 @@ class _ConnectScreenState extends State<ConnectScreen> {
             )
           : await api.login(_identifier.text.trim(), _password.text);
       await services.signIn(url, auth);
+      if (widget.reauth && mounted) Navigator.pop(context);
     } catch (e) {
       if (mounted) setState(() => _error = errorMessage(e));
     } finally {

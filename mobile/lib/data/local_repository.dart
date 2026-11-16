@@ -25,11 +25,21 @@ class LocalRepository implements NotesRepository {
 
   final LocalDb db;
   final _changes = StreamController<void>.broadcast();
+  final _localEdits = StreamController<void>.broadcast();
 
   @override
   Stream<void> get changes => _changes.stream;
 
+  /// Emits only for the user's own mutations (not for sync applying remote
+  /// changes), so the scheduler can push soon after an edit without looping.
+  Stream<void> get localEdits => _localEdits.stream;
+
   void _changed() => _changes.add(null);
+
+  void _edited() {
+    _changes.add(null);
+    _localEdits.add(null);
+  }
 
   DateTime _now() => DateTime.now().toUtc();
 
@@ -83,7 +93,7 @@ class LocalRepository implements NotesRepository {
       await db.into(db.bookshelves).insert(_shelfRow(b));
       await enqueue(EntityKind.bookshelf, b.id, 'upsert', _payload(b), b.updatedAt!);
     });
-    _changed();
+    _edited();
     return b;
   }
 
@@ -95,7 +105,7 @@ class LocalRepository implements NotesRepository {
       await db.into(db.notebooks).insert(_notebookRow(n));
       await enqueue(EntityKind.notebook, n.id, 'upsert', _payload(n), n.updatedAt!);
     });
-    _changed();
+    _edited();
     return n;
   }
 
@@ -107,7 +117,7 @@ class LocalRepository implements NotesRepository {
       await db.into(db.sections).insert(_sectionRow(s));
       await enqueue(EntityKind.section, s.id, 'upsert', _payload(s), s.updatedAt!);
     });
-    _changed();
+    _edited();
     return s;
   }
 
@@ -119,7 +129,7 @@ class LocalRepository implements NotesRepository {
       await db.into(db.pages).insert(_pageRow(p));
       await enqueue(EntityKind.page, p.id, 'upsert', _payload(p), p.updatedAt!);
     });
-    _changed();
+    _edited();
     return p;
   }
 
@@ -130,7 +140,7 @@ class LocalRepository implements NotesRepository {
       await db.into(db.pages).insertOnConflictUpdate(_pageRow(p).toCompanion(true));
       await enqueue(EntityKind.page, p.id, 'upsert', _payload(p), p.updatedAt!);
     });
-    _changed();
+    _edited();
   }
 
   @override
@@ -160,7 +170,7 @@ class LocalRepository implements NotesRepository {
           await enqueue(kind, id, 'upsert', _payload(p), at);
       }
     });
-    _changed();
+    _edited();
   }
 
   @override
@@ -176,7 +186,7 @@ class LocalRepository implements NotesRepository {
       await _deleteTree(kind, id, dropOutbox: true);
       await enqueue(kind, id, 'delete', const {}, _now(), base: base);
     });
-    _changed();
+    _edited();
   }
 
   /// Deletes [id] and its descendants locally. With [dropOutbox], pending ops of

@@ -166,6 +166,12 @@ class SyncEngine extends ChangeNotifier {
     await repo.setMeta('cursor', c.cursor);
   }
 
+  @visibleForTesting
+  void debugSetState(SyncState s, {int pendingCount = 0, String? error}) {
+    pending = pendingCount;
+    _set(s, error: error);
+  }
+
   @override
   void dispose() {
     _disposed = true;

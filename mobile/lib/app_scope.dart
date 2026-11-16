@@ -6,6 +6,8 @@ import 'data/local_repository.dart';
 import 'data/models.dart';
 import 'data/notes_repository.dart';
 import 'data/session_store.dart';
+import 'sync/sync_engine.dart';
+import 'sync/sync_scheduler.dart';
 
 typedef ApiFactory = ApiClient Function(String baseUrl, String? token);
 typedef RepoFactory = NotesRepository Function(ApiClient api);
@@ -20,9 +22,10 @@ class AppServices extends ChangeNotifier {
     ApiFactory? apiFactory,
     LocalRepository? local,
     RepoFactory? repoFactory,
+    this.autoSync = true,
   })  : _apiFactory = apiFactory ?? ((url, token) => ApiClient(baseUrl: url, token: token)),
-        _local = local,
-        _repoFactory = repoFactory {
+        _local = local, // ignore: prefer_initializing_formals
+        _repoFactory = repoFactory { // ignore: prefer_initializing_formals
     if (session.isSignedIn) _connect();
   }
 
@@ -30,6 +33,15 @@ class AppServices extends ChangeNotifier {
   final ApiFactory _apiFactory;
   final RepoFactory? _repoFactory; // tests: bypass the local DB
   LocalRepository? _local;
+
+  /// Start the sync scheduler on sign-in (off in widget tests: no plugins).
+  final bool autoSync;
+
+  SyncEngine? _sync;
+  SyncScheduler? _scheduler;
+
+  /// The sync engine for the signed-in user (null when not using the local DB).
+  SyncEngine? get sync => _sync;
 
   ApiClient? _api;
   NotesRepository? _repo;
@@ -49,8 +61,20 @@ class AppServices extends ChangeNotifier {
   ApiClient apiFor(String baseUrl) => _apiFactory(baseUrl, null);
 
   void _connect() {
+    _stopSync();
     _api = _apiFactory(session.serverUrl!, session.token);
     _repo = _repoFactory?.call(_api!) ?? local;
+    if (_repoFactory == null) {
+      _sync = SyncEngine(local, _api!, retry: autoSync);
+      if (autoSync) _scheduler = SyncScheduler(_sync!, local)..start();
+    }
+  }
+
+  void _stopSync() {
+    _scheduler?.dispose();
+    _scheduler = null;
+    _sync?.dispose();
+    _sync = null;
   }
 
   Future<int> pendingCount() async => _repoFactory == null ? local.pendingCount() : 0;
@@ -64,15 +88,9 @@ class AppServices extends ChangeNotifier {
     notifyListeners();
   }
 
-  /// Replace an expired token without touching local data or the outbox.
-  Future<void> refreshToken(AuthResult auth) async {
-    await session.saveSession(auth);
-    _api?.token = auth.token;
-    notifyListeners();
-  }
-
   /// Signs out and wipes the local DB (including unsynced changes).
   Future<void> signOut() async {
+    _stopSync();
     if (_repoFactory == null && _local != null) await _local!.wipe();
     await session.clearSession();
     _api = null;

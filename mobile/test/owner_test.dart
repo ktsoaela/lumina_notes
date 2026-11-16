@@ -43,7 +43,7 @@ void main() {
   test('AppServices uses the local repository and signOut wipes it', () async {
     final session = SessionStore(MemoryKeyValueStore());
     await session.load();
-    final services = AppServices(session: session, apiFactory: (_, _) => FakeApiClient(), local: repo);
+    final services = AppServices(session: session, apiFactory: (_, _) => FakeApiClient(), local: repo, autoSync: false);
     await services.signIn('http://a', const AuthResult(token: 't', user: User(id: 1, email: '', name: '')));
     expect(services.repo, same(repo));
     await services.repo.createBookshelf('Offline shelf');
