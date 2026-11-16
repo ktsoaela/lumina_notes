@@ -7,6 +7,8 @@ contextBridge.exposeInMainWorld("luminaDesktop", {
     ipcRenderer.invoke("lumina:export-pdf", { html, filename }),
   /** Resize sticky window: closed (tab) | peek | open */
   setStickyMode: (mode) => ipcRenderer.send("lumina:sticky-mode", mode),
+  /** Re-clear Win11 white ghost behind transparent sticky chrome */
+  refreshStickyChrome: () => ipcRenderer.send("lumina:sticky-refresh-chrome"),
   setStickyEdge: (edge) => ipcRenderer.send("lumina:sticky-set-edge", edge),
   openPageInMain: (nav) => ipcRenderer.send("lumina:sticky-open-page", nav),
   onOpenPage: (cb) => {

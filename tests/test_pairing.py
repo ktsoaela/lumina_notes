@@ -126,6 +126,24 @@ class PairingApiTests(unittest.TestCase):
                 ("http://127.0.0.1:58888", False),
             )
 
+    def test_resolve_base_url_unspecified_uses_lan_ip(self) -> None:
+        import pairing
+
+        with mock.patch.object(pairing, "lan_ip", return_value="10.1.2.3"):
+            self.assertEqual(
+                pairing.resolve_base_url(None, "http://0.0.0.0:58888/", "58888"),
+                ("http://10.1.2.3:58888", True),
+            )
+            self.assertEqual(
+                pairing.resolve_base_url("http://0.0.0.0:58888", "http://127.0.0.1:58888", "58888"),
+                ("http://10.1.2.3:58888", True),
+            )
+        with mock.patch.object(pairing, "lan_ip", return_value=None):
+            self.assertEqual(
+                pairing.resolve_base_url(None, "http://0.0.0.0:58888", "58888"),
+                ("http://127.0.0.1:58888", False),
+            )
+
     # ------------------------------------------------------------ complete
 
     def test_complete_returns_session_for_owner(self) -> None:

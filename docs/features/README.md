@@ -11,7 +11,9 @@ User guides for everything Lumina Notes ships today. Screenshots were captured w
 | Books · chapters · pages | [hierarchy.md](./hierarchy.md) | [screenshots/hierarchy.png](./screenshots/hierarchy.png) · [library.png](./screenshots/library.png) |
 | stick'n sticky strips | [sticky-strips.md](./sticky-strips.md) | [screenshots/sticky-strips.png](./screenshots/sticky-strips.png) · [writing](./screenshots/sticky-strips-writing.png) |
 | Desktop app (Electron) | [desktop.md](./desktop.md) | [screenshots/notes-overview.png](./screenshots/notes-overview.png) |
-| Phone & tablet (PWA) | [mobile-pwa.md](./mobile-pwa.md) | [screenshots/mobile-pwa.png](./screenshots/mobile-pwa.png) |
+| Phone & tablet (Flutter) | [flutter-mobile.md](./flutter-mobile.md) | — |
+| Phone & tablet (PWA, secondary) | [mobile-pwa.md](./mobile-pwa.md) | [screenshots/mobile-pwa.png](./screenshots/mobile-pwa.png) |
+| Architecture decisions | [../adr/README.md](../adr/README.md) | — |
 | Print · Markdown · PDF | [export.md](./export.md) | [screenshots/export-actions.png](./screenshots/export-actions.png) |
 | Quick search | [search.md](./search.md) | [screenshots/search.png](./screenshots/search.png) |
 | Devices & sync | [sync.md](./sync.md) | [screenshots/profile-sync.png](./screenshots/profile-sync.png) |

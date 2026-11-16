@@ -8,13 +8,27 @@
 
 const STORAGE_KEY = 'lumina_sync_server';
 
+/** True for bind-all hosts Chromium cannot open (0.0.0.0 / ::). */
+function isUnspecifiedHost(hostname: string): boolean {
+  const h = hostname.trim().toLowerCase().replace(/^\[|\]$/g, '');
+  return h === '0.0.0.0' || h === '::' || h === '[::]';
+}
+
 export function normalizeSyncServerUrl(raw: string): string {
   let u = (raw || '').trim().replace(/\/+$/, '');
   if (!u) return '';
   if (!/^https?:\/\//i.test(u)) {
     u = `https://${u}`;
   }
-  return u.replace(/\/+$/, '');
+  u = u.replace(/\/+$/, '');
+  try {
+    const host = new URL(u).hostname;
+    // 0.0.0.0 is a listen address, not a client URL — treat as "use local API".
+    if (isUnspecifiedHost(host)) return '';
+  } catch {
+    return '';
+  }
+  return u;
 }
 
 export function getSyncServerUrl(): string {
@@ -26,7 +40,12 @@ export function getSyncServerUrl(): string {
   try {
     const stored = localStorage.getItem(STORAGE_KEY);
     if (stored != null && stored.trim() !== '') {
-      return normalizeSyncServerUrl(stored);
+      const clean = normalizeSyncServerUrl(stored);
+      // Drop a previously saved bind address so the desktop stops trying 0.0.0.0.
+      if (!clean && stored.trim()) {
+        localStorage.removeItem(STORAGE_KEY);
+      }
+      return clean;
     }
   } catch {
     /* ignore */

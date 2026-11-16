@@ -10,6 +10,8 @@ describe('syncServer', () => {
       'https://notes.example.com'
     );
     expect(normalizeSyncServerUrl('')).toBe('');
+    expect(normalizeSyncServerUrl('http://0.0.0.0:58888')).toBe('');
+    expect(normalizeSyncServerUrl('0.0.0.0:58888')).toBe('');
   });
 
   it('builds api paths', () => {

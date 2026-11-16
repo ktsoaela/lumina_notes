@@ -36,7 +36,7 @@ jobs:
           python -m pip install --upgrade pip
           pip install -r requirements.txt "pyinstaller>=6.0"
 
-      - name: Build Windows installer
+      - name: Build Windows portable
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           CSC_IDENTITY_AUTO_DISCOVERY: "false"
@@ -93,47 +93,47 @@ jobs:
             release/electron/latest*.yml
           if-no-files-found: error
 
-  android:
+  android-flutter:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
 
-      - uses: actions/setup-node@v4
-        with:
-          node-version: "22"
-          cache: npm
-
       - uses: actions/setup-java@v4
         with:
           distribution: temurin
-          java-version: "21"
+          java-version: "17"
 
       - uses: android-actions/setup-android@v3
 
-      - name: Install JS deps
-        run: npm ci
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          cache: true
 
-      - name: Build web + sync Capacitor
+      - name: Flutter pub get
+        working-directory: mobile
+        run: flutter pub get
+
+      - name: Build release APK
+        working-directory: mobile
         run: |
-          npm run build:mobile
-          npx cap add android || true
-          npx cap sync android
+          echo "kotlin.incremental=false" >> android/gradle.properties
+          flutter build apk --release
 
-      - name: Build debug APK
-        working-directory: android
+      - name: Rename APK
         run: |
-          chmod +x gradlew
-          ./gradlew assembleDebug --no-daemon
+          mkdir -p out
+          cp mobile/build/app/outputs/flutter-apk/app-release.apk out/Lumina-Notes-android.apk
 
-      - name: Upload Android APK
+      - name: Upload Flutter APK
         uses: actions/upload-artifact@v4
         with:
-          name: android-apk
-          path: android/app/build/outputs/apk/debug/*.apk
+          name: android-flutter-apk
+          path: out/Lumina-Notes-android.apk
           if-no-files-found: error
 
   release:
-    needs: [windows, macos, android]
+    needs: [windows, macos, android-flutter]
     if: startsWith(github.ref, 'refs/tags/')
     runs-on: ubuntu-latest
     steps:

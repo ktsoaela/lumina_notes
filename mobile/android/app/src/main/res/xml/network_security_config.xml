@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Explicit network policy for Huawei AppGallery / Play review.
+  Cleartext is permitted so a self-hosted Lumina API on LAN (http://192.168.x.x)
+  can sync. Prefer HTTPS for any internet-facing host.
+-->
+<network-security-config>
+    <base-config cleartextTrafficPermitted="true">
+        <trust-anchors>
+            <certificates src="system" />
+        </trust-anchors>
+    </base-config>
+</network-security-config>

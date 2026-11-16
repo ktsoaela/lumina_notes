@@ -4,7 +4,7 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>Lumina Notes — markdown notebooks, on your server</title>
-  <meta name="description" content="Lumina Notes is a markdown notebook with Mermaid, Plotly, desktop stickies, and self-hosted sync." />
+  <meta name="description" content="Lumina Notes is a markdown notebook with Mermaid, Plotly, desktop stickies, Flutter offline sync, and self-hosted pairing." />
   <link rel="icon" href="logo.png" />
   <style>
     :root { --sage:#375348; --sage-deep:#24382f; --ink:#1c1917; --muted:#5c6560; --line:#e4ebe6; --paper:#f7faf8; }
@@ -17,9 +17,10 @@
     .nav { min-height:68px; display:flex; align-items:center; gap:16px; }
     .brand { display:flex; align-items:center; gap:10px; text-decoration:none; font-weight:750; }
     .brand img { width:36px; height:36px; }
-    nav a { color:#3d4742; text-decoration:none; font-size:15px; }
-    .end { margin-left:auto; }
+    nav a { color:#3d4742; text-decoration:none; font-size:15px; margin-right:14px; }
+    .end { margin-left:auto; display:flex; gap:8px; flex-wrap:wrap; }
     .btn { display:inline-flex; align-items:center; min-height:42px; padding:0 16px; border-radius:999px; background:var(--sage); color:#fff; text-decoration:none; font-weight:700; }
+    .btn.ghost { background:transparent; color:var(--sage); border:1px solid var(--sage); }
     .hero { padding:72px 0 20px; text-align:center; background:linear-gradient(#fff, var(--paper)); }
     h1 { margin:0; font-size:clamp(40px, 6vw, 68px); line-height:1; letter-spacing:-.04em; }
     h1 span { display:block; color:var(--sage); }
@@ -31,11 +32,18 @@
     h2 { margin:0 0 8px; font-size:34px; letter-spacing:-.03em; text-align:center; }
     .lead { text-align:center; color:var(--muted); margin:0 auto 26px; max-width:38em; }
     .grid { display:grid; grid-template-columns:repeat(3,1fr); gap:12px; }
+    .downloads { display:grid; grid-template-columns:repeat(2,1fr); gap:16px; max-width:720px; margin:0 auto; }
     article { background:#fff; border:1px solid var(--line); border-radius:16px; padding:16px; }
     article b { display:block; margin-bottom:4px; }
     article span { color:var(--muted); font-size:15px; }
+    .dl-card { text-align:left; padding:22px; }
+    .dl-card .btn { margin-top:14px; }
+    .ver { font-size:13px; color:var(--muted); margin-top:8px; }
     footer { padding:28px 0 42px; text-align:center; color:var(--muted); font-size:14px; }
-    @media (max-width:800px) { .grid { grid-template-columns:1fr; } nav a.hide { display:none; } }
+    @media (max-width:800px) {
+      .grid, .downloads { grid-template-columns:1fr; }
+      nav a.hide { display:none; }
+    }
   </style>
 </head>
 <body>
@@ -44,23 +52,52 @@
       <a class="brand" href="#top"><img src="logo.png" alt="" /> Lumina Notes</a>
       <nav>
         <a class="hide" href="#features">Features</a>
+        <a class="hide" href="#download">Download</a>
         <a class="hide" href="features/README.md">Guides</a>
+        <a class="hide" href="adr/README.md">ADRs</a>
       </nav>
-      <span class="end"><a class="btn" href="https://github.com/ktsoaela/lumina_notes/releases/download/v1/Lumina-Notes.exe">Download for Windows</a></span>
+      <span class="end">
+        <a class="btn ghost" href="#download">Downloads</a>
+        <a class="btn" href="https://github.com/ktsoaela/lumina_notes/releases/latest">Latest release</a>
+      </span>
     </div>
   </header>
   <main id="top">
     <div class="hero">
       <div class="wrap">
         <h1>Organize your thoughts.<span>Keep them on your server.</span></h1>
-        <p class="sub">Markdown notebooks with Mermaid, Plotly, desktop stickies, and sync you host yourself. Shelves, books, chapters, and pages — not one long scratch file.</p>
-        <p class="sub"><a href="https://github.com/ktsoaela/lumina_notes/releases/download/v1/Lumina-Notes.exe">Download Lumina-Notes.exe</a> for Windows. It includes the notebook and the local server.</p>
+        <p class="sub">Markdown notebooks with Mermaid, Plotly, desktop stickies, Flutter offline sync, and QR phone pairing — no cloud account required.</p>
       </div>
       <div class="shot">
         <img src="features/screenshots/notes-overview.png" alt="Lumina Notes open on a notebook, with the page list and a split markdown preview" />
       </div>
     </div>
-    <section class="wash" id="features">
+
+    <section id="download" class="wash">
+      <div class="wrap">
+        <h2>Download</h2>
+        <p class="lead">Installers from GitHub Releases. Pair the phone with <strong>Profile → Devices &amp; sync → Connect phone</strong> on desktop.</p>
+        <div class="downloads">
+          <article class="dl-card">
+            <b>Windows desktop</b>
+            <span>Electron app with bundled local API and stick'n strips.</span>
+            <a class="btn" href="https://github.com/ktsoaela/lumina_notes/releases/download/v1.2.0/Lumina-Notes.exe">Download Windows (.exe)</a>
+            <p class="ver">v1.2.0 · portable</p>
+          </article>
+          <article class="dl-card">
+            <b>Android (Flutter)</b>
+            <span>Offline-first notes; scan the desktop QR to connect.</span>
+            <a class="btn" href="https://github.com/ktsoaela/lumina_notes/releases/download/v1.2.0/Lumina-Notes-android.apk">Download Android (.apk)</a>
+            <p class="ver">v1.2.0 · release APK</p>
+          </article>
+        </div>
+        <p class="lead" style="margin-top:28px">
+          All assets: <a href="https://github.com/ktsoaela/lumina_notes/releases/tag/v1.2.0">github.com/ktsoaela/lumina_notes/releases/tag/v1.2.0</a>
+        </p>
+      </div>
+    </section>
+
+    <section id="features">
       <div class="wrap">
         <h2>In the notebook</h2>
         <p class="lead">The same tools as the app, without signing in to someone else's cloud.</p>
@@ -70,9 +107,9 @@
           <article><b>Plotly</b><span>Interactive charts inside a note.</span></article>
           <article><b>Books, chapters, pages</b><span>A shelf you can find your way around.</span></article>
           <article><b>stick'n</b><span>Neon sticky strips on the desktop that write the same pages.</span></article>
-          <article><b>Desktop and phone</b><span>Electron on Windows and macOS. A PWA on the phone and tablet.</span></article>
+          <article><b>Desktop + Flutter phone</b><span>Electron on Windows/macOS. Flutter offline sync on Android.</span></article>
+          <article><b>QR pairing</b><span>Connect phone without typing a server URL.</span></article>
           <article><b>Export</b><span>Print, Markdown, or PDF from a page.</span></article>
-          <article><b>Search</b><span>Ctrl+K jumps across books, chapters, and pages.</span></article>
           <article><b>Self-hosted sync</b><span>SQLite on one machine, or Postgres when several devices share a server you run.</span></article>
         </div>
       </div>

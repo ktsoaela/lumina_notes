@@ -40,24 +40,34 @@ let backendProc = null;
 let stickyClamping = false;
 
 function isDev() {
+  // Packaged builds must never wait on Vite (:5173), even if ELECTRON_DEV leaked into the env.
+  if (app.isPackaged) return false;
   return process.env.ELECTRON_DEV === "1";
 }
 
 function waitForServer(url, maxMs = 120000) {
   const start = Date.now();
   return new Promise((resolve, reject) => {
+    function failOrRetry() {
+      if (Date.now() - start > maxMs) {
+        reject(new Error(`Timeout waiting for ${url}`));
+      } else {
+        setTimeout(tryOnce, 300);
+      }
+    }
     function tryOnce() {
       const req = http.get(url, (res) => {
         res.resume();
         resolve();
       });
+      // Hung sockets never emit "error" — without this, startup can stall forever.
+      req.setTimeout(2000, () => {
+        req.destroy();
+        failOrRetry();
+      });
       req.on("error", () => {
         req.destroy();
-        if (Date.now() - start > maxMs) {
-          reject(new Error(`Timeout waiting for ${url}`));
-        } else {
-          setTimeout(tryOnce, 300);
-        }
+        failOrRetry();
       });
     }
     tryOnce();
@@ -72,19 +82,37 @@ function backendExePath() {
   return path.join(base, "LuminaApi");
 }
 
-function startBackend() {
+async function startBackend() {
+  // Always open the UI on 127.0.0.1 — never browse http://0.0.0.0 (Chromium rejects it).
+  // Bind may still be 0.0.0.0 so phones on Wi‑Fi can reach the same API.
+  // Prefer an already-running API (run_api.py / previous instance) — avoids port fights.
+  try {
+    await waitForServer(PROD_URL, 8000);
+    return;
+  } catch {
+    /* nothing listening yet — start the bundled API */
+  }
+
   const exe = backendExePath();
   if (!fs.existsSync(exe)) {
     return Promise.reject(
       new Error(
-        `Backend not found at:\n${exe}\n\nRebuild with npm run build:electron:app`
+        `Backend not found at:\n${exe}\n\nStart the API first:\n  set LUMINA_HOST=0.0.0.0&& python run_api.py\n\nOr rebuild with npm run build:electron:app`
       )
     );
   }
+  // Opt-in LAN bind so Profile → Connect phone QR works over Wi‑Fi.
+  // Override with LUMINA_HOST=127.0.0.1 to keep loopback-only.
+  const luminaHost = process.env.LUMINA_HOST || "0.0.0.0";
   backendProc = spawn(exe, [], {
     cwd: path.dirname(exe),
     stdio: ["ignore", "pipe", "pipe"],
     windowsHide: true,
+    env: {
+      ...process.env,
+      PORT: String(API_PORT),
+      LUMINA_HOST: luminaHost,
+    },
   });
   let stderr = "";
   backendProc.stderr?.on("data", (chunk) => {
@@ -99,9 +127,12 @@ function startBackend() {
       console.error(`Backend exited code=${code} signal=${signal}`);
     }
   });
-  return waitForServer(PROD_URL).catch((err) => {
+  // Short wait: if the port is already taken, the existing server still answers PROD_URL.
+  return waitForServer(PROD_URL, 30000).catch((err) => {
     const detail = stderr.trim() ? `\n\nBackend output:\n${stderr.trim()}` : "";
-    throw new Error(`${err.message}${detail}`);
+    throw new Error(
+      `${err.message}${detail}\n\nTip: keep python run_api.py running with LUMINA_HOST=0.0.0.0, then reopen Lumina Notes.`
+    );
   });
 }
 
@@ -139,6 +170,18 @@ async function loadAppUrl(win, query, attempts = 5) {
   for (let i = 0; i < attempts; i++) {
     try {
       await win.loadURL(url);
+      // Drop a saved sync URL of http://0.0.0.0 — Chromium cannot open that host.
+      try {
+        await win.webContents.executeJavaScript(`(() => {
+          try {
+            const k = 'lumina_sync_server';
+            const v = localStorage.getItem(k) || '';
+            if (/0\\.0\\.0\\.0|\\[::\\]|^::/i.test(v)) localStorage.removeItem(k);
+          } catch (_) {}
+        })()`);
+      } catch {
+        /* page may not be ready for storage yet */
+      }
       return;
     } catch (err) {
       lastErr = err;
@@ -208,6 +251,29 @@ function snapStickyBounds(bounds, area, mode = "pack", forcedEdge = null) {
   return { x, y, width: size.width, height: size.height, edge };
 }
 
+/** Win11 DWM often paints opaque white over transparent sticky chrome after blur. */
+function refreshStickyTransparency() {
+  if (!stickyWindow || stickyWindow.isDestroyed()) return;
+  stickyWindow.setBackgroundColor("#00000000");
+  if (process.platform !== "win32") return;
+  const current = stickyWindow.getBounds();
+  stickyClamping = true;
+  stickyMoveFromSnap = true;
+  // 1px nudge forces DWM to recomposite transparency without a visible jump.
+  stickyWindow.setBounds({
+    x: current.x,
+    y: current.y,
+    width: current.width + 1,
+    height: current.height,
+  });
+  stickyWindow.setBounds(current);
+  stickyClamping = false;
+  setTimeout(() => {
+    stickyMoveFromSnap = false;
+  }, 50);
+  applyStickyAlwaysOnTop(stickyWindow);
+}
+
 function snapStickyWindow(forcedEdge = null) {
   if (!stickyWindow || stickyWindow.isDestroyed() || stickyClamping) return;
   // Profile/orientation snaps always use pack size (not writing editor size)
@@ -222,7 +288,11 @@ function snapStickyWindow(forcedEdge = null) {
     next.y === current.y &&
     next.width === current.width &&
     next.height === current.height;
-  if (unchanged && !forcedEdge) return;
+  if (unchanged && !forcedEdge) {
+    // Still refresh chrome — blur leaves a white bar when bounds don't change.
+    refreshStickyTransparency();
+    return;
+  }
 
   stickyClamping = true;
   stickyMoveFromSnap = true;
@@ -236,6 +306,7 @@ function snapStickyWindow(forcedEdge = null) {
   setTimeout(() => {
     stickyMoveFromSnap = false;
   }, 50);
+  stickyWindow.setBackgroundColor("#00000000");
   stickyWindow.webContents.send("lumina:sticky-edge", lastStickyEdge);
 }
 
@@ -316,12 +387,20 @@ async function createStickyWindow() {
     if (!stickyWindow || stickyWindow.isDestroyed()) return;
     stickyWindow.webContents.send("lumina:sticky-edge", lastStickyEdge);
   });
+  // Clicking another app leaves a thick white bar on Win11 until the next resize.
+  stickyWindow.on("blur", () => {
+    refreshStickyTransparency();
+  });
+  stickyWindow.on("focus", () => {
+    refreshStickyTransparency();
+  });
   stickyWindow.on("closed", () => {
     stickyWindow = null;
   });
   stickyWindow.once("ready-to-show", () => {
     if (!stickyWindow || stickyWindow.isDestroyed()) return;
     stickyWindow.show();
+    stickyWindow.setBackgroundColor("#00000000");
     applyStickyAlwaysOnTop(stickyWindow);
     stickyWindow.moveTop();
     stickyWindow.webContents.send("lumina:sticky-edge", lastStickyEdge);
@@ -434,7 +513,12 @@ ipcMain.on("lumina:sticky-mode", (_event, mode) => {
   if (process.platform === "win32") {
     applyStickyAlwaysOnTop(stickyWindow);
     stickyWindow.moveTop();
+    stickyWindow.setBackgroundColor("#00000000");
   }
+});
+
+ipcMain.on("lumina:sticky-refresh-chrome", () => {
+  refreshStickyTransparency();
 });
 
 ipcMain.on("lumina:sticky-set-edge", async (_event, edge) => {

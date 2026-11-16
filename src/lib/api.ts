@@ -268,12 +268,31 @@ export const api = {
       return res.json();
     },
     update: async (id: string, title: string, content: string) => {
-      const res = await fetch(apiUrl(`/api/pages/${id}`), {
-        method: 'PUT',
-        headers: getHeaders(),
-        body: JSON.stringify({ title, content }),
-      });
-      if (!res.ok) throw new Error('Failed to update page');
+      let res: Response;
+      try {
+        res = await fetch(apiUrl(`/api/pages/${id}`), {
+          method: 'PUT',
+          headers: getHeaders(),
+          body: JSON.stringify({ title, content }),
+        });
+      } catch {
+        throw new Error('Cannot reach the Lumina server — is it running?');
+      }
+      if (!res.ok) {
+        let detail = '';
+        try {
+          const body = await res.json();
+          detail =
+            typeof body?.detail === 'string'
+              ? body.detail
+              : Array.isArray(body?.detail)
+                ? body.detail.map((d: { msg?: string }) => d.msg).filter(Boolean).join('; ')
+                : '';
+        } catch {
+          /* ignore */
+        }
+        throw new Error(detail || `Failed to update page (${res.status})`);
+      }
       return res.json();
     },
     delete: async (id: string) => {

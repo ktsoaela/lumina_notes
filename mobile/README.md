@@ -24,7 +24,15 @@ flutter run                             # pick an Android emulator/device, iOS s
 
 ## Point the app at your server
 
-On the first screen, enter the server URL and tap **Test connection**, then sign in or sign up:
+**Normal path — scan, don't type.** On your computer open **Profile → Devices & sync →
+Connect phone → Create pairing code**. On the phone tap **Scan to connect** and scan the QR
+(or open the `lumina://pair?u=<server>&c=<code>` link on the phone). The phone saves the server
+and signs in to the same account. Codes are single-use and expire after 5 minutes; if a code has
+expired the server stays saved and the normal login form appears (or tap **Scan** for a new code).
+**Change server** on the login screen forgets the saved server.
+
+**Advanced — Enter server manually** (first screen) still takes a typed URL and
+**Test connection**:
 
 | Where the app runs       | Server URL                    |
 |--------------------------|-------------------------------|
@@ -34,8 +42,19 @@ On the first screen, enter the server URL and tap **Test connection**, then sign
 | Hosted                   | `https://notes.example.com`   |
 | Phone over USB (no Wi-Fi needed) | run `adb reverse tcp:58888 tcp:58888`, then use `http://127.0.0.1:58888` |
 
-The app allows plain `http://` (Android `usesCleartextTraffic`, iOS ATS
-exceptions) so LAN self-hosting works. Use HTTPS for anything internet-facing.
+The app allows plain `http://` (Android network security config + cleartext for
+LAN self-host, iOS ATS exceptions). Use HTTPS for anything internet-facing.
+
+### Android permissions (Huawei / Play)
+
+| Permission | Why |
+|------------|-----|
+| `INTERNET` / `ACCESS_NETWORK_STATE` | Talk to your Lumina API and show online/offline |
+| `CAMERA` | Optional — scan the **Connect phone** pairing QR only |
+
+Camera hardware is declared **optional** (`uses-feature required=false`) so Huawei
+tablets without a rear camera are not filtered. The app must still work with
+login-only if the user denies camera access.
 
 The token and server URL are stored in the platform's secure storage (Keychain / Android Keystore).
 

@@ -181,11 +181,25 @@ export default function StickyDesktopApp() {
     syncWindow(writing ? 'writing' : 'pack');
   }, [writing, syncWindow]);
 
+  // Clicking away: collapse hover + ask Electron to clear Win11 white ghost bar.
+  useEffect(() => {
+    const onBlur = () => {
+      setHoveredId(null);
+      const active = document.activeElement;
+      if (active instanceof HTMLElement) active.blur();
+      window.luminaDesktop?.refreshStickyChrome?.();
+      if (!writingId) syncWindow('pack');
+    };
+    window.addEventListener('blur', onBlur);
+    return () => window.removeEventListener('blur', onBlur);
+  }, [writingId, syncWindow]);
+
   useEffect(() => {
     const refresh = () => setTargetTick((n) => n + 1);
     const syncTheme = () => applyTheme(getStoredTheme());
     const onFocus = () => {
       syncTheme();
+      window.luminaDesktop?.refreshStickyChrome?.();
       // Reload shared page if widget has no unsaved edits
       if (writingId && draft === lastLoadedRef.current) {
         setReloadTick((n) => n + 1);
@@ -385,7 +399,11 @@ export default function StickyDesktopApp() {
     setSaveState('saving');
     setError(null);
     try {
-      await api.pages.update(meta.pageId, meta.title, content);
+      await api.pages.update(
+        meta.pageId,
+        coerceEntityTitle(meta.title || '', 'page'),
+        content
+      );
       if (draftRef.current === content) {
         lastLoadedRef.current = content;
         setSaveState('saved');

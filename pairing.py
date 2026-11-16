@@ -92,19 +92,38 @@ def _is_loopback(host: str) -> bool:
         return False
 
 
+def _is_unspecified(host: str) -> bool:
+    """Bind-all addresses (0.0.0.0 / ::) — not browsable; treat like loopback for QR."""
+    try:
+        return ipaddress.ip_address(host).is_unspecified
+    except ValueError:
+        return False
+
+
 def resolve_base_url(client_url: str | None, request_base: str, port: str) -> tuple[str, bool]:
     """(base url for the QR, whether a LAN IP was substituted for loopback)."""
     if client_url and client_url.strip():
         url = normalize_url(client_url)
         if url is None:
             raise ValueError("Invalid server URL")
+        parts = urlsplit(url)
+        # Someone saved LUMINA_HOST as the sync URL — never put 0.0.0.0 in a QR.
+        if parts.hostname and _is_unspecified(parts.hostname):
+            ip = lan_ip()
+            if ip:
+                return f"http://{ip}:{port}", True
+            raise ValueError("Invalid server URL")
         return url, False
     base = request_base.rstrip("/")
     parts = urlsplit(base)
-    if parts.hostname and _is_loopback(parts.hostname):
+    host = parts.hostname or ""
+    if host and (_is_loopback(host) or _is_unspecified(host)):
         ip = lan_ip()
         if ip:
             return f"http://{ip}:{port}", True
+        if _is_unspecified(host):
+            # Prefer loopback over a non-browsable bind address when offline.
+            return f"http://127.0.0.1:{port}", False
     return base, False
 
 

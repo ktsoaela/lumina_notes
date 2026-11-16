@@ -43,11 +43,11 @@ export default function LandingPage({
             <a href="#features" className="hover:text-brand-700 transition-colors">
               Features
             </a>
+            <a href="#download" className="hover:text-brand-700 transition-colors">
+              Download
+            </a>
             <a href="#pricing" className="hover:text-brand-700 transition-colors">
               Pricing
-            </a>
-            <a href="#about" className="hover:text-brand-700 transition-colors">
-              About
             </a>
           </div>
           <button
@@ -89,11 +89,17 @@ export default function LandingPage({
                 Get Started for Free
                 <ArrowRight className="w-5 h-5 group-hover:translate-x-1 transition-transform" />
               </button>
+              <a
+                href="#download"
+                className="inline-flex w-full items-center justify-center gap-2 rounded-xl border-2 border-brand-700 bg-[var(--app-surface)] px-8 py-4 text-lg font-bold text-brand-700 transition-all hover:bg-brand-50 dark:border-brand-500 dark:bg-[var(--app-bg)] dark:text-brand-300 dark:hover:bg-[var(--app-surface)] sm:w-auto"
+              >
+                Download apps
+              </a>
               <button
                 type="button"
                 disabled={viewDemoLoading}
                 onClick={onViewDemo}
-                className="inline-flex w-full items-center justify-center gap-2 rounded-xl border-2 border-brand-700 bg-[var(--app-surface)] px-8 py-4 text-lg font-bold text-brand-700 transition-all hover:bg-brand-50 disabled:opacity-60 dark:border-brand-500 dark:bg-[var(--app-bg)] dark:text-brand-300 dark:hover:bg-[var(--app-surface)] sm:w-auto"
+                className="inline-flex w-full items-center justify-center gap-2 rounded-xl border border-[var(--app-border)] bg-[var(--app-surface)] px-8 py-4 text-lg font-bold text-[var(--app-fg)] transition-all hover:bg-gray-50 disabled:opacity-60 dark:hover:bg-[var(--app-surface)] sm:w-auto"
               >
                 {viewDemoLoading ? (
                   <>
@@ -173,8 +179,8 @@ export default function LandingPage({
               },
               {
                 icon: <Smartphone className="w-6 h-6 text-brand-600" />,
-                title: 'Phone & tablet',
-                desc: 'Install as a PWA on your home screen and take your Markdown notes with you.',
+                title: 'Flutter phone & tablet',
+                desc: 'Offline-first Android app. Scan a QR from Devices & sync — no server URL to type.',
               },
               {
                 icon: <FileDown className="w-6 h-6 text-brand-700" />,
@@ -200,6 +206,52 @@ export default function LandingPage({
               </motion.div>
             ))}
           </div>
+        </div>
+      </section>
+
+      {/* Downloads */}
+      <section id="download" className="bg-gray-50 py-24 dark:bg-[var(--app-surface)]/50">
+        <div className="mx-auto max-w-7xl px-4">
+          <div className="mb-12 text-center">
+            <h2 className="mb-4 text-3xl font-bold text-gray-900 dark:text-[var(--app-fg)] md:text-4xl">
+              Download Lumina Notes
+            </h2>
+            <p className="text-gray-600 dark:text-[var(--app-muted)]">
+              v1.2.0 from GitHub Releases — desktop for Windows, Flutter APK for Android.
+            </p>
+          </div>
+          <div className="mx-auto grid max-w-3xl gap-6 md:grid-cols-2">
+            <a
+              href="https://github.com/ktsoaela/lumina_notes/releases/download/v1.2.0/Lumina-Notes.exe"
+              className="rounded-2xl border border-[var(--app-border)] bg-[var(--app-surface)] p-8 shadow-sm transition-all hover:shadow-md dark:bg-[var(--app-bg)]/80"
+            >
+              <Monitor className="mb-4 h-8 w-8 text-brand-700" />
+              <h3 className="mb-2 text-xl font-bold text-gray-900 dark:text-[var(--app-fg)]">Windows</h3>
+              <p className="mb-4 text-sm text-gray-600 dark:text-[var(--app-muted)]">
+                Portable Electron app with local API and stick&apos;n.
+              </p>
+              <span className="font-semibold text-brand-700 dark:text-brand-300">Lumina-Notes.exe →</span>
+            </a>
+            <a
+              href="https://github.com/ktsoaela/lumina_notes/releases/download/v1.2.0/Lumina-Notes-android.apk"
+              className="rounded-2xl border border-[var(--app-border)] bg-[var(--app-surface)] p-8 shadow-sm transition-all hover:shadow-md dark:bg-[var(--app-bg)]/80"
+            >
+              <Smartphone className="mb-4 h-8 w-8 text-brand-600" />
+              <h3 className="mb-2 text-xl font-bold text-gray-900 dark:text-[var(--app-fg)]">Android</h3>
+              <p className="mb-4 text-sm text-gray-600 dark:text-[var(--app-muted)]">
+                Flutter release APK — scan Connect phone on desktop to pair.
+              </p>
+              <span className="font-semibold text-brand-700 dark:text-brand-300">Lumina-Notes-android.apk →</span>
+            </a>
+          </div>
+          <p className="mt-8 text-center text-sm text-gray-500 dark:text-[var(--app-muted)]">
+            <a
+              className="underline hover:text-brand-700"
+              href="https://github.com/ktsoaela/lumina_notes/releases/tag/v1.2.0"
+            >
+              All release assets
+            </a>
+          </p>
         </div>
       </section>
 

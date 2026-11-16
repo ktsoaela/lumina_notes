@@ -1070,6 +1070,16 @@ html.sticky-strip-mode #root {
   background-image: none !important;
 }
 
+/* Beat @layer base { background-color: var(--app-bg) } which shows as a white bar */
+@layer base {
+  html.sticky-strip-mode,
+  html.sticky-strip-mode body,
+  html.sticky-strip-mode #root {
+    background-color: transparent !important;
+    background-image: none !important;
+  }
+}
+
 .stickn-root {
   --film-accent: var(--spine);
   width: 100vw;

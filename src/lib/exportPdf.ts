@@ -10,6 +10,7 @@ declare global {
         filename: string
       ) => Promise<{ ok: boolean; path?: string; canceled?: boolean; error?: string }>;
       setStickyMode?: (mode: 'pack' | 'writing') => void;
+      refreshStickyChrome?: () => void;
       setStickyEdge?: (edge: 'left' | 'right' | 'top' | 'bottom') => void;
       openPageInMain?: (nav: {
         bookshelfId: string;

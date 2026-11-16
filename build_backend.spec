@@ -38,6 +38,7 @@ hiddenimports = [
     "bcrypt",
     "jose.backends",
     "jose.backends.cryptography_backend",
+    "pairing",
 ]
 
 block_cipher = None
@@ -67,7 +68,8 @@ exe = EXE(
     bootloader_ignore_signals=False,
     strip=False,
     upx=False,
-    console=False,
+    # True so a failed bind/import shows a console instead of a silent hang.
+    console=True,
     disable_windowed_traceback=False,
     argv_emulation=False,
     target_arch=None,

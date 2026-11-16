@@ -95,9 +95,9 @@ export function ConnectPhonePanel() {
             </button>
             {pair.lan ? (
               <p className={cn(mutedText, 'text-xs')}>
-                Using this PC&apos;s Wi‑Fi address. The phone must be on the same Wi‑Fi, and the
-                local API must accept LAN connections (start it with{' '}
-                <span className="font-mono">LUMINA_HOST=0.0.0.0</span>).
+                Using this PC&apos;s Wi‑Fi address ({pair.serverUrl}). Phone and PC must share the
+                same Wi‑Fi. Do not open or save <span className="font-mono">0.0.0.0</span> — that is
+                only a listen setting, not a website address.
               </p>
             ) : null}
           </div>

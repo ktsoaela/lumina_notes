@@ -449,14 +449,16 @@ export default function App() {
     let titleForApi = '';
     let sectionId = '';
     let notebookId = '';
+    let found = false;
     setState(prev => {
       for (const nb of prev.notebooks) {
         for (const sec of nb.sections) {
           const page = sec.pages.find((p) => p.id === pageId);
           if (page) {
-            titleForApi = page.title || '';
+            titleForApi = coerceEntityTitle(page.title || '', 'page');
             sectionId = sec.id;
             notebookId = nb.id;
+            found = true;
           }
         }
       }
@@ -477,6 +479,10 @@ export default function App() {
         })),
       };
     });
+    if (!found) {
+      toast.error('Page is not loaded — pick it again from the sidebar');
+      return;
+    }
     localPageEditAtRef.current = Date.now();
     window.luminaDesktop?.publishPageSync?.({
       pageId,
@@ -490,7 +496,7 @@ export default function App() {
       await api.pages.update(pageId, titleForApi, contentCheck.value);
     } catch (err) {
       console.error('Failed to save page content', err);
-      toast.error('Failed to save page');
+      toast.error(err instanceof Error ? err.message : 'Failed to save page');
     }
   }, [toast]);
 
