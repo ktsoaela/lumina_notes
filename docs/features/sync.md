@@ -15,6 +15,21 @@ Free multi-device sync by pointing every client at **your** FastAPI URL. There i
 
 Leave the URL empty on the Windows/macOS installer to keep using the **local** bundled SQLite database.
 
+### Connect a phone (no typing the URL)
+
+1. On desktop/web, open **Profile → Devices & sync → Connect phone** and click **Create pairing code**.
+2. On the phone, open Lumina Notes and tap **Scan to connect**. Scan the QR (or open the copied
+   `lumina://pair?...` link on the phone).
+3. The phone saves the server URL and signs in to the same account. The code works **once** and
+   expires after **5 minutes**. If it has expired, the phone keeps the server and shows the normal
+   login form; or create a new code and scan again.
+
+The QR always uses the URL saved in Devices & sync. If that is empty (bundled local API), it uses this
+PC's Wi‑Fi address instead of `127.0.0.1`. In that case the phone must be on the **same Wi‑Fi**, and the
+local API must listen on the LAN: start it with `LUMINA_HOST=0.0.0.0` (default is loopback only).
+
+Typing a server URL on the phone is still possible under **Enter server manually**.
+
 ## How it works
 
 - Clients store the sync base URL and send JWT-authenticated REST calls to that host.
@@ -50,6 +65,8 @@ Unlike the PWA, it keeps a **local database** on the device:
 |----------|---------|
 | `GET /api/sync/changes?since=<cursor>` | Rows changed since the cursor + deletions (tombstones) |
 | `POST /api/sync/push` | Apply queued ops; per-op `applied` / `stale` / `rejected` with the server's current row |
+| `POST /api/pair/start` | (signed in) 5-minute single-use pairing code + `lumina://pair?u=<server>&c=<code>` link |
+| `POST /api/pair/complete` | `{code, deviceName?}` → `{token, user}` like login; `400` if invalid, used or expired |
 
 `updatedAt` and tombstones are maintained by database triggers (SQLite and
 Postgres), so edits made through the existing routes (Electron, web, backup
@@ -59,6 +76,7 @@ import) show up in the change feed. Existing routes are unchanged.
 
 - Passwords are hashed (bcrypt); use HTTPS in production.
 - Note bodies are stored as text in your database — encrypt the disk/volume and protect the server.
+- A pairing QR is a 5-minute sign-in for your account: don't share it or leave it on screen.
 - Set a strong `JWT_SECRET` and `LUMINA_ENV=production` for public deployments.
 
 More packaging detail: [PACKAGING.md](../PACKAGING.md).

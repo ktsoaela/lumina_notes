@@ -18,6 +18,7 @@ import {
   UserX,
 } from 'lucide-react';
 import { api } from '../lib/api';
+import { ConnectPhonePanel } from './ConnectPhonePanel';
 import type { ThemeMode } from '../lib/theme';
 import type { A11yPrefs } from '../lib/a11y';
 import { downloadText, formatBytes, notebookToMarkdown } from '../lib/markdownIO';
@@ -749,9 +750,9 @@ export default function ProfilePage({
                     inputMode="url"
                   />
                   <p className={cn(mutedText, 'mb-4 text-xs')}>
-                    Leave empty to use this device&apos;s local API (desktop app, or Vite in dev). Phone APK
-                    needs a reachable URL — LAN IP like{' '}
-                    <span className="font-mono">http://192.168.x.x:58888</span> works on the same Wi‑Fi.
+                    Leave empty to use this device&apos;s local API (desktop app, or Vite in dev). To add a
+                    phone, use <strong>Connect phone</strong> below — the phone scans a QR instead of
+                    typing this URL.
                   </p>
                   <div className="flex flex-wrap gap-2">
                     <button
@@ -814,6 +815,7 @@ export default function ProfilePage({
                       {syncMsg}
                     </p>
                   ) : null}
+                  <ConnectPhonePanel />
                 </section>
               ) : null}
 
