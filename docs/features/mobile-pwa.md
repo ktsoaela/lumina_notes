@@ -1,5 +1,8 @@
 # Phone & tablet (PWA)
 
+> **Primary mobile app is now Flutter** ([mobile/README.md](../../mobile/README.md)): it works offline and syncs.
+> The PWA / Capacitor shell below stays available as an online-only web fallback.
+
 ![Landing / install surface](./screenshots/mobile-pwa.png)
 
 ## What it is

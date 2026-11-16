@@ -31,7 +31,8 @@ The page is [`docs/index.html`](docs/index.html). Turn on GitHub Pages for the `
 - **Markdown-first** editor with live split preview
 - **Mermaid** diagrams and **Plotly** charts in notes
 - **Desktop** Electron app with neon **stick'n** sticky strips
-- **PWA / Android** for phone and tablet
+- **Flutter app** for Android, iOS and tablets that works **offline** and syncs when online
+- **PWA** for phone and tablet browsers
 - **Your server** — JWT + SQLite/Postgres; no vendor lock-in cloud
 
 ## Quick start
@@ -77,6 +78,7 @@ Each feature has a short how-to (with Playwright screenshots):
 | Books · chapters · pages | [docs/features/hierarchy.md](docs/features/hierarchy.md) |
 | stick'n sticky strips | [docs/features/sticky-strips.md](docs/features/sticky-strips.md) |
 | Desktop app | [docs/features/desktop.md](docs/features/desktop.md) |
+| Phone & tablet (Flutter, offline sync) | [mobile/README.md](mobile/README.md) |
 | Phone & tablet (PWA) | [docs/features/mobile-pwa.md](docs/features/mobile-pwa.md) |
 | Print · Markdown · PDF | [docs/features/export.md](docs/features/export.md) |
 | Quick search (Ctrl+K) | [docs/features/search.md](docs/features/search.md) |
@@ -107,7 +109,7 @@ npx playwright test e2e/docs-screenshots.spec.ts --workers=1
 | API | FastAPI, Uvicorn, SQLite (or Postgres) |
 | Admin (optional) | Django 5 (same database) |
 | Desktop | Electron + electron-builder (Windows / macOS) |
-| Mobile | PWA + Capacitor (Android APK) |
+| Mobile | Flutter (Android / iOS / tablet, Drift offline store); PWA + Capacitor as web fallback |
 
 ---
 
@@ -117,7 +119,8 @@ npx playwright test e2e/docs-screenshots.spec.ts --workers=1
 |----------|----------------|
 | Windows installer | `npm run build:win` / `npm run build:installer` |
 | macOS | `npm run build:mac` (on macOS) |
-| Android APK | `npm run build:apk` |
+| Android / iOS (Flutter, primary) | `cd mobile && flutter build apk --release` — see [mobile/README.md](mobile/README.md) |
+| Android APK (Capacitor web shell) | `npm run build:apk` |
 | Sync & packaging notes | [docs/PACKAGING.md](docs/PACKAGING.md) |
 
 Artifacts appear under `release/electron/` and Android Studio / Gradle output paths (see packaging doc).

@@ -4,8 +4,9 @@ The primary phone/tablet client for Lumina Notes. It talks to the same FastAPI
 server as the Electron desktop app. Use the same account and the same server
 URL on every device.
 
-> Status: Phase 1 (online client). Offline storage and sync come in later phases.
-> See `../docs/superpowers/plans/2026-11-16-flutter-mobile-offline-sync.md`.
+Works **offline**: notes live in a local database (Drift/SQLite) on the
+device, edits are queued, and the app syncs with the server whenever it can.
+Conflict rules: [docs/features/sync.md](../docs/features/sync.md#conflicts-v1-last-write-wins).
 
 ## Run
 
@@ -31,6 +32,7 @@ On the first screen, enter the server URL and tap **Test connection**, then sign
 | iOS simulator / desktop  | `http://127.0.0.1:58888`      |
 | Phone on your Wi-Fi      | `http://<your-PC-LAN-IP>:58888` (server must listen on `0.0.0.0`) |
 | Hosted                   | `https://notes.example.com`   |
+| Phone over USB (no Wi-Fi needed) | run `adb reverse tcp:58888 tcp:58888`, then use `http://127.0.0.1:58888` |
 
 The app allows plain `http://` (Android `usesCleartextTraffic`, iOS ATS
 exceptions) so LAN self-hosting works. Use HTTPS for anything internet-facing.
@@ -38,6 +40,20 @@ exceptions) so LAN self-hosting works. Use HTTPS for anything internet-facing.
 The token and server URL are stored in the platform's secure storage (Keychain / Android Keystore).
 
 Demo login (when the server seeds it in development): `demo_user` / `demo_user`.
+
+## How sync works
+
+- All screens read and write the local DB; every change also goes into an
+  outbox (one entry per item, kept in order so parents are pushed before children).
+- Sync = push the outbox (`POST /api/sync/push`), then pull changes since the
+  last cursor (`GET /api/sync/changes`).
+- Sync runs at start, when connectivity returns, on app resume, 2 s after an
+  edit, every 60 s, and on pull-to-refresh. Failures retry with backoff (max 60 s).
+- Token expired? The chip shows **Sign in again**; local data and unsynced
+  changes are kept when the same user signs back in.
+- Signing out, or signing in as another user / to another server, wipes the
+  local DB (you're warned if there are unsynced changes).
+- Tablets (≥ 840 dp wide) get a two-pane layout: navigation left, editor right.
 
 ## Build
 
@@ -54,4 +70,10 @@ App id: `com.lumina.notes`.
 ```bash
 flutter analyze
 flutter test
+
+# Against a real server (from the repo root: uvicorn app:app --port 58888)
+LUMINA_LIVE_API=http://127.0.0.1:58888 flutter test test/live_api_test.dart
 ```
+
+Server sync tests: `python -m pytest tests -q` (add
+`LUMINA_TEST_PG_URL=postgresql://...` to also run them on Postgres).
