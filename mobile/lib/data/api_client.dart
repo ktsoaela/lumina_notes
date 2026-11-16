@@ -175,4 +175,17 @@ class ApiClient {
 
   Future<void> delete(EntityKind kind, String id) =>
       _send('DELETE', '${_paths[kind]}/${Uri.encodeComponent(id)}');
+
+  // ---- sync ----
+
+  Future<SyncChanges> changes(String? since) async => SyncChanges.fromJson(
+      await _send('GET', '/api/sync/changes', query: {'since': since ?? ''}) as Map<String, dynamic>);
+
+  Future<List<PushResult>> push(List<PushOp> ops) async {
+    final j = await _send('POST', '/api/sync/push', body: {'ops': ops.map((o) => o.toJson()).toList()});
+    return ((j as Map<String, dynamic>)['results'] as List)
+        .cast<Map<String, dynamic>>()
+        .map(PushResult.fromJson)
+        .toList();
+  }
 }

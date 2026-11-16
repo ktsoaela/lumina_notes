@@ -11,6 +11,9 @@ class Bookshelves extends Table {
   TextColumn get name => text()();
   DateTimeColumn get updatedAt => dateTime().nullable()();
 
+  /// Server `updatedAt` last seen (pull or applied push); sent as `baseUpdatedAt`.
+  DateTimeColumn get serverUpdatedAt => dateTime().nullable()();
+
   @override
   Set<Column> get primaryKey => {id};
 }
@@ -23,6 +26,9 @@ class Notebooks extends Table {
   BoolColumn get archived => boolean().withDefault(const Constant(false))();
   DateTimeColumn get updatedAt => dateTime().nullable()();
 
+  /// Server `updatedAt` last seen (pull or applied push); sent as `baseUpdatedAt`.
+  DateTimeColumn get serverUpdatedAt => dateTime().nullable()();
+
   @override
   Set<Column> get primaryKey => {id};
 }
@@ -33,6 +39,9 @@ class Sections extends Table {
   TextColumn get notebookId => text()();
   TextColumn get name => text()();
   DateTimeColumn get updatedAt => dateTime().nullable()();
+
+  /// Server `updatedAt` last seen (pull or applied push); sent as `baseUpdatedAt`.
+  DateTimeColumn get serverUpdatedAt => dateTime().nullable()();
 
   @override
   Set<Column> get primaryKey => {id};
@@ -46,6 +55,9 @@ class Pages extends Table {
   TextColumn get content => text()();
   DateTimeColumn get updatedAt => dateTime().nullable()();
 
+  /// Server `updatedAt` last seen (pull or applied push); sent as `baseUpdatedAt`.
+  DateTimeColumn get serverUpdatedAt => dateTime().nullable()();
+
   @override
   Set<Column> get primaryKey => {id};
 }
@@ -58,6 +70,9 @@ class Outbox extends Table {
   TextColumn get entityId => text()();
   TextColumn get op => text()(); // 'upsert' | 'delete'
   TextColumn get payload => text()(); // JSON (row without id)
+
+  /// For deletes: the row's serverUpdatedAt at delete time (the row is gone by push time).
+  DateTimeColumn get baseUpdatedAt => dateTime().nullable()();
   DateTimeColumn get clientUpdatedAt => dateTime()();
   IntColumn get attempts => integer().withDefault(const Constant(0))();
 

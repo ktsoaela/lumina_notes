@@ -38,8 +38,20 @@ class $BookshelvesTable extends Bookshelves
     type: DriftSqlType.dateTime,
     requiredDuringInsert: false,
   );
+  static const VerificationMeta _serverUpdatedAtMeta = const VerificationMeta(
+    'serverUpdatedAt',
+  );
   @override
-  List<GeneratedColumn> get $columns => [id, name, updatedAt];
+  late final GeneratedColumn<DateTime> serverUpdatedAt =
+      GeneratedColumn<DateTime>(
+        'server_updated_at',
+        aliasedName,
+        true,
+        type: DriftSqlType.dateTime,
+        requiredDuringInsert: false,
+      );
+  @override
+  List<GeneratedColumn> get $columns => [id, name, updatedAt, serverUpdatedAt];
   @override
   String get aliasedName => _alias ?? actualTableName;
   @override
@@ -71,6 +83,15 @@ class $BookshelvesTable extends Bookshelves
         updatedAt.isAcceptableOrUnknown(data['updated_at']!, _updatedAtMeta),
       );
     }
+    if (data.containsKey('server_updated_at')) {
+      context.handle(
+        _serverUpdatedAtMeta,
+        serverUpdatedAt.isAcceptableOrUnknown(
+          data['server_updated_at']!,
+          _serverUpdatedAtMeta,
+        ),
+      );
+    }
     return context;
   }
 
@@ -92,6 +113,10 @@ class $BookshelvesTable extends Bookshelves
         DriftSqlType.dateTime,
         data['${effectivePrefix}updated_at'],
       ),
+      serverUpdatedAt: attachedDatabase.typeMapping.read(
+        DriftSqlType.dateTime,
+        data['${effectivePrefix}server_updated_at'],
+      ),
     );
   }
 
@@ -105,7 +130,15 @@ class BookshelfRow extends DataClass implements Insertable<BookshelfRow> {
   final String id;
   final String name;
   final DateTime? updatedAt;
-  const BookshelfRow({required this.id, required this.name, this.updatedAt});
+
+  /// Server `updatedAt` last seen (pull or applied push); sent as `baseUpdatedAt`.
+  final DateTime? serverUpdatedAt;
+  const BookshelfRow({
+    required this.id,
+    required this.name,
+    this.updatedAt,
+    this.serverUpdatedAt,
+  });
   @override
   Map<String, Expression> toColumns(bool nullToAbsent) {
     final map = <String, Expression>{};
@@ -113,6 +146,9 @@ class BookshelfRow extends DataClass implements Insertable<BookshelfRow> {
     map['name'] = Variable<String>(name);
     if (!nullToAbsent || updatedAt != null) {
       map['updated_at'] = Variable<DateTime>(updatedAt);
+    }
+    if (!nullToAbsent || serverUpdatedAt != null) {
+      map['server_updated_at'] = Variable<DateTime>(serverUpdatedAt);
     }
     return map;
   }
@@ -124,6 +160,9 @@ class BookshelfRow extends DataClass implements Insertable<BookshelfRow> {
       updatedAt: updatedAt == null && nullToAbsent
           ? const Value.absent()
           : Value(updatedAt),
+      serverUpdatedAt: serverUpdatedAt == null && nullToAbsent
+          ? const Value.absent()
+          : Value(serverUpdatedAt),
     );
   }
 
@@ -136,6 +175,7 @@ class BookshelfRow extends DataClass implements Insertable<BookshelfRow> {
       id: serializer.fromJson<String>(json['id']),
       name: serializer.fromJson<String>(json['name']),
       updatedAt: serializer.fromJson<DateTime?>(json['updatedAt']),
+      serverUpdatedAt: serializer.fromJson<DateTime?>(json['serverUpdatedAt']),
     );
   }
   @override
@@ -145,6 +185,7 @@ class BookshelfRow extends DataClass implements Insertable<BookshelfRow> {
       'id': serializer.toJson<String>(id),
       'name': serializer.toJson<String>(name),
       'updatedAt': serializer.toJson<DateTime?>(updatedAt),
+      'serverUpdatedAt': serializer.toJson<DateTime?>(serverUpdatedAt),
     };
   }
 
@@ -152,16 +193,23 @@ class BookshelfRow extends DataClass implements Insertable<BookshelfRow> {
     String? id,
     String? name,
     Value<DateTime?> updatedAt = const Value.absent(),
+    Value<DateTime?> serverUpdatedAt = const Value.absent(),
   }) => BookshelfRow(
     id: id ?? this.id,
     name: name ?? this.name,
     updatedAt: updatedAt.present ? updatedAt.value : this.updatedAt,
+    serverUpdatedAt: serverUpdatedAt.present
+        ? serverUpdatedAt.value
+        : this.serverUpdatedAt,
   );
   BookshelfRow copyWithCompanion(BookshelvesCompanion data) {
     return BookshelfRow(
       id: data.id.present ? data.id.value : this.id,
       name: data.name.present ? data.name.value : this.name,
       updatedAt: data.updatedAt.present ? data.updatedAt.value : this.updatedAt,
+      serverUpdatedAt: data.serverUpdatedAt.present
+          ? data.serverUpdatedAt.value
+          : this.serverUpdatedAt,
     );
   }
 
@@ -170,37 +218,42 @@ class BookshelfRow extends DataClass implements Insertable<BookshelfRow> {
     return (StringBuffer('BookshelfRow(')
           ..write('id: $id, ')
           ..write('name: $name, ')
-          ..write('updatedAt: $updatedAt')
+          ..write('updatedAt: $updatedAt, ')
+          ..write('serverUpdatedAt: $serverUpdatedAt')
           ..write(')'))
         .toString();
   }
 
   @override
-  int get hashCode => Object.hash(id, name, updatedAt);
+  int get hashCode => Object.hash(id, name, updatedAt, serverUpdatedAt);
   @override
   bool operator ==(Object other) =>
       identical(this, other) ||
       (other is BookshelfRow &&
           other.id == this.id &&
           other.name == this.name &&
-          other.updatedAt == this.updatedAt);
+          other.updatedAt == this.updatedAt &&
+          other.serverUpdatedAt == this.serverUpdatedAt);
 }
 
 class BookshelvesCompanion extends UpdateCompanion<BookshelfRow> {
   final Value<String> id;
   final Value<String> name;
   final Value<DateTime?> updatedAt;
+  final Value<DateTime?> serverUpdatedAt;
   final Value<int> rowid;
   const BookshelvesCompanion({
     this.id = const Value.absent(),
     this.name = const Value.absent(),
     this.updatedAt = const Value.absent(),
+    this.serverUpdatedAt = const Value.absent(),
     this.rowid = const Value.absent(),
   });
   BookshelvesCompanion.insert({
     required String id,
     required String name,
     this.updatedAt = const Value.absent(),
+    this.serverUpdatedAt = const Value.absent(),
     this.rowid = const Value.absent(),
   }) : id = Value(id),
        name = Value(name);
@@ -208,12 +261,14 @@ class BookshelvesCompanion extends UpdateCompanion<BookshelfRow> {
     Expression<String>? id,
     Expression<String>? name,
     Expression<DateTime>? updatedAt,
+    Expression<DateTime>? serverUpdatedAt,
     Expression<int>? rowid,
   }) {
     return RawValuesInsertable({
       if (id != null) 'id': id,
       if (name != null) 'name': name,
       if (updatedAt != null) 'updated_at': updatedAt,
+      if (serverUpdatedAt != null) 'server_updated_at': serverUpdatedAt,
       if (rowid != null) 'rowid': rowid,
     });
   }
@@ -222,12 +277,14 @@ class BookshelvesCompanion extends UpdateCompanion<BookshelfRow> {
     Value<String>? id,
     Value<String>? name,
     Value<DateTime?>? updatedAt,
+    Value<DateTime?>? serverUpdatedAt,
     Value<int>? rowid,
   }) {
     return BookshelvesCompanion(
       id: id ?? this.id,
       name: name ?? this.name,
       updatedAt: updatedAt ?? this.updatedAt,
+      serverUpdatedAt: serverUpdatedAt ?? this.serverUpdatedAt,
       rowid: rowid ?? this.rowid,
     );
   }
@@ -244,6 +301,9 @@ class BookshelvesCompanion extends UpdateCompanion<BookshelfRow> {
     if (updatedAt.present) {
       map['updated_at'] = Variable<DateTime>(updatedAt.value);
     }
+    if (serverUpdatedAt.present) {
+      map['server_updated_at'] = Variable<DateTime>(serverUpdatedAt.value);
+    }
     if (rowid.present) {
       map['rowid'] = Variable<int>(rowid.value);
     }
@@ -256,6 +316,7 @@ class BookshelvesCompanion extends UpdateCompanion<BookshelfRow> {
           ..write('id: $id, ')
           ..write('name: $name, ')
           ..write('updatedAt: $updatedAt, ')
+          ..write('serverUpdatedAt: $serverUpdatedAt, ')
           ..write('rowid: $rowid')
           ..write(')'))
         .toString();
@@ -323,6 +384,18 @@ class $NotebooksTable extends Notebooks
     type: DriftSqlType.dateTime,
     requiredDuringInsert: false,
   );
+  static const VerificationMeta _serverUpdatedAtMeta = const VerificationMeta(
+    'serverUpdatedAt',
+  );
+  @override
+  late final GeneratedColumn<DateTime> serverUpdatedAt =
+      GeneratedColumn<DateTime>(
+        'server_updated_at',
+        aliasedName,
+        true,
+        type: DriftSqlType.dateTime,
+        requiredDuringInsert: false,
+      );
   @override
   List<GeneratedColumn> get $columns => [
     id,
@@ -330,6 +403,7 @@ class $NotebooksTable extends Notebooks
     name,
     archived,
     updatedAt,
+    serverUpdatedAt,
   ];
   @override
   String get aliasedName => _alias ?? actualTableName;
@@ -379,6 +453,15 @@ class $NotebooksTable extends Notebooks
         updatedAt.isAcceptableOrUnknown(data['updated_at']!, _updatedAtMeta),
       );
     }
+    if (data.containsKey('server_updated_at')) {
+      context.handle(
+        _serverUpdatedAtMeta,
+        serverUpdatedAt.isAcceptableOrUnknown(
+          data['server_updated_at']!,
+          _serverUpdatedAtMeta,
+        ),
+      );
+    }
     return context;
   }
 
@@ -408,6 +491,10 @@ class $NotebooksTable extends Notebooks
         DriftSqlType.dateTime,
         data['${effectivePrefix}updated_at'],
       ),
+      serverUpdatedAt: attachedDatabase.typeMapping.read(
+        DriftSqlType.dateTime,
+        data['${effectivePrefix}server_updated_at'],
+      ),
     );
   }
 
@@ -423,12 +510,16 @@ class NotebookRow extends DataClass implements Insertable<NotebookRow> {
   final String name;
   final bool archived;
   final DateTime? updatedAt;
+
+  /// Server `updatedAt` last seen (pull or applied push); sent as `baseUpdatedAt`.
+  final DateTime? serverUpdatedAt;
   const NotebookRow({
     required this.id,
     required this.bookshelfId,
     required this.name,
     required this.archived,
     this.updatedAt,
+    this.serverUpdatedAt,
   });
   @override
   Map<String, Expression> toColumns(bool nullToAbsent) {
@@ -439,6 +530,9 @@ class NotebookRow extends DataClass implements Insertable<NotebookRow> {
     map['archived'] = Variable<bool>(archived);
     if (!nullToAbsent || updatedAt != null) {
       map['updated_at'] = Variable<DateTime>(updatedAt);
+    }
+    if (!nullToAbsent || serverUpdatedAt != null) {
+      map['server_updated_at'] = Variable<DateTime>(serverUpdatedAt);
     }
     return map;
   }
@@ -452,6 +546,9 @@ class NotebookRow extends DataClass implements Insertable<NotebookRow> {
       updatedAt: updatedAt == null && nullToAbsent
           ? const Value.absent()
           : Value(updatedAt),
+      serverUpdatedAt: serverUpdatedAt == null && nullToAbsent
+          ? const Value.absent()
+          : Value(serverUpdatedAt),
     );
   }
 
@@ -466,6 +563,7 @@ class NotebookRow extends DataClass implements Insertable<NotebookRow> {
       name: serializer.fromJson<String>(json['name']),
       archived: serializer.fromJson<bool>(json['archived']),
       updatedAt: serializer.fromJson<DateTime?>(json['updatedAt']),
+      serverUpdatedAt: serializer.fromJson<DateTime?>(json['serverUpdatedAt']),
     );
   }
   @override
@@ -477,6 +575,7 @@ class NotebookRow extends DataClass implements Insertable<NotebookRow> {
       'name': serializer.toJson<String>(name),
       'archived': serializer.toJson<bool>(archived),
       'updatedAt': serializer.toJson<DateTime?>(updatedAt),
+      'serverUpdatedAt': serializer.toJson<DateTime?>(serverUpdatedAt),
     };
   }
 
@@ -486,12 +585,16 @@ class NotebookRow extends DataClass implements Insertable<NotebookRow> {
     String? name,
     bool? archived,
     Value<DateTime?> updatedAt = const Value.absent(),
+    Value<DateTime?> serverUpdatedAt = const Value.absent(),
   }) => NotebookRow(
     id: id ?? this.id,
     bookshelfId: bookshelfId ?? this.bookshelfId,
     name: name ?? this.name,
     archived: archived ?? this.archived,
     updatedAt: updatedAt.present ? updatedAt.value : this.updatedAt,
+    serverUpdatedAt: serverUpdatedAt.present
+        ? serverUpdatedAt.value
+        : this.serverUpdatedAt,
   );
   NotebookRow copyWithCompanion(NotebooksCompanion data) {
     return NotebookRow(
@@ -502,6 +605,9 @@ class NotebookRow extends DataClass implements Insertable<NotebookRow> {
       name: data.name.present ? data.name.value : this.name,
       archived: data.archived.present ? data.archived.value : this.archived,
       updatedAt: data.updatedAt.present ? data.updatedAt.value : this.updatedAt,
+      serverUpdatedAt: data.serverUpdatedAt.present
+          ? data.serverUpdatedAt.value
+          : this.serverUpdatedAt,
     );
   }
 
@@ -512,13 +618,15 @@ class NotebookRow extends DataClass implements Insertable<NotebookRow> {
           ..write('bookshelfId: $bookshelfId, ')
           ..write('name: $name, ')
           ..write('archived: $archived, ')
-          ..write('updatedAt: $updatedAt')
+          ..write('updatedAt: $updatedAt, ')
+          ..write('serverUpdatedAt: $serverUpdatedAt')
           ..write(')'))
         .toString();
   }
 
   @override
-  int get hashCode => Object.hash(id, bookshelfId, name, archived, updatedAt);
+  int get hashCode =>
+      Object.hash(id, bookshelfId, name, archived, updatedAt, serverUpdatedAt);
   @override
   bool operator ==(Object other) =>
       identical(this, other) ||
@@ -527,7 +635,8 @@ class NotebookRow extends DataClass implements Insertable<NotebookRow> {
           other.bookshelfId == this.bookshelfId &&
           other.name == this.name &&
           other.archived == this.archived &&
-          other.updatedAt == this.updatedAt);
+          other.updatedAt == this.updatedAt &&
+          other.serverUpdatedAt == this.serverUpdatedAt);
 }
 
 class NotebooksCompanion extends UpdateCompanion<NotebookRow> {
@@ -536,6 +645,7 @@ class NotebooksCompanion extends UpdateCompanion<NotebookRow> {
   final Value<String> name;
   final Value<bool> archived;
   final Value<DateTime?> updatedAt;
+  final Value<DateTime?> serverUpdatedAt;
   final Value<int> rowid;
   const NotebooksCompanion({
     this.id = const Value.absent(),
@@ -543,6 +653,7 @@ class NotebooksCompanion extends UpdateCompanion<NotebookRow> {
     this.name = const Value.absent(),
     this.archived = const Value.absent(),
     this.updatedAt = const Value.absent(),
+    this.serverUpdatedAt = const Value.absent(),
     this.rowid = const Value.absent(),
   });
   NotebooksCompanion.insert({
@@ -551,6 +662,7 @@ class NotebooksCompanion extends UpdateCompanion<NotebookRow> {
     required String name,
     this.archived = const Value.absent(),
     this.updatedAt = const Value.absent(),
+    this.serverUpdatedAt = const Value.absent(),
     this.rowid = const Value.absent(),
   }) : id = Value(id),
        bookshelfId = Value(bookshelfId),
@@ -561,6 +673,7 @@ class NotebooksCompanion extends UpdateCompanion<NotebookRow> {
     Expression<String>? name,
     Expression<bool>? archived,
     Expression<DateTime>? updatedAt,
+    Expression<DateTime>? serverUpdatedAt,
     Expression<int>? rowid,
   }) {
     return RawValuesInsertable({
@@ -569,6 +682,7 @@ class NotebooksCompanion extends UpdateCompanion<NotebookRow> {
       if (name != null) 'name': name,
       if (archived != null) 'archived': archived,
       if (updatedAt != null) 'updated_at': updatedAt,
+      if (serverUpdatedAt != null) 'server_updated_at': serverUpdatedAt,
       if (rowid != null) 'rowid': rowid,
     });
   }
@@ -579,6 +693,7 @@ class NotebooksCompanion extends UpdateCompanion<NotebookRow> {
     Value<String>? name,
     Value<bool>? archived,
     Value<DateTime?>? updatedAt,
+    Value<DateTime?>? serverUpdatedAt,
     Value<int>? rowid,
   }) {
     return NotebooksCompanion(
@@ -587,6 +702,7 @@ class NotebooksCompanion extends UpdateCompanion<NotebookRow> {
       name: name ?? this.name,
       archived: archived ?? this.archived,
       updatedAt: updatedAt ?? this.updatedAt,
+      serverUpdatedAt: serverUpdatedAt ?? this.serverUpdatedAt,
       rowid: rowid ?? this.rowid,
     );
   }
@@ -609,6 +725,9 @@ class NotebooksCompanion extends UpdateCompanion<NotebookRow> {
     if (updatedAt.present) {
       map['updated_at'] = Variable<DateTime>(updatedAt.value);
     }
+    if (serverUpdatedAt.present) {
+      map['server_updated_at'] = Variable<DateTime>(serverUpdatedAt.value);
+    }
     if (rowid.present) {
       map['rowid'] = Variable<int>(rowid.value);
     }
@@ -623,6 +742,7 @@ class NotebooksCompanion extends UpdateCompanion<NotebookRow> {
           ..write('name: $name, ')
           ..write('archived: $archived, ')
           ..write('updatedAt: $updatedAt, ')
+          ..write('serverUpdatedAt: $serverUpdatedAt, ')
           ..write('rowid: $rowid')
           ..write(')'))
         .toString();
@@ -675,8 +795,26 @@ class $SectionsTable extends Sections
     type: DriftSqlType.dateTime,
     requiredDuringInsert: false,
   );
+  static const VerificationMeta _serverUpdatedAtMeta = const VerificationMeta(
+    'serverUpdatedAt',
+  );
   @override
-  List<GeneratedColumn> get $columns => [id, notebookId, name, updatedAt];
+  late final GeneratedColumn<DateTime> serverUpdatedAt =
+      GeneratedColumn<DateTime>(
+        'server_updated_at',
+        aliasedName,
+        true,
+        type: DriftSqlType.dateTime,
+        requiredDuringInsert: false,
+      );
+  @override
+  List<GeneratedColumn> get $columns => [
+    id,
+    notebookId,
+    name,
+    updatedAt,
+    serverUpdatedAt,
+  ];
   @override
   String get aliasedName => _alias ?? actualTableName;
   @override
@@ -716,6 +854,15 @@ class $SectionsTable extends Sections
         updatedAt.isAcceptableOrUnknown(data['updated_at']!, _updatedAtMeta),
       );
     }
+    if (data.containsKey('server_updated_at')) {
+      context.handle(
+        _serverUpdatedAtMeta,
+        serverUpdatedAt.isAcceptableOrUnknown(
+          data['server_updated_at']!,
+          _serverUpdatedAtMeta,
+        ),
+      );
+    }
     return context;
   }
 
@@ -741,6 +888,10 @@ class $SectionsTable extends Sections
         DriftSqlType.dateTime,
         data['${effectivePrefix}updated_at'],
       ),
+      serverUpdatedAt: attachedDatabase.typeMapping.read(
+        DriftSqlType.dateTime,
+        data['${effectivePrefix}server_updated_at'],
+      ),
     );
   }
 
@@ -755,11 +906,15 @@ class SectionRow extends DataClass implements Insertable<SectionRow> {
   final String notebookId;
   final String name;
   final DateTime? updatedAt;
+
+  /// Server `updatedAt` last seen (pull or applied push); sent as `baseUpdatedAt`.
+  final DateTime? serverUpdatedAt;
   const SectionRow({
     required this.id,
     required this.notebookId,
     required this.name,
     this.updatedAt,
+    this.serverUpdatedAt,
   });
   @override
   Map<String, Expression> toColumns(bool nullToAbsent) {
@@ -769,6 +924,9 @@ class SectionRow extends DataClass implements Insertable<SectionRow> {
     map['name'] = Variable<String>(name);
     if (!nullToAbsent || updatedAt != null) {
       map['updated_at'] = Variable<DateTime>(updatedAt);
+    }
+    if (!nullToAbsent || serverUpdatedAt != null) {
+      map['server_updated_at'] = Variable<DateTime>(serverUpdatedAt);
     }
     return map;
   }
@@ -781,6 +939,9 @@ class SectionRow extends DataClass implements Insertable<SectionRow> {
       updatedAt: updatedAt == null && nullToAbsent
           ? const Value.absent()
           : Value(updatedAt),
+      serverUpdatedAt: serverUpdatedAt == null && nullToAbsent
+          ? const Value.absent()
+          : Value(serverUpdatedAt),
     );
   }
 
@@ -794,6 +955,7 @@ class SectionRow extends DataClass implements Insertable<SectionRow> {
       notebookId: serializer.fromJson<String>(json['notebookId']),
       name: serializer.fromJson<String>(json['name']),
       updatedAt: serializer.fromJson<DateTime?>(json['updatedAt']),
+      serverUpdatedAt: serializer.fromJson<DateTime?>(json['serverUpdatedAt']),
     );
   }
   @override
@@ -804,6 +966,7 @@ class SectionRow extends DataClass implements Insertable<SectionRow> {
       'notebookId': serializer.toJson<String>(notebookId),
       'name': serializer.toJson<String>(name),
       'updatedAt': serializer.toJson<DateTime?>(updatedAt),
+      'serverUpdatedAt': serializer.toJson<DateTime?>(serverUpdatedAt),
     };
   }
 
@@ -812,11 +975,15 @@ class SectionRow extends DataClass implements Insertable<SectionRow> {
     String? notebookId,
     String? name,
     Value<DateTime?> updatedAt = const Value.absent(),
+    Value<DateTime?> serverUpdatedAt = const Value.absent(),
   }) => SectionRow(
     id: id ?? this.id,
     notebookId: notebookId ?? this.notebookId,
     name: name ?? this.name,
     updatedAt: updatedAt.present ? updatedAt.value : this.updatedAt,
+    serverUpdatedAt: serverUpdatedAt.present
+        ? serverUpdatedAt.value
+        : this.serverUpdatedAt,
   );
   SectionRow copyWithCompanion(SectionsCompanion data) {
     return SectionRow(
@@ -826,6 +993,9 @@ class SectionRow extends DataClass implements Insertable<SectionRow> {
           : this.notebookId,
       name: data.name.present ? data.name.value : this.name,
       updatedAt: data.updatedAt.present ? data.updatedAt.value : this.updatedAt,
+      serverUpdatedAt: data.serverUpdatedAt.present
+          ? data.serverUpdatedAt.value
+          : this.serverUpdatedAt,
     );
   }
 
@@ -835,13 +1005,15 @@ class SectionRow extends DataClass implements Insertable<SectionRow> {
           ..write('id: $id, ')
           ..write('notebookId: $notebookId, ')
           ..write('name: $name, ')
-          ..write('updatedAt: $updatedAt')
+          ..write('updatedAt: $updatedAt, ')
+          ..write('serverUpdatedAt: $serverUpdatedAt')
           ..write(')'))
         .toString();
   }
 
   @override
-  int get hashCode => Object.hash(id, notebookId, name, updatedAt);
+  int get hashCode =>
+      Object.hash(id, notebookId, name, updatedAt, serverUpdatedAt);
   @override
   bool operator ==(Object other) =>
       identical(this, other) ||
@@ -849,7 +1021,8 @@ class SectionRow extends DataClass implements Insertable<SectionRow> {
           other.id == this.id &&
           other.notebookId == this.notebookId &&
           other.name == this.name &&
-          other.updatedAt == this.updatedAt);
+          other.updatedAt == this.updatedAt &&
+          other.serverUpdatedAt == this.serverUpdatedAt);
 }
 
 class SectionsCompanion extends UpdateCompanion<SectionRow> {
@@ -857,12 +1030,14 @@ class SectionsCompanion extends UpdateCompanion<SectionRow> {
   final Value<String> notebookId;
   final Value<String> name;
   final Value<DateTime?> updatedAt;
+  final Value<DateTime?> serverUpdatedAt;
   final Value<int> rowid;
   const SectionsCompanion({
     this.id = const Value.absent(),
     this.notebookId = const Value.absent(),
     this.name = const Value.absent(),
     this.updatedAt = const Value.absent(),
+    this.serverUpdatedAt = const Value.absent(),
     this.rowid = const Value.absent(),
   });
   SectionsCompanion.insert({
@@ -870,6 +1045,7 @@ class SectionsCompanion extends UpdateCompanion<SectionRow> {
     required String notebookId,
     required String name,
     this.updatedAt = const Value.absent(),
+    this.serverUpdatedAt = const Value.absent(),
     this.rowid = const Value.absent(),
   }) : id = Value(id),
        notebookId = Value(notebookId),
@@ -879,6 +1055,7 @@ class SectionsCompanion extends UpdateCompanion<SectionRow> {
     Expression<String>? notebookId,
     Expression<String>? name,
     Expression<DateTime>? updatedAt,
+    Expression<DateTime>? serverUpdatedAt,
     Expression<int>? rowid,
   }) {
     return RawValuesInsertable({
@@ -886,6 +1063,7 @@ class SectionsCompanion extends UpdateCompanion<SectionRow> {
       if (notebookId != null) 'notebook_id': notebookId,
       if (name != null) 'name': name,
       if (updatedAt != null) 'updated_at': updatedAt,
+      if (serverUpdatedAt != null) 'server_updated_at': serverUpdatedAt,
       if (rowid != null) 'rowid': rowid,
     });
   }
@@ -895,6 +1073,7 @@ class SectionsCompanion extends UpdateCompanion<SectionRow> {
     Value<String>? notebookId,
     Value<String>? name,
     Value<DateTime?>? updatedAt,
+    Value<DateTime?>? serverUpdatedAt,
     Value<int>? rowid,
   }) {
     return SectionsCompanion(
@@ -902,6 +1081,7 @@ class SectionsCompanion extends UpdateCompanion<SectionRow> {
       notebookId: notebookId ?? this.notebookId,
       name: name ?? this.name,
       updatedAt: updatedAt ?? this.updatedAt,
+      serverUpdatedAt: serverUpdatedAt ?? this.serverUpdatedAt,
       rowid: rowid ?? this.rowid,
     );
   }
@@ -921,6 +1101,9 @@ class SectionsCompanion extends UpdateCompanion<SectionRow> {
     if (updatedAt.present) {
       map['updated_at'] = Variable<DateTime>(updatedAt.value);
     }
+    if (serverUpdatedAt.present) {
+      map['server_updated_at'] = Variable<DateTime>(serverUpdatedAt.value);
+    }
     if (rowid.present) {
       map['rowid'] = Variable<int>(rowid.value);
     }
@@ -934,6 +1117,7 @@ class SectionsCompanion extends UpdateCompanion<SectionRow> {
           ..write('notebookId: $notebookId, ')
           ..write('name: $name, ')
           ..write('updatedAt: $updatedAt, ')
+          ..write('serverUpdatedAt: $serverUpdatedAt, ')
           ..write('rowid: $rowid')
           ..write(')'))
         .toString();
@@ -996,6 +1180,18 @@ class $PagesTable extends Pages with TableInfo<$PagesTable, PageRow> {
     type: DriftSqlType.dateTime,
     requiredDuringInsert: false,
   );
+  static const VerificationMeta _serverUpdatedAtMeta = const VerificationMeta(
+    'serverUpdatedAt',
+  );
+  @override
+  late final GeneratedColumn<DateTime> serverUpdatedAt =
+      GeneratedColumn<DateTime>(
+        'server_updated_at',
+        aliasedName,
+        true,
+        type: DriftSqlType.dateTime,
+        requiredDuringInsert: false,
+      );
   @override
   List<GeneratedColumn> get $columns => [
     id,
@@ -1003,6 +1199,7 @@ class $PagesTable extends Pages with TableInfo<$PagesTable, PageRow> {
     title,
     content,
     updatedAt,
+    serverUpdatedAt,
   ];
   @override
   String get aliasedName => _alias ?? actualTableName;
@@ -1051,6 +1248,15 @@ class $PagesTable extends Pages with TableInfo<$PagesTable, PageRow> {
         updatedAt.isAcceptableOrUnknown(data['updated_at']!, _updatedAtMeta),
       );
     }
+    if (data.containsKey('server_updated_at')) {
+      context.handle(
+        _serverUpdatedAtMeta,
+        serverUpdatedAt.isAcceptableOrUnknown(
+          data['server_updated_at']!,
+          _serverUpdatedAtMeta,
+        ),
+      );
+    }
     return context;
   }
 
@@ -1080,6 +1286,10 @@ class $PagesTable extends Pages with TableInfo<$PagesTable, PageRow> {
         DriftSqlType.dateTime,
         data['${effectivePrefix}updated_at'],
       ),
+      serverUpdatedAt: attachedDatabase.typeMapping.read(
+        DriftSqlType.dateTime,
+        data['${effectivePrefix}server_updated_at'],
+      ),
     );
   }
 
@@ -1095,12 +1305,16 @@ class PageRow extends DataClass implements Insertable<PageRow> {
   final String title;
   final String content;
   final DateTime? updatedAt;
+
+  /// Server `updatedAt` last seen (pull or applied push); sent as `baseUpdatedAt`.
+  final DateTime? serverUpdatedAt;
   const PageRow({
     required this.id,
     required this.sectionId,
     required this.title,
     required this.content,
     this.updatedAt,
+    this.serverUpdatedAt,
   });
   @override
   Map<String, Expression> toColumns(bool nullToAbsent) {
@@ -1111,6 +1325,9 @@ class PageRow extends DataClass implements Insertable<PageRow> {
     map['content'] = Variable<String>(content);
     if (!nullToAbsent || updatedAt != null) {
       map['updated_at'] = Variable<DateTime>(updatedAt);
+    }
+    if (!nullToAbsent || serverUpdatedAt != null) {
+      map['server_updated_at'] = Variable<DateTime>(serverUpdatedAt);
     }
     return map;
   }
@@ -1124,6 +1341,9 @@ class PageRow extends DataClass implements Insertable<PageRow> {
       updatedAt: updatedAt == null && nullToAbsent
           ? const Value.absent()
           : Value(updatedAt),
+      serverUpdatedAt: serverUpdatedAt == null && nullToAbsent
+          ? const Value.absent()
+          : Value(serverUpdatedAt),
     );
   }
 
@@ -1138,6 +1358,7 @@ class PageRow extends DataClass implements Insertable<PageRow> {
       title: serializer.fromJson<String>(json['title']),
       content: serializer.fromJson<String>(json['content']),
       updatedAt: serializer.fromJson<DateTime?>(json['updatedAt']),
+      serverUpdatedAt: serializer.fromJson<DateTime?>(json['serverUpdatedAt']),
     );
   }
   @override
@@ -1149,6 +1370,7 @@ class PageRow extends DataClass implements Insertable<PageRow> {
       'title': serializer.toJson<String>(title),
       'content': serializer.toJson<String>(content),
       'updatedAt': serializer.toJson<DateTime?>(updatedAt),
+      'serverUpdatedAt': serializer.toJson<DateTime?>(serverUpdatedAt),
     };
   }
 
@@ -1158,12 +1380,16 @@ class PageRow extends DataClass implements Insertable<PageRow> {
     String? title,
     String? content,
     Value<DateTime?> updatedAt = const Value.absent(),
+    Value<DateTime?> serverUpdatedAt = const Value.absent(),
   }) => PageRow(
     id: id ?? this.id,
     sectionId: sectionId ?? this.sectionId,
     title: title ?? this.title,
     content: content ?? this.content,
     updatedAt: updatedAt.present ? updatedAt.value : this.updatedAt,
+    serverUpdatedAt: serverUpdatedAt.present
+        ? serverUpdatedAt.value
+        : this.serverUpdatedAt,
   );
   PageRow copyWithCompanion(PagesCompanion data) {
     return PageRow(
@@ -1172,6 +1398,9 @@ class PageRow extends DataClass implements Insertable<PageRow> {
       title: data.title.present ? data.title.value : this.title,
       content: data.content.present ? data.content.value : this.content,
       updatedAt: data.updatedAt.present ? data.updatedAt.value : this.updatedAt,
+      serverUpdatedAt: data.serverUpdatedAt.present
+          ? data.serverUpdatedAt.value
+          : this.serverUpdatedAt,
     );
   }
 
@@ -1182,13 +1411,15 @@ class PageRow extends DataClass implements Insertable<PageRow> {
           ..write('sectionId: $sectionId, ')
           ..write('title: $title, ')
           ..write('content: $content, ')
-          ..write('updatedAt: $updatedAt')
+          ..write('updatedAt: $updatedAt, ')
+          ..write('serverUpdatedAt: $serverUpdatedAt')
           ..write(')'))
         .toString();
   }
 
   @override
-  int get hashCode => Object.hash(id, sectionId, title, content, updatedAt);
+  int get hashCode =>
+      Object.hash(id, sectionId, title, content, updatedAt, serverUpdatedAt);
   @override
   bool operator ==(Object other) =>
       identical(this, other) ||
@@ -1197,7 +1428,8 @@ class PageRow extends DataClass implements Insertable<PageRow> {
           other.sectionId == this.sectionId &&
           other.title == this.title &&
           other.content == this.content &&
-          other.updatedAt == this.updatedAt);
+          other.updatedAt == this.updatedAt &&
+          other.serverUpdatedAt == this.serverUpdatedAt);
 }
 
 class PagesCompanion extends UpdateCompanion<PageRow> {
@@ -1206,6 +1438,7 @@ class PagesCompanion extends UpdateCompanion<PageRow> {
   final Value<String> title;
   final Value<String> content;
   final Value<DateTime?> updatedAt;
+  final Value<DateTime?> serverUpdatedAt;
   final Value<int> rowid;
   const PagesCompanion({
     this.id = const Value.absent(),
@@ -1213,6 +1446,7 @@ class PagesCompanion extends UpdateCompanion<PageRow> {
     this.title = const Value.absent(),
     this.content = const Value.absent(),
     this.updatedAt = const Value.absent(),
+    this.serverUpdatedAt = const Value.absent(),
     this.rowid = const Value.absent(),
   });
   PagesCompanion.insert({
@@ -1221,6 +1455,7 @@ class PagesCompanion extends UpdateCompanion<PageRow> {
     required String title,
     required String content,
     this.updatedAt = const Value.absent(),
+    this.serverUpdatedAt = const Value.absent(),
     this.rowid = const Value.absent(),
   }) : id = Value(id),
        sectionId = Value(sectionId),
@@ -1232,6 +1467,7 @@ class PagesCompanion extends UpdateCompanion<PageRow> {
     Expression<String>? title,
     Expression<String>? content,
     Expression<DateTime>? updatedAt,
+    Expression<DateTime>? serverUpdatedAt,
     Expression<int>? rowid,
   }) {
     return RawValuesInsertable({
@@ -1240,6 +1476,7 @@ class PagesCompanion extends UpdateCompanion<PageRow> {
       if (title != null) 'title': title,
       if (content != null) 'content': content,
       if (updatedAt != null) 'updated_at': updatedAt,
+      if (serverUpdatedAt != null) 'server_updated_at': serverUpdatedAt,
       if (rowid != null) 'rowid': rowid,
     });
   }
@@ -1250,6 +1487,7 @@ class PagesCompanion extends UpdateCompanion<PageRow> {
     Value<String>? title,
     Value<String>? content,
     Value<DateTime?>? updatedAt,
+    Value<DateTime?>? serverUpdatedAt,
     Value<int>? rowid,
   }) {
     return PagesCompanion(
@@ -1258,6 +1496,7 @@ class PagesCompanion extends UpdateCompanion<PageRow> {
       title: title ?? this.title,
       content: content ?? this.content,
       updatedAt: updatedAt ?? this.updatedAt,
+      serverUpdatedAt: serverUpdatedAt ?? this.serverUpdatedAt,
       rowid: rowid ?? this.rowid,
     );
   }
@@ -1280,6 +1519,9 @@ class PagesCompanion extends UpdateCompanion<PageRow> {
     if (updatedAt.present) {
       map['updated_at'] = Variable<DateTime>(updatedAt.value);
     }
+    if (serverUpdatedAt.present) {
+      map['server_updated_at'] = Variable<DateTime>(serverUpdatedAt.value);
+    }
     if (rowid.present) {
       map['rowid'] = Variable<int>(rowid.value);
     }
@@ -1294,6 +1536,7 @@ class PagesCompanion extends UpdateCompanion<PageRow> {
           ..write('title: $title, ')
           ..write('content: $content, ')
           ..write('updatedAt: $updatedAt, ')
+          ..write('serverUpdatedAt: $serverUpdatedAt, ')
           ..write('rowid: $rowid')
           ..write(')'))
         .toString();
@@ -1358,6 +1601,18 @@ class $OutboxTable extends Outbox with TableInfo<$OutboxTable, OutboxEntry> {
     type: DriftSqlType.string,
     requiredDuringInsert: true,
   );
+  static const VerificationMeta _baseUpdatedAtMeta = const VerificationMeta(
+    'baseUpdatedAt',
+  );
+  @override
+  late final GeneratedColumn<DateTime> baseUpdatedAt =
+      GeneratedColumn<DateTime>(
+        'base_updated_at',
+        aliasedName,
+        true,
+        type: DriftSqlType.dateTime,
+        requiredDuringInsert: false,
+      );
   static const VerificationMeta _clientUpdatedAtMeta = const VerificationMeta(
     'clientUpdatedAt',
   );
@@ -1389,6 +1644,7 @@ class $OutboxTable extends Outbox with TableInfo<$OutboxTable, OutboxEntry> {
     entityId,
     op,
     payload,
+    baseUpdatedAt,
     clientUpdatedAt,
     attempts,
   ];
@@ -1438,6 +1694,15 @@ class $OutboxTable extends Outbox with TableInfo<$OutboxTable, OutboxEntry> {
       );
     } else if (isInserting) {
       context.missing(_payloadMeta);
+    }
+    if (data.containsKey('base_updated_at')) {
+      context.handle(
+        _baseUpdatedAtMeta,
+        baseUpdatedAt.isAcceptableOrUnknown(
+          data['base_updated_at']!,
+          _baseUpdatedAtMeta,
+        ),
+      );
     }
     if (data.containsKey('client_updated_at')) {
       context.handle(
@@ -1489,6 +1754,10 @@ class $OutboxTable extends Outbox with TableInfo<$OutboxTable, OutboxEntry> {
         DriftSqlType.string,
         data['${effectivePrefix}payload'],
       )!,
+      baseUpdatedAt: attachedDatabase.typeMapping.read(
+        DriftSqlType.dateTime,
+        data['${effectivePrefix}base_updated_at'],
+      ),
       clientUpdatedAt: attachedDatabase.typeMapping.read(
         DriftSqlType.dateTime,
         data['${effectivePrefix}client_updated_at'],
@@ -1512,6 +1781,9 @@ class OutboxEntry extends DataClass implements Insertable<OutboxEntry> {
   final String entityId;
   final String op;
   final String payload;
+
+  /// For deletes: the row's serverUpdatedAt at delete time (the row is gone by push time).
+  final DateTime? baseUpdatedAt;
   final DateTime clientUpdatedAt;
   final int attempts;
   const OutboxEntry({
@@ -1520,6 +1792,7 @@ class OutboxEntry extends DataClass implements Insertable<OutboxEntry> {
     required this.entityId,
     required this.op,
     required this.payload,
+    this.baseUpdatedAt,
     required this.clientUpdatedAt,
     required this.attempts,
   });
@@ -1531,6 +1804,9 @@ class OutboxEntry extends DataClass implements Insertable<OutboxEntry> {
     map['entity_id'] = Variable<String>(entityId);
     map['op'] = Variable<String>(op);
     map['payload'] = Variable<String>(payload);
+    if (!nullToAbsent || baseUpdatedAt != null) {
+      map['base_updated_at'] = Variable<DateTime>(baseUpdatedAt);
+    }
     map['client_updated_at'] = Variable<DateTime>(clientUpdatedAt);
     map['attempts'] = Variable<int>(attempts);
     return map;
@@ -1543,6 +1819,9 @@ class OutboxEntry extends DataClass implements Insertable<OutboxEntry> {
       entityId: Value(entityId),
       op: Value(op),
       payload: Value(payload),
+      baseUpdatedAt: baseUpdatedAt == null && nullToAbsent
+          ? const Value.absent()
+          : Value(baseUpdatedAt),
       clientUpdatedAt: Value(clientUpdatedAt),
       attempts: Value(attempts),
     );
@@ -1559,6 +1838,7 @@ class OutboxEntry extends DataClass implements Insertable<OutboxEntry> {
       entityId: serializer.fromJson<String>(json['entityId']),
       op: serializer.fromJson<String>(json['op']),
       payload: serializer.fromJson<String>(json['payload']),
+      baseUpdatedAt: serializer.fromJson<DateTime?>(json['baseUpdatedAt']),
       clientUpdatedAt: serializer.fromJson<DateTime>(json['clientUpdatedAt']),
       attempts: serializer.fromJson<int>(json['attempts']),
     );
@@ -1572,6 +1852,7 @@ class OutboxEntry extends DataClass implements Insertable<OutboxEntry> {
       'entityId': serializer.toJson<String>(entityId),
       'op': serializer.toJson<String>(op),
       'payload': serializer.toJson<String>(payload),
+      'baseUpdatedAt': serializer.toJson<DateTime?>(baseUpdatedAt),
       'clientUpdatedAt': serializer.toJson<DateTime>(clientUpdatedAt),
       'attempts': serializer.toJson<int>(attempts),
     };
@@ -1583,6 +1864,7 @@ class OutboxEntry extends DataClass implements Insertable<OutboxEntry> {
     String? entityId,
     String? op,
     String? payload,
+    Value<DateTime?> baseUpdatedAt = const Value.absent(),
     DateTime? clientUpdatedAt,
     int? attempts,
   }) => OutboxEntry(
@@ -1591,6 +1873,9 @@ class OutboxEntry extends DataClass implements Insertable<OutboxEntry> {
     entityId: entityId ?? this.entityId,
     op: op ?? this.op,
     payload: payload ?? this.payload,
+    baseUpdatedAt: baseUpdatedAt.present
+        ? baseUpdatedAt.value
+        : this.baseUpdatedAt,
     clientUpdatedAt: clientUpdatedAt ?? this.clientUpdatedAt,
     attempts: attempts ?? this.attempts,
   );
@@ -1601,6 +1886,9 @@ class OutboxEntry extends DataClass implements Insertable<OutboxEntry> {
       entityId: data.entityId.present ? data.entityId.value : this.entityId,
       op: data.op.present ? data.op.value : this.op,
       payload: data.payload.present ? data.payload.value : this.payload,
+      baseUpdatedAt: data.baseUpdatedAt.present
+          ? data.baseUpdatedAt.value
+          : this.baseUpdatedAt,
       clientUpdatedAt: data.clientUpdatedAt.present
           ? data.clientUpdatedAt.value
           : this.clientUpdatedAt,
@@ -1616,6 +1904,7 @@ class OutboxEntry extends DataClass implements Insertable<OutboxEntry> {
           ..write('entityId: $entityId, ')
           ..write('op: $op, ')
           ..write('payload: $payload, ')
+          ..write('baseUpdatedAt: $baseUpdatedAt, ')
           ..write('clientUpdatedAt: $clientUpdatedAt, ')
           ..write('attempts: $attempts')
           ..write(')'))
@@ -1629,6 +1918,7 @@ class OutboxEntry extends DataClass implements Insertable<OutboxEntry> {
     entityId,
     op,
     payload,
+    baseUpdatedAt,
     clientUpdatedAt,
     attempts,
   );
@@ -1641,6 +1931,7 @@ class OutboxEntry extends DataClass implements Insertable<OutboxEntry> {
           other.entityId == this.entityId &&
           other.op == this.op &&
           other.payload == this.payload &&
+          other.baseUpdatedAt == this.baseUpdatedAt &&
           other.clientUpdatedAt == this.clientUpdatedAt &&
           other.attempts == this.attempts);
 }
@@ -1651,6 +1942,7 @@ class OutboxCompanion extends UpdateCompanion<OutboxEntry> {
   final Value<String> entityId;
   final Value<String> op;
   final Value<String> payload;
+  final Value<DateTime?> baseUpdatedAt;
   final Value<DateTime> clientUpdatedAt;
   final Value<int> attempts;
   const OutboxCompanion({
@@ -1659,6 +1951,7 @@ class OutboxCompanion extends UpdateCompanion<OutboxEntry> {
     this.entityId = const Value.absent(),
     this.op = const Value.absent(),
     this.payload = const Value.absent(),
+    this.baseUpdatedAt = const Value.absent(),
     this.clientUpdatedAt = const Value.absent(),
     this.attempts = const Value.absent(),
   });
@@ -1668,6 +1961,7 @@ class OutboxCompanion extends UpdateCompanion<OutboxEntry> {
     required String entityId,
     required String op,
     required String payload,
+    this.baseUpdatedAt = const Value.absent(),
     required DateTime clientUpdatedAt,
     this.attempts = const Value.absent(),
   }) : entity = Value(entity),
@@ -1681,6 +1975,7 @@ class OutboxCompanion extends UpdateCompanion<OutboxEntry> {
     Expression<String>? entityId,
     Expression<String>? op,
     Expression<String>? payload,
+    Expression<DateTime>? baseUpdatedAt,
     Expression<DateTime>? clientUpdatedAt,
     Expression<int>? attempts,
   }) {
@@ -1690,6 +1985,7 @@ class OutboxCompanion extends UpdateCompanion<OutboxEntry> {
       if (entityId != null) 'entity_id': entityId,
       if (op != null) 'op': op,
       if (payload != null) 'payload': payload,
+      if (baseUpdatedAt != null) 'base_updated_at': baseUpdatedAt,
       if (clientUpdatedAt != null) 'client_updated_at': clientUpdatedAt,
       if (attempts != null) 'attempts': attempts,
     });
@@ -1701,6 +1997,7 @@ class OutboxCompanion extends UpdateCompanion<OutboxEntry> {
     Value<String>? entityId,
     Value<String>? op,
     Value<String>? payload,
+    Value<DateTime?>? baseUpdatedAt,
     Value<DateTime>? clientUpdatedAt,
     Value<int>? attempts,
   }) {
@@ -1710,6 +2007,7 @@ class OutboxCompanion extends UpdateCompanion<OutboxEntry> {
       entityId: entityId ?? this.entityId,
       op: op ?? this.op,
       payload: payload ?? this.payload,
+      baseUpdatedAt: baseUpdatedAt ?? this.baseUpdatedAt,
       clientUpdatedAt: clientUpdatedAt ?? this.clientUpdatedAt,
       attempts: attempts ?? this.attempts,
     );
@@ -1733,6 +2031,9 @@ class OutboxCompanion extends UpdateCompanion<OutboxEntry> {
     if (payload.present) {
       map['payload'] = Variable<String>(payload.value);
     }
+    if (baseUpdatedAt.present) {
+      map['base_updated_at'] = Variable<DateTime>(baseUpdatedAt.value);
+    }
     if (clientUpdatedAt.present) {
       map['client_updated_at'] = Variable<DateTime>(clientUpdatedAt.value);
     }
@@ -1750,6 +2051,7 @@ class OutboxCompanion extends UpdateCompanion<OutboxEntry> {
           ..write('entityId: $entityId, ')
           ..write('op: $op, ')
           ..write('payload: $payload, ')
+          ..write('baseUpdatedAt: $baseUpdatedAt, ')
           ..write('clientUpdatedAt: $clientUpdatedAt, ')
           ..write('attempts: $attempts')
           ..write(')'))
@@ -1996,6 +2298,7 @@ typedef $$BookshelvesTableCreateCompanionBuilder =
       required String id,
       required String name,
       Value<DateTime?> updatedAt,
+      Value<DateTime?> serverUpdatedAt,
       Value<int> rowid,
     });
 typedef $$BookshelvesTableUpdateCompanionBuilder =
@@ -2003,6 +2306,7 @@ typedef $$BookshelvesTableUpdateCompanionBuilder =
       Value<String> id,
       Value<String> name,
       Value<DateTime?> updatedAt,
+      Value<DateTime?> serverUpdatedAt,
       Value<int> rowid,
     });
 
@@ -2027,6 +2331,11 @@ class $$BookshelvesTableFilterComposer
 
   ColumnFilters<DateTime> get updatedAt => $composableBuilder(
     column: $table.updatedAt,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<DateTime> get serverUpdatedAt => $composableBuilder(
+    column: $table.serverUpdatedAt,
     builder: (column) => ColumnFilters(column),
   );
 }
@@ -2054,6 +2363,11 @@ class $$BookshelvesTableOrderingComposer
     column: $table.updatedAt,
     builder: (column) => ColumnOrderings(column),
   );
+
+  ColumnOrderings<DateTime> get serverUpdatedAt => $composableBuilder(
+    column: $table.serverUpdatedAt,
+    builder: (column) => ColumnOrderings(column),
+  );
 }
 
 class $$BookshelvesTableAnnotationComposer
@@ -2073,6 +2387,11 @@ class $$BookshelvesTableAnnotationComposer
 
   GeneratedColumn<DateTime> get updatedAt =>
       $composableBuilder(column: $table.updatedAt, builder: (column) => column);
+
+  GeneratedColumn<DateTime> get serverUpdatedAt => $composableBuilder(
+    column: $table.serverUpdatedAt,
+    builder: (column) => column,
+  );
 }
 
 class $$BookshelvesTableTableManager
@@ -2109,11 +2428,13 @@ class $$BookshelvesTableTableManager
                 Value<String> id = const Value.absent(),
                 Value<String> name = const Value.absent(),
                 Value<DateTime?> updatedAt = const Value.absent(),
+                Value<DateTime?> serverUpdatedAt = const Value.absent(),
                 Value<int> rowid = const Value.absent(),
               }) => BookshelvesCompanion(
                 id: id,
                 name: name,
                 updatedAt: updatedAt,
+                serverUpdatedAt: serverUpdatedAt,
                 rowid: rowid,
               ),
           createCompanionCallback:
@@ -2121,11 +2442,13 @@ class $$BookshelvesTableTableManager
                 required String id,
                 required String name,
                 Value<DateTime?> updatedAt = const Value.absent(),
+                Value<DateTime?> serverUpdatedAt = const Value.absent(),
                 Value<int> rowid = const Value.absent(),
               }) => BookshelvesCompanion.insert(
                 id: id,
                 name: name,
                 updatedAt: updatedAt,
+                serverUpdatedAt: serverUpdatedAt,
                 rowid: rowid,
               ),
           withReferenceMapper: (p0) => p0
@@ -2168,6 +2491,7 @@ typedef $$NotebooksTableCreateCompanionBuilder = NotebooksCompanion Function({
   required String name,
   Value<bool> archived,
   Value<DateTime?> updatedAt,
+  Value<DateTime?> serverUpdatedAt,
   Value<int> rowid,
 });
 typedef $$NotebooksTableUpdateCompanionBuilder = NotebooksCompanion Function({
@@ -2176,6 +2500,7 @@ typedef $$NotebooksTableUpdateCompanionBuilder = NotebooksCompanion Function({
   Value<String> name,
   Value<bool> archived,
   Value<DateTime?> updatedAt,
+  Value<DateTime?> serverUpdatedAt,
   Value<int> rowid,
 });
 
@@ -2210,6 +2535,11 @@ class $$NotebooksTableFilterComposer
 
   ColumnFilters<DateTime> get updatedAt => $composableBuilder(
     column: $table.updatedAt,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<DateTime> get serverUpdatedAt => $composableBuilder(
+    column: $table.serverUpdatedAt,
     builder: (column) => ColumnFilters(column),
   );
 }
@@ -2247,6 +2577,11 @@ class $$NotebooksTableOrderingComposer
     column: $table.updatedAt,
     builder: (column) => ColumnOrderings(column),
   );
+
+  ColumnOrderings<DateTime> get serverUpdatedAt => $composableBuilder(
+    column: $table.serverUpdatedAt,
+    builder: (column) => ColumnOrderings(column),
+  );
 }
 
 class $$NotebooksTableAnnotationComposer
@@ -2274,6 +2609,11 @@ class $$NotebooksTableAnnotationComposer
 
   GeneratedColumn<DateTime> get updatedAt =>
       $composableBuilder(column: $table.updatedAt, builder: (column) => column);
+
+  GeneratedColumn<DateTime> get serverUpdatedAt => $composableBuilder(
+    column: $table.serverUpdatedAt,
+    builder: (column) => column,
+  );
 }
 
 class $$NotebooksTableTableManager
@@ -2312,6 +2652,7 @@ class $$NotebooksTableTableManager
                 Value<String> name = const Value.absent(),
                 Value<bool> archived = const Value.absent(),
                 Value<DateTime?> updatedAt = const Value.absent(),
+                Value<DateTime?> serverUpdatedAt = const Value.absent(),
                 Value<int> rowid = const Value.absent(),
               }) => NotebooksCompanion(
                 id: id,
@@ -2319,6 +2660,7 @@ class $$NotebooksTableTableManager
                 name: name,
                 archived: archived,
                 updatedAt: updatedAt,
+                serverUpdatedAt: serverUpdatedAt,
                 rowid: rowid,
               ),
           createCompanionCallback:
@@ -2328,6 +2670,7 @@ class $$NotebooksTableTableManager
                 required String name,
                 Value<bool> archived = const Value.absent(),
                 Value<DateTime?> updatedAt = const Value.absent(),
+                Value<DateTime?> serverUpdatedAt = const Value.absent(),
                 Value<int> rowid = const Value.absent(),
               }) => NotebooksCompanion.insert(
                 id: id,
@@ -2335,6 +2678,7 @@ class $$NotebooksTableTableManager
                 name: name,
                 archived: archived,
                 updatedAt: updatedAt,
+                serverUpdatedAt: serverUpdatedAt,
                 rowid: rowid,
               ),
           withReferenceMapper: (p0) => p0
@@ -2373,6 +2717,7 @@ typedef $$SectionsTableCreateCompanionBuilder = SectionsCompanion Function({
   required String notebookId,
   required String name,
   Value<DateTime?> updatedAt,
+  Value<DateTime?> serverUpdatedAt,
   Value<int> rowid,
 });
 typedef $$SectionsTableUpdateCompanionBuilder = SectionsCompanion Function({
@@ -2380,6 +2725,7 @@ typedef $$SectionsTableUpdateCompanionBuilder = SectionsCompanion Function({
   Value<String> notebookId,
   Value<String> name,
   Value<DateTime?> updatedAt,
+  Value<DateTime?> serverUpdatedAt,
   Value<int> rowid,
 });
 
@@ -2409,6 +2755,11 @@ class $$SectionsTableFilterComposer
 
   ColumnFilters<DateTime> get updatedAt => $composableBuilder(
     column: $table.updatedAt,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<DateTime> get serverUpdatedAt => $composableBuilder(
+    column: $table.serverUpdatedAt,
     builder: (column) => ColumnFilters(column),
   );
 }
@@ -2441,6 +2792,11 @@ class $$SectionsTableOrderingComposer
     column: $table.updatedAt,
     builder: (column) => ColumnOrderings(column),
   );
+
+  ColumnOrderings<DateTime> get serverUpdatedAt => $composableBuilder(
+    column: $table.serverUpdatedAt,
+    builder: (column) => ColumnOrderings(column),
+  );
 }
 
 class $$SectionsTableAnnotationComposer
@@ -2465,6 +2821,11 @@ class $$SectionsTableAnnotationComposer
 
   GeneratedColumn<DateTime> get updatedAt =>
       $composableBuilder(column: $table.updatedAt, builder: (column) => column);
+
+  GeneratedColumn<DateTime> get serverUpdatedAt => $composableBuilder(
+    column: $table.serverUpdatedAt,
+    builder: (column) => column,
+  );
 }
 
 class $$SectionsTableTableManager
@@ -2499,12 +2860,14 @@ class $$SectionsTableTableManager
                 Value<String> notebookId = const Value.absent(),
                 Value<String> name = const Value.absent(),
                 Value<DateTime?> updatedAt = const Value.absent(),
+                Value<DateTime?> serverUpdatedAt = const Value.absent(),
                 Value<int> rowid = const Value.absent(),
               }) => SectionsCompanion(
                 id: id,
                 notebookId: notebookId,
                 name: name,
                 updatedAt: updatedAt,
+                serverUpdatedAt: serverUpdatedAt,
                 rowid: rowid,
               ),
           createCompanionCallback:
@@ -2513,12 +2876,14 @@ class $$SectionsTableTableManager
                 required String notebookId,
                 required String name,
                 Value<DateTime?> updatedAt = const Value.absent(),
+                Value<DateTime?> serverUpdatedAt = const Value.absent(),
                 Value<int> rowid = const Value.absent(),
               }) => SectionsCompanion.insert(
                 id: id,
                 notebookId: notebookId,
                 name: name,
                 updatedAt: updatedAt,
+                serverUpdatedAt: serverUpdatedAt,
                 rowid: rowid,
               ),
           withReferenceMapper: (p0) => p0
@@ -2558,6 +2923,7 @@ typedef $$PagesTableCreateCompanionBuilder = PagesCompanion Function({
   required String title,
   required String content,
   Value<DateTime?> updatedAt,
+  Value<DateTime?> serverUpdatedAt,
   Value<int> rowid,
 });
 typedef $$PagesTableUpdateCompanionBuilder = PagesCompanion Function({
@@ -2566,6 +2932,7 @@ typedef $$PagesTableUpdateCompanionBuilder = PagesCompanion Function({
   Value<String> title,
   Value<String> content,
   Value<DateTime?> updatedAt,
+  Value<DateTime?> serverUpdatedAt,
   Value<int> rowid,
 });
 
@@ -2599,6 +2966,11 @@ class $$PagesTableFilterComposer extends Composer<_$LocalDb, $PagesTable> {
 
   ColumnFilters<DateTime> get updatedAt => $composableBuilder(
     column: $table.updatedAt,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<DateTime> get serverUpdatedAt => $composableBuilder(
+    column: $table.serverUpdatedAt,
     builder: (column) => ColumnFilters(column),
   );
 }
@@ -2635,6 +3007,11 @@ class $$PagesTableOrderingComposer extends Composer<_$LocalDb, $PagesTable> {
     column: $table.updatedAt,
     builder: (column) => ColumnOrderings(column),
   );
+
+  ColumnOrderings<DateTime> get serverUpdatedAt => $composableBuilder(
+    column: $table.serverUpdatedAt,
+    builder: (column) => ColumnOrderings(column),
+  );
 }
 
 class $$PagesTableAnnotationComposer extends Composer<_$LocalDb, $PagesTable> {
@@ -2659,6 +3036,11 @@ class $$PagesTableAnnotationComposer extends Composer<_$LocalDb, $PagesTable> {
 
   GeneratedColumn<DateTime> get updatedAt =>
       $composableBuilder(column: $table.updatedAt, builder: (column) => column);
+
+  GeneratedColumn<DateTime> get serverUpdatedAt => $composableBuilder(
+    column: $table.serverUpdatedAt,
+    builder: (column) => column,
+  );
 }
 
 class $$PagesTableTableManager
@@ -2694,6 +3076,7 @@ class $$PagesTableTableManager
                 Value<String> title = const Value.absent(),
                 Value<String> content = const Value.absent(),
                 Value<DateTime?> updatedAt = const Value.absent(),
+                Value<DateTime?> serverUpdatedAt = const Value.absent(),
                 Value<int> rowid = const Value.absent(),
               }) => PagesCompanion(
                 id: id,
@@ -2701,6 +3084,7 @@ class $$PagesTableTableManager
                 title: title,
                 content: content,
                 updatedAt: updatedAt,
+                serverUpdatedAt: serverUpdatedAt,
                 rowid: rowid,
               ),
           createCompanionCallback:
@@ -2710,6 +3094,7 @@ class $$PagesTableTableManager
                 required String title,
                 required String content,
                 Value<DateTime?> updatedAt = const Value.absent(),
+                Value<DateTime?> serverUpdatedAt = const Value.absent(),
                 Value<int> rowid = const Value.absent(),
               }) => PagesCompanion.insert(
                 id: id,
@@ -2717,6 +3102,7 @@ class $$PagesTableTableManager
                 title: title,
                 content: content,
                 updatedAt: updatedAt,
+                serverUpdatedAt: serverUpdatedAt,
                 rowid: rowid,
               ),
           withReferenceMapper: (p0) => p0
@@ -2752,6 +3138,7 @@ typedef $$OutboxTableCreateCompanionBuilder = OutboxCompanion Function({
   required String entityId,
   required String op,
   required String payload,
+  Value<DateTime?> baseUpdatedAt,
   required DateTime clientUpdatedAt,
   Value<int> attempts,
 });
@@ -2761,6 +3148,7 @@ typedef $$OutboxTableUpdateCompanionBuilder = OutboxCompanion Function({
   Value<String> entityId,
   Value<String> op,
   Value<String> payload,
+  Value<DateTime?> baseUpdatedAt,
   Value<DateTime> clientUpdatedAt,
   Value<int> attempts,
 });
@@ -2795,6 +3183,11 @@ class $$OutboxTableFilterComposer extends Composer<_$LocalDb, $OutboxTable> {
 
   ColumnFilters<String> get payload => $composableBuilder(
     column: $table.payload,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<DateTime> get baseUpdatedAt => $composableBuilder(
+    column: $table.baseUpdatedAt,
     builder: (column) => ColumnFilters(column),
   );
 
@@ -2842,6 +3235,11 @@ class $$OutboxTableOrderingComposer extends Composer<_$LocalDb, $OutboxTable> {
     builder: (column) => ColumnOrderings(column),
   );
 
+  ColumnOrderings<DateTime> get baseUpdatedAt => $composableBuilder(
+    column: $table.baseUpdatedAt,
+    builder: (column) => ColumnOrderings(column),
+  );
+
   ColumnOrderings<DateTime> get clientUpdatedAt => $composableBuilder(
     column: $table.clientUpdatedAt,
     builder: (column) => ColumnOrderings(column),
@@ -2876,6 +3274,11 @@ class $$OutboxTableAnnotationComposer
 
   GeneratedColumn<String> get payload =>
       $composableBuilder(column: $table.payload, builder: (column) => column);
+
+  GeneratedColumn<DateTime> get baseUpdatedAt => $composableBuilder(
+    column: $table.baseUpdatedAt,
+    builder: (column) => column,
+  );
 
   GeneratedColumn<DateTime> get clientUpdatedAt => $composableBuilder(
     column: $table.clientUpdatedAt,
@@ -2919,6 +3322,7 @@ class $$OutboxTableTableManager
                 Value<String> entityId = const Value.absent(),
                 Value<String> op = const Value.absent(),
                 Value<String> payload = const Value.absent(),
+                Value<DateTime?> baseUpdatedAt = const Value.absent(),
                 Value<DateTime> clientUpdatedAt = const Value.absent(),
                 Value<int> attempts = const Value.absent(),
               }) => OutboxCompanion(
@@ -2927,6 +3331,7 @@ class $$OutboxTableTableManager
                 entityId: entityId,
                 op: op,
                 payload: payload,
+                baseUpdatedAt: baseUpdatedAt,
                 clientUpdatedAt: clientUpdatedAt,
                 attempts: attempts,
               ),
@@ -2937,6 +3342,7 @@ class $$OutboxTableTableManager
                 required String entityId,
                 required String op,
                 required String payload,
+                Value<DateTime?> baseUpdatedAt = const Value.absent(),
                 required DateTime clientUpdatedAt,
                 Value<int> attempts = const Value.absent(),
               }) => OutboxCompanion.insert(
@@ -2945,6 +3351,7 @@ class $$OutboxTableTableManager
                 entityId: entityId,
                 op: op,
                 payload: payload,
+                baseUpdatedAt: baseUpdatedAt,
                 clientUpdatedAt: clientUpdatedAt,
                 attempts: attempts,
               ),

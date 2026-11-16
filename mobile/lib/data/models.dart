@@ -186,3 +186,92 @@ class NotePage {
         updatedAt: updatedAt ?? this.updatedAt,
       );
 }
+
+EntityKind entityKindFromWire(String wire) => EntityKind.values.byName(wire);
+
+/// Response of `GET /api/sync/changes`.
+class SyncChanges {
+  const SyncChanges({
+    required this.cursor,
+    this.bookshelves = const [],
+    this.notebooks = const [],
+    this.sections = const [],
+    this.pages = const [],
+    this.tombstones = const [],
+  });
+
+  final String cursor;
+  final List<Bookshelf> bookshelves;
+  final List<Notebook> notebooks;
+  final List<Section> sections;
+  final List<NotePage> pages;
+  final List<(EntityKind, String)> tombstones;
+
+  factory SyncChanges.fromJson(Map<String, dynamic> j) {
+    List<Map<String, dynamic>> list(String k) => ((j[k] as List?) ?? const []).cast<Map<String, dynamic>>();
+    return SyncChanges(
+      cursor: j['cursor'] as String,
+      bookshelves: list('bookshelves').map(Bookshelf.fromJson).toList(),
+      notebooks: list('notebooks').map(Notebook.fromJson).toList(),
+      sections: list('sections').map(Section.fromJson).toList(),
+      pages: list('pages').map(NotePage.fromJson).toList(),
+      tombstones: list('tombstones')
+          .map((t) => (entityKindFromWire(t['entity'] as String), t['id'] as String))
+          .toList(),
+    );
+  }
+}
+
+/// One queued mutation sent to `POST /api/sync/push`.
+class PushOp {
+  const PushOp({
+    required this.opId,
+    required this.entity,
+    required this.op,
+    required this.id,
+    required this.clientUpdatedAt,
+    this.baseUpdatedAt,
+    this.data,
+  });
+
+  final String opId;
+  final EntityKind entity;
+  final String op; // 'upsert' | 'delete'
+  final String id;
+  final DateTime clientUpdatedAt;
+
+  /// Server version this edit was based on (null: never seen by the server).
+  final DateTime? baseUpdatedAt;
+  final Map<String, dynamic>? data;
+
+  Map<String, dynamic> toJson() => {
+        'opId': opId,
+        'entity': entity.wire,
+        'op': op,
+        'id': id,
+        'clientUpdatedAt': clientUpdatedAt.toUtc().toIso8601String(),
+        'baseUpdatedAt': baseUpdatedAt?.toUtc().toIso8601String(),
+        'data': data,
+      };
+}
+
+/// Per-op push result: `applied`, `stale` or `rejected` (+ server's current row).
+class PushResult {
+  const PushResult({required this.opId, required this.status, this.detail, this.current, this.updatedAt});
+
+  final String opId;
+  final String status;
+  final String? detail;
+  final Map<String, dynamic>? current;
+
+  /// For `applied`: the row's new server version.
+  final DateTime? updatedAt;
+
+  factory PushResult.fromJson(Map<String, dynamic> j) => PushResult(
+        opId: j['opId'] as String,
+        status: j['status'] as String,
+        detail: j['detail'] as String?,
+        current: j['current'] as Map<String, dynamic>?,
+        updatedAt: parseServerTime(j['updatedAt']),
+      );
+}

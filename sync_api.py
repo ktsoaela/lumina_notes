@@ -1,9 +1,10 @@
 """Offline sync for mobile clients: pull changes since a cursor, push queued ops.
 
-Conflict policy (v1): last-write-wins. An op is applied when its
-``clientUpdatedAt`` is not older than the server row's ``updatedAt``; otherwise
-it is ``stale`` and the current server row is returned so the client can adopt
-it. ``updatedAt``/tombstones are maintained by DB triggers (see ``db.py``), so
+Conflict policy (v1): last-write-wins. If the server row is unchanged since the
+client's ``baseUpdatedAt``, the op applies. Otherwise (someone else edited it)
+the op applies only when its ``clientUpdatedAt`` is not older than the server
+row's ``updatedAt``; else it is ``stale`` and the current server row is returned
+so the client can adopt it. ``updatedAt``/tombstones are maintained by DB triggers (see ``db.py``), so
 legacy routes used by Electron feed the same change stream.
 """
 from __future__ import annotations
@@ -29,6 +30,10 @@ class PushOp(BaseModel):
     op: Literal["upsert", "delete"]
     id: str = Field(..., min_length=1, max_length=200)
     clientUpdatedAt: str = Field(..., min_length=1, max_length=40)
+    # The server updatedAt the client last saw for this row (from a pull or an
+    # applied push). If the row hasn't changed since, the op applies regardless
+    # of clocks; otherwise last-write-wins on clientUpdatedAt decides.
+    baseUpdatedAt: str | None = Field(None, max_length=40)
     data: dict[str, Any] | None = None
 
 
@@ -61,6 +66,11 @@ def iso(value: Any) -> str | None:
     if dt is None:
         return None
     return dt.astimezone(timezone.utc).isoformat(timespec="milliseconds").replace("+00:00", "Z")
+
+
+def _ms(dt: datetime) -> datetime:
+    """Truncate to milliseconds: the precision clients see (Postgres stores µs)."""
+    return dt.replace(microsecond=dt.microsecond // 1000 * 1000)
 
 
 def _time_param(db: Connection, dt: datetime) -> Any:
@@ -202,16 +212,19 @@ def _apply(db: Connection, user_id: int, op: PushOp, validators: dict[str, type[
         raise _Reject("Id contains invalid characters")
     try:
         client_at = parse_time(op.clientUpdatedAt)
+        base_at = parse_time(op.baseUpdatedAt) if op.baseUpdatedAt else None
     except ValueError:
-        raise _Reject("Invalid clientUpdatedAt") from None
+        raise _Reject("Invalid timestamp") from None
     assert client_at is not None
 
     row = db.execute(_SELECT_ONE[entity], (op.id,)).fetchone()
     if row is not None and row["owner_id"] != user_id:
         raise _Reject("Not found")
     server_at = parse_time(row["updatedAt"]) if row is not None else None
-    if row is not None and server_at is not None and server_at > client_at:
-        return "stale"
+    if row is not None and server_at is not None:
+        changed_since_base = base_at is None or _ms(server_at) > _ms(base_at)
+        if changed_since_base and server_at > client_at:
+            return "stale"
 
     if op.op == "delete":
         if row is None:
@@ -288,9 +301,12 @@ def push(
             status = _apply(db, user_id, op, validators)
             db.execute("RELEASE SAVEPOINT sync_op")
             res: dict[str, Any] = {"opId": op.opId, "status": status}
+            row = db.execute(_SELECT_ONE[op.entity], (op.id,)).fetchone()
             if status == "stale":
-                row = db.execute(_SELECT_ONE[op.entity], (op.id,)).fetchone()
                 res["current"] = _current(op.entity, row) if row is not None else None
+            elif row is not None:
+                # New server version; the client sends it back as baseUpdatedAt.
+                res["updatedAt"] = iso(row["updatedAt"])
             results.append(res)
         except _Reject as r:
             db.execute("ROLLBACK TO SAVEPOINT sync_op")

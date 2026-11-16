@@ -127,7 +127,7 @@ class LocalRepository implements NotesRepository {
   Future<void> savePage(NotePage page) async {
     final p = page.copyWith(updatedAt: _now());
     await db.transaction(() async {
-      await db.into(db.pages).insertOnConflictUpdate(_pageRow(p));
+      await db.into(db.pages).insertOnConflictUpdate(_pageRow(p).toCompanion(true));
       await enqueue(EntityKind.page, p.id, 'upsert', _payload(p), p.updatedAt!);
     });
     _changed();
@@ -141,22 +141,22 @@ class LocalRepository implements NotesRepository {
         case EntityKind.bookshelf:
           final r = await (db.select(db.bookshelves)..where((t) => t.id.equals(id))).getSingle();
           final b = _shelf(r).copyWith(name: name, updatedAt: at);
-          await db.into(db.bookshelves).insertOnConflictUpdate(_shelfRow(b));
+          await db.into(db.bookshelves).insertOnConflictUpdate(_shelfRow(b).toCompanion(true));
           await enqueue(kind, id, 'upsert', _payload(b), at);
         case EntityKind.notebook:
           final r = await (db.select(db.notebooks)..where((t) => t.id.equals(id))).getSingle();
           final n = _notebook(r).copyWith(name: name, updatedAt: at);
-          await db.into(db.notebooks).insertOnConflictUpdate(_notebookRow(n));
+          await db.into(db.notebooks).insertOnConflictUpdate(_notebookRow(n).toCompanion(true));
           await enqueue(kind, id, 'upsert', _payload(n), at);
         case EntityKind.section:
           final r = await (db.select(db.sections)..where((t) => t.id.equals(id))).getSingle();
           final s = _section(r).copyWith(name: name, updatedAt: at);
-          await db.into(db.sections).insertOnConflictUpdate(_sectionRow(s));
+          await db.into(db.sections).insertOnConflictUpdate(_sectionRow(s).toCompanion(true));
           await enqueue(kind, id, 'upsert', _payload(s), at);
         case EntityKind.page:
           final r = await (db.select(db.pages)..where((t) => t.id.equals(id))).getSingle();
           final p = _page(r).copyWith(title: name, updatedAt: at);
-          await db.into(db.pages).insertOnConflictUpdate(_pageRow(p));
+          await db.into(db.pages).insertOnConflictUpdate(_pageRow(p).toCompanion(true));
           await enqueue(kind, id, 'upsert', _payload(p), at);
       }
     });
@@ -172,8 +172,9 @@ class LocalRepository implements NotesRepository {
       }
     }
     await db.transaction(() async {
+      final base = await serverVersion(kind, id);
       await _deleteTree(kind, id, dropOutbox: true);
-      await enqueue(kind, id, 'delete', const {}, _now());
+      await enqueue(kind, id, 'delete', const {}, _now(), base: base);
     });
     _changed();
   }
@@ -215,8 +216,8 @@ class LocalRepository implements NotesRepository {
 
   /// Records a pending op. One row per entity: a newer mutation replaces the
   /// op/payload in place and keeps [OutboxEntry.seq], so parents stay ahead of children.
-  Future<void> enqueue(
-      EntityKind kind, String id, String op, Map<String, dynamic> payload, DateTime at) async {
+  Future<void> enqueue(EntityKind kind, String id, String op, Map<String, dynamic> payload, DateTime at,
+      {DateTime? base}) async {
     final existing = await (db.select(db.outbox)
           ..where((t) => t.entity.equals(kind.wire) & t.entityId.equals(id)))
         .getSingleOrNull();
@@ -226,6 +227,7 @@ class LocalRepository implements NotesRepository {
       op: Value(op),
       payload: Value(jsonEncode(payload)),
       clientUpdatedAt: Value(at),
+      baseUpdatedAt: Value(base),
       attempts: const Value(0),
     );
     if (existing == null) {
@@ -263,6 +265,33 @@ class LocalRepository implements NotesRepository {
         updates: {db.outbox},
       );
 
+  /// The server version last seen for a local row (null if never synced or gone).
+  Future<DateTime?> serverVersion(EntityKind kind, String id) async => switch (kind) {
+        EntityKind.bookshelf =>
+          (await (db.select(db.bookshelves)..where((t) => t.id.equals(id))).getSingleOrNull())?.serverUpdatedAt,
+        EntityKind.notebook =>
+          (await (db.select(db.notebooks)..where((t) => t.id.equals(id))).getSingleOrNull())?.serverUpdatedAt,
+        EntityKind.section =>
+          (await (db.select(db.sections)..where((t) => t.id.equals(id))).getSingleOrNull())?.serverUpdatedAt,
+        EntityKind.page =>
+          (await (db.select(db.pages)..where((t) => t.id.equals(id))).getSingleOrNull())?.serverUpdatedAt,
+      };
+
+  /// Records the server version after an applied push.
+  Future<void> markPushed(EntityKind kind, String id, DateTime serverAt) async {
+    final v = Value<DateTime?>(serverAt.toUtc());
+    switch (kind) {
+      case EntityKind.bookshelf:
+        await (db.update(db.bookshelves)..where((t) => t.id.equals(id))).write(BookshelvesCompanion(serverUpdatedAt: v));
+      case EntityKind.notebook:
+        await (db.update(db.notebooks)..where((t) => t.id.equals(id))).write(NotebooksCompanion(serverUpdatedAt: v));
+      case EntityKind.section:
+        await (db.update(db.sections)..where((t) => t.id.equals(id))).write(SectionsCompanion(serverUpdatedAt: v));
+      case EntityKind.page:
+        await (db.update(db.pages)..where((t) => t.id.equals(id))).write(PagesCompanion(serverUpdatedAt: v));
+    }
+  }
+
   Future<bool> hasPending(EntityKind kind, String id) async =>
       await (db.select(db.outbox)..where((t) => t.entity.equals(kind.wire) & t.entityId.equals(id)))
           .getSingleOrNull() !=
@@ -280,22 +309,22 @@ class LocalRepository implements NotesRepository {
     await db.transaction(() async {
       for (final b in bookshelves) {
         if (!await hasPending(EntityKind.bookshelf, b.id)) {
-          await db.into(db.bookshelves).insertOnConflictUpdate(_shelfRow(b));
+          await db.into(db.bookshelves).insertOnConflictUpdate(_shelfRow(b, server: b.updatedAt));
         }
       }
       for (final n in notebooks) {
         if (!await hasPending(EntityKind.notebook, n.id)) {
-          await db.into(db.notebooks).insertOnConflictUpdate(_notebookRow(n));
+          await db.into(db.notebooks).insertOnConflictUpdate(_notebookRow(n, server: n.updatedAt));
         }
       }
       for (final s in sections) {
         if (!await hasPending(EntityKind.section, s.id)) {
-          await db.into(db.sections).insertOnConflictUpdate(_sectionRow(s));
+          await db.into(db.sections).insertOnConflictUpdate(_sectionRow(s, server: s.updatedAt));
         }
       }
       for (final p in pages) {
         if (!await hasPending(EntityKind.page, p.id)) {
-          await db.into(db.pages).insertOnConflictUpdate(_pageRow(p));
+          await db.into(db.pages).insertOnConflictUpdate(_pageRow(p, server: p.updatedAt));
         }
       }
       for (final (kind, id) in tombstones) {
@@ -349,13 +378,24 @@ class LocalRepository implements NotesRepository {
   static NotePage _page(PageRow r) => NotePage(
       id: r.id, sectionId: r.sectionId, title: r.title, content: r.content, updatedAt: r.updatedAt);
 
-  static BookshelfRow _shelfRow(Bookshelf b) => BookshelfRow(id: b.id, name: b.name, updatedAt: b.updatedAt);
-  static NotebookRow _notebookRow(Notebook n) => NotebookRow(
-      id: n.id, bookshelfId: n.bookshelfId, name: n.name, archived: n.archived, updatedAt: n.updatedAt);
-  static SectionRow _sectionRow(Section s) =>
-      SectionRow(id: s.id, notebookId: s.notebookId, name: s.name, updatedAt: s.updatedAt);
-  static PageRow _pageRow(NotePage p) => PageRow(
-      id: p.id, sectionId: p.sectionId, title: p.title, content: p.content, updatedAt: p.updatedAt);
+  static BookshelfRow _shelfRow(Bookshelf b, {DateTime? server}) =>
+      BookshelfRow(id: b.id, name: b.name, updatedAt: b.updatedAt, serverUpdatedAt: server);
+  static NotebookRow _notebookRow(Notebook n, {DateTime? server}) => NotebookRow(
+      id: n.id,
+      bookshelfId: n.bookshelfId,
+      name: n.name,
+      archived: n.archived,
+      updatedAt: n.updatedAt,
+      serverUpdatedAt: server);
+  static SectionRow _sectionRow(Section s, {DateTime? server}) => SectionRow(
+      id: s.id, notebookId: s.notebookId, name: s.name, updatedAt: s.updatedAt, serverUpdatedAt: server);
+  static PageRow _pageRow(NotePage p, {DateTime? server}) => PageRow(
+      id: p.id,
+      sectionId: p.sectionId,
+      title: p.title,
+      content: p.content,
+      updatedAt: p.updatedAt,
+      serverUpdatedAt: server);
 }
 
 /// The local DB belongs to one (server, user). Signing in as someone else, or

@@ -22,10 +22,12 @@ class FakeApiClient extends ApiClient {
 
   /// Seeds shelf → notebook → section → page; returns the page.
   NotePage seed({String content = '# Hello'}) {
-    shelves['bs-1'] = const Bookshelf(id: 'bs-1', name: 'My bookshelf');
-    notebooksById['nb-1'] = const Notebook(id: 'nb-1', name: 'Welcome', bookshelfId: 'bs-1');
-    sectionsById['sec-1'] = const Section(id: 'sec-1', notebookId: 'nb-1', name: 'Notes');
-    final p = NotePage(id: 'page-1', sectionId: 'sec-1', title: 'Getting started', content: content);
+    final t0 = DateTime.utc(2026, 1, 1);
+    shelves['bs-1'] = Bookshelf(id: 'bs-1', name: 'My bookshelf', updatedAt: t0);
+    notebooksById['nb-1'] = Notebook(id: 'nb-1', name: 'Welcome', bookshelfId: 'bs-1', updatedAt: t0);
+    sectionsById['sec-1'] = Section(id: 'sec-1', notebookId: 'nb-1', name: 'Notes', updatedAt: t0);
+    final p = NotePage(
+        id: 'page-1', sectionId: 'sec-1', title: 'Getting started', content: content, updatedAt: t0);
     pagesById[p.id] = p;
     return p;
   }
@@ -103,6 +105,134 @@ class FakeApiClient extends ApiClient {
       case EntityKind.page:
         pagesById.remove(id);
     }
+  }
+
+  // ---------------------------------------------------------------- sync
+
+  /// Thrown by changes()/push() when set (simulates offline / expired token).
+  Object? syncError;
+
+  /// When true, push() "loses" the response: applies nothing, returns no results.
+  bool dropPushResponses = false;
+
+  final List<(EntityKind, String, DateTime)> tombstoneLog = [];
+  int pushCalls = 0;
+
+  /// Runs at the start of push() (simulates the user typing while a push is in flight).
+  Future<void> Function()? beforePush;
+
+  DateTime clock() => DateTime.now().toUtc();
+
+  /// Server-side edit (like Electron) stamped [at] (default: now).
+  void serverEditPage(String id, String content, {DateTime? at}) =>
+      pagesById[id] = pagesById[id]!.copyWith(content: content, updatedAt: at ?? clock());
+
+  void serverDelete(EntityKind kind, String id) {
+    switch (kind) {
+      case EntityKind.bookshelf:
+        shelves.remove(id);
+      case EntityKind.notebook:
+        notebooksById.remove(id);
+        for (final s in sectionsById.values.where((s) => s.notebookId == id).toList()) {
+          serverDelete(EntityKind.section, s.id);
+        }
+      case EntityKind.section:
+        sectionsById.remove(id);
+        for (final p in pagesById.values.where((p) => p.sectionId == id).toList()) {
+          serverDelete(EntityKind.page, p.id);
+        }
+      case EntityKind.page:
+        pagesById.remove(id);
+    }
+    tombstoneLog.add((kind, id, clock()));
+  }
+
+  @override
+  Future<SyncChanges> changes(String? since) async {
+    if (syncError != null) throw syncError!;
+    final cut = since == null || since.isEmpty ? null : DateTime.parse(since);
+    bool fresh(DateTime? t) => cut == null || t == null || !t.isBefore(cut);
+    final now = clock();
+    return SyncChanges(
+      cursor: now.subtract(const Duration(seconds: 5)).toIso8601String(),
+      bookshelves: shelves.values.where((x) => fresh(x.updatedAt)).toList(),
+      notebooks: notebooksById.values.where((x) => fresh(x.updatedAt)).toList(),
+      sections: sectionsById.values.where((x) => fresh(x.updatedAt)).toList(),
+      pages: pagesById.values.where((x) => fresh(x.updatedAt)).toList(),
+      tombstones: tombstoneLog.where((t) => fresh(t.$3)).map((t) => (t.$1, t.$2)).toList(),
+    );
+  }
+
+  Map<String, dynamic>? _row(EntityKind k, String id) => switch (k) {
+        EntityKind.bookshelf => shelves[id]?.toJson(),
+        EntityKind.notebook => notebooksById[id]?.toJson(),
+        EntityKind.section => sectionsById[id]?.toJson(),
+        EntityKind.page => pagesById[id]?.toJson(),
+      };
+
+  bool _parentExists(EntityKind k, Map<String, dynamic> d) => switch (k) {
+        EntityKind.bookshelf => true,
+        EntityKind.notebook => shelves.containsKey(d['bookshelfId']),
+        EntityKind.section => notebooksById.containsKey(d['notebookId']),
+        EntityKind.page => sectionsById.containsKey(d['sectionId']),
+      };
+
+  @override
+  Future<List<PushResult>> push(List<PushOp> ops) async {
+    pushCalls++;
+    if (syncError != null) throw syncError!;
+    await beforePush?.call();
+    if (dropPushResponses) return const [];
+    final out = <PushResult>[];
+    for (final op in ops) {
+      final row = _row(op.entity, op.id);
+      final serverAt = row == null ? null : parseServerTime(row['updatedAt']);
+      Map<String, dynamic>? current() {
+        final r = _row(op.entity, op.id);
+        return r == null ? null : {'entity': op.entity.wire, ...r};
+      }
+
+      final changedSinceBase = op.baseUpdatedAt == null || serverAt == null || serverAt.isAfter(op.baseUpdatedAt!);
+      if (serverAt != null && changedSinceBase && serverAt.isAfter(op.clientUpdatedAt)) {
+        out.add(PushResult(opId: op.opId, status: 'stale', current: current()));
+        continue;
+      }
+      if (op.op == 'delete') {
+        if (row != null) serverDelete(op.entity, op.id);
+        out.add(PushResult(opId: op.opId, status: 'applied'));
+        continue;
+      }
+      final d = op.data ?? const {};
+      if (!_parentExists(op.entity, d)) {
+        out.add(PushResult(opId: op.opId, status: 'rejected', detail: 'Parent not found', current: current()));
+        continue;
+      }
+      final at = clock();
+      switch (op.entity) {
+        case EntityKind.bookshelf:
+          shelves[op.id] = Bookshelf(id: op.id, name: d['name'] as String, updatedAt: at);
+        case EntityKind.notebook:
+          notebooksById[op.id] = Notebook(
+              id: op.id,
+              name: d['name'] as String,
+              bookshelfId: d['bookshelfId'] as String,
+              archived: d['archived'] == true,
+              updatedAt: at);
+        case EntityKind.section:
+          sectionsById[op.id] =
+              Section(id: op.id, notebookId: d['notebookId'] as String, name: d['name'] as String, updatedAt: at);
+        case EntityKind.page:
+          pagesById[op.id] = NotePage(
+              id: op.id,
+              sectionId: d['sectionId'] as String,
+              title: d['title'] as String,
+              content: d['content'] as String,
+              updatedAt: at);
+      }
+      tombstoneLog.removeWhere((t) => t.$1 == op.entity && t.$2 == op.id);
+      out.add(PushResult(opId: op.opId, status: 'applied', updatedAt: at));
+    }
+    return out;
   }
 }
 

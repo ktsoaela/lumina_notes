@@ -11,6 +11,8 @@ import unittest
 import uuid
 from pathlib import Path
 
+RUN = uuid.uuid4().hex[:8]
+
 
 def _reload_app(env: dict[str, str | None]):
     for k, v in env.items():
@@ -167,31 +169,31 @@ class SyncApiTestsSqlite(unittest.TestCase):
     def test_push_upsert_creates_page_visible_to_legacy_list(self) -> None:
         h, shelf = self._user()
         _, sec, _ = self._tree(h, shelf)
-        res = self._push(h, [self._op("page", "page-m1", {"sectionId": sec, "title": "Mobile", "content": "# hi"})])
+        res = self._push(h, [self._op("page", f"page-m1-{RUN}", {"sectionId": sec, "title": "Mobile", "content": "# hi"})])
         self.assertEqual(res[0]["status"], "applied", res)
         listed = self.client.get(f"/api/pages/{sec}", headers=h).json()
-        self.assertIn("page-m1", [p["id"] for p in listed])
+        self.assertIn(f"page-m1-{RUN}", [p["id"] for p in listed])
 
     def test_push_creates_whole_tree_in_order(self) -> None:
-        h, shelf = self._user()
+        h, _ = self._user()
         ops = [
-            self._op("bookshelf", "bs-m", {"name": "Phone shelf"}),
-            self._op("notebook", "nb-m", {"bookshelfId": "bs-m", "name": "N", "archived": False}),
-            self._op("section", "sec-m", {"notebookId": "nb-m", "name": "S"}),
-            self._op("page", "page-m", {"sectionId": "sec-m", "title": "P", "content": "x"}),
+            self._op("bookshelf", f"bs-m-{RUN}", {"name": "Phone shelf"}),
+            self._op("notebook", f"nb-m-{RUN}", {"bookshelfId": f"bs-m-{RUN}", "name": "N", "archived": False}),
+            self._op("section", f"sec-m-{RUN}", {"notebookId": f"nb-m-{RUN}", "name": "S"}),
+            self._op("page", f"page-m-{RUN}", {"sectionId": f"sec-m-{RUN}", "title": "P", "content": "x"}),
         ]
         self.assertEqual([r["status"] for r in self._push(h, ops)], ["applied"] * 4)
-        notebooks = self.client.get("/api/notebooks", headers=h, params={"bookshelfId": "bs-m"}).json()
-        self.assertEqual([n["id"] for n in notebooks], ["nb-m"])
+        notebooks = self.client.get("/api/notebooks", headers=h, params={"bookshelfId": f"bs-m-{RUN}"}).json()
+        self.assertEqual([n["id"] for n in notebooks], [f"nb-m-{RUN}"])
 
     def test_push_upsert_is_idempotent(self) -> None:
         h, shelf = self._user()
         _, sec, _ = self._tree(h, shelf)
-        op = self._op("page", "page-idem", {"sectionId": sec, "title": "T", "content": "x"})
+        op = self._op("page", f"page-idem-{RUN}", {"sectionId": sec, "title": "T", "content": "x"})
         self.assertEqual(self._push(h, [op])[0]["status"], "applied")
         self.assertEqual(self._push(h, [op])[0]["status"], "applied")
         listed = self.client.get(f"/api/pages/{sec}", headers=h).json()
-        self.assertEqual(sum(1 for p in listed if p["id"] == "page-idem"), 1)
+        self.assertEqual(sum(1 for p in listed if p["id"] == f"page-idem-{RUN}"), 1)
 
     def test_push_stale_returns_current(self) -> None:
         h, shelf = self._user()
@@ -213,11 +215,37 @@ class SyncApiTestsSqlite(unittest.TestCase):
         listed = {p["id"]: p for p in self.client.get(f"/api/pages/{sec}", headers=h).json()}
         self.assertEqual(listed[page]["content"], "phone")
 
+    def test_push_with_base_applies_even_if_client_clock_behind(self) -> None:
+        """A follow-up edit queued while the previous push was in flight carries the
+        server version it last saw (base); it must apply, not come back stale."""
+        h, shelf = self._user()
+        _, sec, page = self._tree(h, shelf)
+        first = self._push(h, [self._op("page", page, {"sectionId": sec, "title": "P", "content": "first"})])[0]
+        self.assertEqual(first["status"], "applied")
+        self.assertTrue(first["updatedAt"].endswith("Z"))
+        op = self._op("page", page, {"sectionId": sec, "title": "P", "content": "second"}, at="2000-01-01T00:00:00Z")
+        op["baseUpdatedAt"] = first["updatedAt"]
+        self.assertEqual(self._push(h, [op])[0]["status"], "applied")
+        listed = {p["id"]: p for p in self.client.get(f"/api/pages/{sec}", headers=h).json()}
+        self.assertEqual(listed[page]["content"], "second")
+
+    def test_push_with_old_base_after_other_edit_is_lww(self) -> None:
+        h, shelf = self._user()
+        _, sec, page = self._tree(h, shelf)
+        base = next(p for p in self._changes(h)["pages"] if p["id"] == page)["updatedAt"]
+        time.sleep(0.01)
+        self.client.put(f"/api/pages/{page}", headers=h, json={"title": "P", "content": "desktop"})
+        op = self._op("page", page, {"sectionId": sec, "title": "P", "content": "phone"}, at="2000-01-01T00:00:00Z")
+        op["baseUpdatedAt"] = base
+        res = self._push(h, [op])[0]
+        self.assertEqual(res["status"], "stale")
+        self.assertEqual(res["current"]["content"], "desktop")
+
     def test_push_child_of_deleted_parent_rejected(self) -> None:
         h, shelf = self._user()
         nb, sec, _ = self._tree(h, shelf)
         self.client.delete(f"/api/notebooks/{nb}", headers=h)
-        res = self._push(h, [self._op("page", "page-orphan", {"sectionId": sec, "title": "T", "content": ""})])
+        res = self._push(h, [self._op("page", f"page-orphan-{RUN}", {"sectionId": sec, "title": "T", "content": ""})])
         self.assertEqual(res[0]["status"], "rejected")
         self.assertIsNone(res[0]["current"])
 
@@ -235,7 +263,7 @@ class SyncApiTestsSqlite(unittest.TestCase):
 
     def test_push_delete_missing_is_applied(self) -> None:
         h, _ = self._user()
-        res = self._push(h, [self._op("page", "page-never", op="delete")])
+        res = self._push(h, [self._op("page", f"page-never-{RUN}", op="delete")])
         self.assertEqual(res[0]["status"], "applied")
 
     def test_push_delete_cascades_and_tombstones(self) -> None:
@@ -273,8 +301,8 @@ class SyncApiTestsSqlite(unittest.TestCase):
             h,
             [
                 self._op("page", "bad id!", {"sectionId": sec, "title": "T", "content": ""}),
-                self._op("section", "sec-noname", {"notebookId": "nb-x", "name": "   "}),
-                self._op("page", "page-ok", {"sectionId": sec, "title": "T", "content": ""}),
+                self._op("section", f"sec-noname-{RUN}", {"notebookId": "nb-x", "name": "   "}),
+                self._op("page", f"page-ok-{RUN}", {"sectionId": sec, "title": "T", "content": ""}),
             ],
         )
         self.assertEqual([r["status"] for r in res], ["rejected", "rejected", "applied"])
@@ -282,7 +310,7 @@ class SyncApiTestsSqlite(unittest.TestCase):
 
     def test_push_limit(self) -> None:
         h, _ = self._user()
-        ops = [self._op("page", f"page-{i}", op="delete") for i in range(501)]
+        ops = [self._op("page", f"page-{i}-{RUN}", op="delete") for i in range(501)]
         r = self.client.post("/api/sync/push", headers=h, json={"ops": ops})
         self.assertEqual(r.status_code, 422)
 
