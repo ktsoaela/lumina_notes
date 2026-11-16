@@ -5,6 +5,7 @@ import 'data/local_db.dart';
 import 'data/local_repository.dart';
 import 'data/models.dart';
 import 'data/notes_repository.dart';
+import 'data/pair_link.dart';
 import 'data/session_store.dart';
 import 'sync/sync_engine.dart';
 import 'sync/sync_scheduler.dart';
@@ -86,6 +87,20 @@ class AppServices extends ChangeNotifier {
     await session.saveSession(auth);
     _connect();
     notifyListeners();
+  }
+
+  /// Applies a scanned / opened pairing link: saves its server, then exchanges
+  /// the code for a session. If the code is rejected the server URL stays saved
+  /// (so the login form can be used) and the error is rethrown.
+  ///
+  /// Refused while signed in, so a stray link never switches account or server.
+  Future<void> applyPairLink(PairLink link) async {
+    if (session.isSignedIn) throw const RuleException('Sign out first to switch servers');
+    await session.saveServerUrl(link.serverUrl);
+    final code = link.code;
+    if (code == null) return;
+    final auth = await apiFor(link.serverUrl).pairComplete(code, deviceName: 'Lumina mobile');
+    await signIn(link.serverUrl, auth);
   }
 
   /// Signs out and wipes the local DB (including unsynced changes).

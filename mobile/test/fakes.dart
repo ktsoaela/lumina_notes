@@ -48,6 +48,17 @@ class FakeApiClient extends ApiClient {
     return authResult;
   }
 
+  /// When set, pairComplete throws this.
+  Object? pairError;
+  final List<String> pairedCodes = [];
+
+  @override
+  Future<AuthResult> pairComplete(String code, {String? deviceName}) async {
+    if (pairError != null) throw pairError!;
+    pairedCodes.add(code);
+    return authResult;
+  }
+
   @override
   Future<User> me() async => authResult.user;
 

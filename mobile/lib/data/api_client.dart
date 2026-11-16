@@ -125,6 +125,13 @@ class ApiClient {
         if (username != null && username.trim().isNotEmpty) 'username': username.trim(),
       }));
 
+  /// Exchange a pairing code from Devices & sync for a session (no password).
+  Future<AuthResult> pairComplete(String code, {String? deviceName}) async =>
+      AuthResult.fromJson(await _send('POST', '/api/pair/complete', body: {
+        'code': code,
+        if (deviceName != null && deviceName.trim().isNotEmpty) 'deviceName': deviceName.trim(),
+      }));
+
   Future<User> me() async => User.fromJson(await _send('GET', '/api/auth/me'));
 
   // ---- hierarchy reads ----

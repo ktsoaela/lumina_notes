@@ -87,6 +87,13 @@ class SessionStore extends ChangeNotifier {
     notifyListeners();
   }
 
+  /// "Change server": forget the server so the connect screen asks to scan again.
+  Future<void> clearServerUrl() async {
+    serverUrl = null;
+    await _kv.delete(_kUrl);
+    notifyListeners();
+  }
+
   Future<void> saveSession(AuthResult auth) async {
     token = auth.token;
     user = auth.user;
