@@ -103,8 +103,10 @@
     "icon": "src/assets/book_colour_no_outline.png",
     "files": [
       "electron/**/*",
-      "src/assets/**/*"
+      "src/assets/**/*",
+      "!node_modules/**"
     ],
+    "npmRebuild": false,
     "extraResources": [
       {
         "from": "release/LuminaApi",
